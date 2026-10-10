@@ -8,6 +8,18 @@ Pre-code. `RAD·CUT - PRD.md` is the source of truth for scope, requirements (FR
 
 Phase 0 (three feasibility spikes on Windows desktop) comes before any MVP build: shortcut → task pane with focus in the search box; REF field to a hidden bookmark survives F9 and the hyperlink jumps; bookmark insertion under tracked changes and SharePoint co-authoring.
 
+## Spec-driven workflow (spec-kit)
+
+Features are built with GitHub spec-kit (Claude integration, PowerShell scripts). Core flow: `/speckit-constitution` → `/speckit-specify` → `/speckit-clarify` (optional) → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` (optional) → `/speckit-implement`. The constitution lives in `.specify/memory/constitution.md`; feature artefacts (spec, plan, tasks) go under `specs/<feature>/`. Specs must not copy internal content from the gitignored PRD or `planning/` beyond what is fit for the public repo.
+
+Community extensions (each offers an optional hook after the matching core step):
+
+- **agent-assign:** `/speckit-agent-assign-assign` maps tasks to Claude Code agents; `-validate` and `-execute` check and run them.
+- **refine:** when requirements change, use `/speckit-refine-update` on the spec, then `/speckit-refine-propagate` to update plan and tasks, rather than regenerating. `/speckit-refine-status` shows stale artefacts.
+- **review:** `/speckit-review-run` is a read-only post-implementation review (code, comments, tests, errors, types, simplify); toggles in `.specify/extensions/review/review-config.yml`.
+
+`review` v1.0.1 is installed from a locally patched copy (its manifest's script names had file extensions, which the current CLI rejects) and its skill files were converted from symlinks to real files, because this repo uses `core.symlinks=false`. `specify extension update` will not upgrade it; reinstall from the catalogue once upstream fixes the manifest. Do not reinstall any extension with `--dev` without converting the resulting `.claude/skills` symlinks.
+
 ## What it is
 
 RAD·CUT (RadBeri) is a Word add-in in TypeScript on Office.js. Shortcut (default Ctrl+Alt+K) → palette of the document's headings → fuzzy filter → Enter inserts a native Word cross-reference at the cursor. Windows desktop only for the MVP; Mac and web are phase 4 on the same codebase.
