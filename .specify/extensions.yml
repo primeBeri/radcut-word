@@ -1,0 +1,43 @@
+installed:
+- agent-assign
+- refine
+- review
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_tasks:
+  - extension: agent-assign
+    command: speckit.agent-assign.assign
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Assign agents to the generated tasks?
+    description: Automatically assign specialized agents to tasks after generation
+    condition: null
+  after_specify:
+  - extension: refine
+    command: speckit.refine.status
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Check artifact sync status after specification?
+    description: Show sync status after spec generation
+    condition: null
+  after_plan:
+  - extension: refine
+    command: speckit.refine.status
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Check artifact sync status after planning?
+    description: Show sync status after plan generation
+    condition: null
+  after_implement:
+  - extension: review
+    command: speckit.review.run
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run PR review on implemented changes?
+    description: Comprehensive review after implementation
+    condition: null

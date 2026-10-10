@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "agent-assign": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:5e5c8ca8e58d032fa4485c4c06f270623911fd12f1e8a7e0dec971531d7a8802",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.agent-assign.assign",
+          "speckit.agent-assign.validate",
+          "speckit.agent-assign.execute"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-10T09:33:41.992912+00:00"
+    },
+    "refine": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:f81d942a057a69e00d223e0c2154de0e1040b33f80f9acfc1a15a6e3762ae22b",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.refine.update",
+          "speckit.refine.propagate",
+          "speckit.refine.diff",
+          "speckit.refine.status"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-10T09:33:42.736864+00:00"
+    },
+    "review": {
+      "version": "1.0.1",
+      "source": "local",
+      "manifest_hash": "sha256:38ced2b3bd4dc0d06598ebd60898a46632ed170511b6a1f42efc4208fd496601",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.review.run",
+          "speckit.review.code",
+          "speckit.review.comments",
+          "speckit.review.tests",
+          "speckit.review.errors",
+          "speckit.review.types",
+          "speckit.review.simplify"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-10T09:34:30.087000+00:00"
+    }
+  }
+}
