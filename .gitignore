@@ -1,0 +1,56 @@
+# Private planning documents
+*PRD*.md
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Office add-in dev certificates and local env
+.env
+.env.*
+*.pem
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+.claude/settings.local.json
+# Windows reserved names and generic build output
+nul
+nul.*
+con
+con.*
+prn
+prn.*
+aux
+aux.*
+com[1-9]
+com[1-9].*
+lpt[1-9]
+lpt[1-9].*
+*.swp
+*.swo
+*~
+*.code-workspace
+!.env.example
+.next/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+.cache/
+tmp/
+
+# Internal planning drafts (never commit)
+/planning/
