@@ -1,0 +1,75 @@
+import type { FormatPart } from "../formats/types";
+import type { HeadingKey, HeadingSnapshot } from "../headings/types";
+import type { Declined, InsertionPoint, LocationPolicy } from "../location/types";
+
+/**
+ * The core's only view of a Word document (contracts/document-gateway.md). Implemented by
+ * FakeGateway (tests) and OfficeJsGateway (adapter); both pass the shared contract suite.
+ */
+export interface IDocumentGateway {
+  /** Every heading paragraph in document order, with usable bookmark if present. */
+  readHeadings(): Promise<HeadingSnapshot>;
+
+  /** Read Word's current selection as an insertion point, or say why it is not allowed. Read-only. */
+  checkInsertionPoint(policy: LocationPolicy): Promise<InsertionPoint | Declined>;
+
+  /** All bookmark names in the document, including hidden ones. */
+  listBookmarkNames(): Promise<string[]>;
+
+  /**
+   * Insert a reference in ONE document transaction: re-read the selection and re-check location
+   * and protection, stop with `needsConfirmation` for an unconfirmed extended selection, ensure a
+   * bookmark on the target (reuse a usable one, else create `newBookmarkName`), then write the
+   * format's parts and update the new fields. On any failure, decline or `needsConfirmation` the
+   * document is left unchanged. All writes go in one `sync` (one Undo step, FR-013).
+   */
+  insertReference(request: InsertReferenceRequest): Promise<InsertReferenceResult>;
+
+  /** Put the caret back in the document: after the reference if given, else where it is now. */
+  returnFocus(after?: InsertedReference): Promise<void>;
+
+  /** Every REF/PAGEREF field and its target bookmark (backlinks-ready; not used by the MVP UI). */
+  readReferences(): Promise<ReferenceRecord[]>;
+}
+
+export interface InsertReferenceRequest {
+  /** Provisional keys are re-validated against the live document. */
+  readonly target: HeadingKey;
+  /** Fingerprint (level + location + text) when the palette listed the heading. */
+  readonly expectedFingerprint: string;
+  /** Already validated by the core. */
+  readonly parts: readonly FormatPart[];
+  /** Used only if no usable bookmark exists. */
+  readonly newBookmarkName: string;
+  readonly policy: LocationPolicy;
+  /** True only after the user confirmed the selection warning (FR-008a). */
+  readonly confirmExtendedSelection: boolean;
+}
+
+/** Opaque handle the gateway that made it uses to put the caret after the reference. */
+export interface InsertedReference {
+  readonly id: string;
+}
+
+export type InsertReferenceResult =
+  | {
+      readonly ok: true;
+      readonly reference: InsertedReference;
+      readonly bookmark: string;
+      readonly bookmarkCreated: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "staleTarget" | "hostError" | "needsConfirmation";
+      readonly detail?: string;
+    }
+  /** Cursor now disallowed, self reference, or document protected. */
+  | { readonly ok: false; readonly reason: "declined"; readonly declined: Declined };
+
+export interface ReferenceRecord {
+  readonly bookmark: string;
+  readonly fieldType: "ref" | "pageRef";
+  /** e.g. ["\w", "\h"] */
+  readonly switches: readonly string[];
+  readonly location: "main" | "footnote" | "endnote" | "other";
+}

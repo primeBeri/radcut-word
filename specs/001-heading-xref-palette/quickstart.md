@@ -62,14 +62,14 @@ In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run "Contract suite
 | 2 | Press the shortcut, Esc | No change; caret where it was | US1 5 |
 | 3 | Ctrl+A, F9; move section 4.3 above 4.1; Ctrl+A, F9 | Reference shows the new number; Ctrl+click jumps to the heading | US1 6–7, SC-005 |
 | 4 | Insert twice to a heading that already has a bookmark; check Insert → Bookmark (hidden shown) | No new bookmark | US1 8, SC-006 |
-| 5 | Insert, then Ctrl+Z once | Reference and any new bookmark gone (record any exception) | US1 10, SC-009 |
+| 5 | Insert with no selection, with a selected word, and with a confirmed two-paragraph selection; Ctrl+Z once after each; repeat with tracking on | Each time the document is exactly as before (reference, new bookmark and replaced text); more than one Undo step is a release blocker | US1 10, FR-013, SC-009 |
 | 6 | Save, sideload removed (or another PC), open, Ctrl+A, F9 | All references correct | US1 9, SC-007 |
 | 7 | Open palette, Tab through all formats, Shift+Tab back; insert each | Preview matches inserted text; all update on F9 | US2, SC-004 |
 | 8 | Settings → default "number"; restart Word; open palette | Palette starts on "number" | US2 4–5 |
 | 9 | Add template `see §{number} {text}, {abovebelow}`; try `{num}` | First appears in the cycle; second rejected with message | US3 |
 | 10 | Ribbon "Cross-reference"; change shortcut; try Ctrl+@; switch to UK layout | Same palette; new shortcut works, old one does not; Ctrl+@ refused; no stray character typed | US4 |
 | 11 | Insert to two headings; reopen palette with empty query | Both listed first under "Recent", most recent at top | US5 |
-| 12 | Cursor in a heading, Title, header, comment, text box; protected document | Clear message; no change | FR-001a, edge cases |
+| 12 | Cursor in a heading, Title, header, comment, text box; protected document | Clear message (for heading and Title, it names the "Allow references in headings" setting); no change | FR-001a, edge cases |
 | 13 | Cursor in a caption, quote, table cell, footnote | Insert works | FR-001a |
 | 14 | `tracked.docx`: insert; accept all; reject on a copy | Tracked insertion; reference valid after accept; nothing broken after reject | Edge cases |
 | 15 | Windows dark mode + Office black theme; Windows "Animation effects" off | Palette dark; no motion | FR-025, FR-026 |
@@ -80,3 +80,7 @@ In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run "Contract suite
 | 20 | Insert inside bold text and inside italic text; insert a reference to a heading that has direct bold on one word; F9 | Each reference matches the text around it, not the heading; unchanged after F9 | FR-012a |
 | 21 | Open the palette, click into a different paragraph of the document, then into a heading; return to the palette each time and press Enter | First Enter inserts at the new paragraph; second shows the "cannot insert in headings" message, palette stays open, no change | FR-008 |
 | 22 | `tracked.docx`: delete a heading with tracking on; open the palette. Insert a reference, then reject it | Deleted heading not listed; after reject the reference is gone and any leftover hidden bookmark is reused by the next insert | FR-003, edge cases |
+| 23 | Select a few words and press the shortcut, Enter. Then select across two paragraphs (and, separately, a table) and press Enter; Esc; Enter, Enter | Words replaced without warning. Multi-paragraph/table: warning shown, nothing changed; Esc keeps the selection; second Enter replaces it; one Ctrl+Z restores it | FR-008a, FR-013 |
+| 24 | Settings → turn on "Allow references in headings" (read the explanation); put the cursor in heading 4.3 and open the palette; insert a reference to 4.1. Turn the setting off again | 4.3 itself is not listed; the reference goes into the heading; with the setting off the heading message returns | FR-001b |
+| 25 | In `spec-300.docx`, open the palette; reference the headings in the table cell, text box, footnote, endnote, header and footer; F9; Ctrl+click each. Settings → turn off "Show headings outside the main text"; reopen | Each is listed with its badge; every reference resolves and jumps. With the setting off they are not listed | FR-003, FR-003a |
+| 26 | Insert a heading-number and a heading-text reference with Word's Insert → Cross-reference, then the same with RAD·CUT; Alt+F9 to compare field codes; check both bookmarks' extent | Same field types, switches and bookmark extent; only the bookmark names differ (`_Ref…` and `_RC…`); bookmarks and fields made by Word are untouched | FR-012, FR-011a |

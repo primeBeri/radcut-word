@@ -54,6 +54,18 @@ KeyboardShortcuts 1.1 = 2408.
   add-ins unless triggered by an explicit user action. This MVP is sideloaded, so it does not
   apply now; whether a keyboard shortcut counts as explicit user action must be re-checked before
   store publication.
+- **Outcome (spike 1, 2026-10-11, Word 16.0.20430.20092)**: the task pane takes keyboard focus
+  when opened by the shortcut. `showAsTaskpane()` + `focus()` gives `activeElementIsProbe: true`
+  in 5–21 ms, typed keys reach the input with `clickedSinceShow: false`, and showing the pane does
+  not move Word's selection. Esc → `hide()` + `range.select()` returns the caret: typing lands at
+  the original position. **Decision: task pane; the dialog fallback is not needed** (1.10 not
+  run). Ribbon: the first click opened the pane, later clicks did nothing while the shortcut
+  kept working, because the handler never called `event.completed()` and Word treated the first
+  command as still running. **Decision: every `Office.actions.associate` handler calls
+  `event?.completed()` when done** (shortcuts pass no event); fixed in the spike pane, required
+  in `OfficeHostShell` (T050).
+  Sideloading note: Word ignores a registry-sideloaded manifest whose path has non-ASCII
+  characters, so the start/stop scripts sideload a copy (see CLAUDE.md).
 
 ## R4. Default shortcut and customisation — SPIKE 1
 
@@ -74,13 +86,26 @@ KeyboardShortcuts 1.1 = 2408.
     "no shortcut assigned" in that case.
   - AltGr is sent as Ctrl+Alt on Windows, so Ctrl+Alt+letter can collide on European layouts.
     UK AltGr only affects vowels and 4; K is believed safe but is tested in the spike.
+- **Outcome (spike 1, 2026-10-11, Word 16.0.20430.20092)**: `areShortcutsInUse` reports
+  Ctrl+Alt+K **in use** and Ctrl+Shift+Alt+K free; on first press Word showed its conflict
+  prompt and, once our action was chosen, Ctrl+Alt+K opened the pane reliably. On the UK layout
+  Ctrl+Alt+K types no character and AltGr+K also opened the pane. Ctrl+, reaches the pane and
+  Word does nothing with it, so it stays the settings shortcut. A second run checked every
+  two-modifier + letter/digit combination with `areShortcutsInUse`: free were Ctrl+Alt + A B E J Q
+  R T W X 0 4 6 7 8 9, Ctrl+Shift + C Y 0–7 9, Alt+Shift + B G H J Q S V W Y Z 0. The list is not
+  complete: Ctrl+Shift+C (copy formatting) and Ctrl+Alt+R/T (® and ™) are Word shortcuts
+  reported as free. **Decision (product owner, 2026-10-11): default `Ctrl+Shift+Y`.** Three keys
+  rather than four (Ctrl+Shift+Alt+K was rejected as too long), free in Word, and with no Alt
+  there is no AltGr clash on any layout. It must be pressed once in Word to confirm no prompt
+  appears before release; if one does, the next choice is Ctrl+Alt+J.
 
 ## R5. Inserting cross-references — SPIKE 2
 
 - **Decision**: In one `Word.run` and one `sync`: ensure the target bookmark, then insert literal
   text and fields at the captured range with `Range.insertField(location, Word.FieldType.ref |
   pageRef, "<bookmark> <switches>")` (WordApi 1.5), then `updateResult()` on each new field.
-- **Format → field mapping** (all with `\h`):
+- **Format → field mapping** (all with `\h`, and `\* CHARFORMAT` appended to every field per
+  the spike 2 outcome below):
 
   | Format | Composition |
   |---|---|
@@ -106,8 +131,39 @@ KeyboardShortcuts 1.1 = 2408.
 - **Fallback**: `insertOoxml` with complex fields (`w:fldChar` begin/separate/end, `w:instrText`,
   cached result run), followed by `updateResult()`. Watch for extra paragraphs and imported
   styles.
-- **Undo (FR-013)**: there is no undo-grouping API for Word. All writes go in one `sync`; spike 2
-  measures how many Undo presses remove an insertion. Any case over one is documented.
+- **Undo (FR-013, mandatory)**: there is no undo-grouping API for Word. All writes (selection
+  replacement, bookmark, literals, fields, `updateResult()`) go in one `Word.run` and one `sync`.
+  Spike 2 counts the Undo presses that restore the document for: no selection, an inline
+  selection, a confirmed extended selection, a reused bookmark and a new bookmark; spike 3
+  repeats them with tracking on. If the primary path needs more than one, try the OOXML path and
+  write-order variations (bookmark first or last). If no path gives one step, stop: it is a
+  release blocker raised with the product owner (plan "Delivery sequence"), not a documented
+  exception.
+- **Match Word's own dialog** (spec Assumptions): spike 2 also inserts a heading-text and a
+  heading-number reference with Insert → Cross-reference and compares field codes, switches,
+  bookmark extent and resulting formatting with ours. Differences other than the bookmark name
+  are fixed in the mapping above or recorded here with a reason.
+- **Outcome (spike 2, 2026-10-11, Word 16.0.20430.20092)**: `insertField` works for every format
+  (codes as in the mapping, e.g. ` REF _RC… \w \h `) and gives the right result without further
+  action. **One Undo step** in every case: no selection, inline selection, two-paragraph
+  selection, new bookmark (written first or last), reused `_Ref` bookmark, the six-story run
+  (2.11), and with tracking on (3.2). F9 and Ctrl+click work. **Decision: `insertField` path;
+  bookmark first; the OOXML fallback (T049) is not needed.**
+  - Formatting: literals and the number, page and above/below fields take the surrounding bold
+    or italic; the **heading-text REF does not**: it shows the heading's own character
+    formatting, including direct bold inside the heading (2.9). That breaks FR-012a, so per the
+    rule above **`\* CHARFORMAT` is added to every field**. Verified in Word: with it, all seven
+    formats inserted into bold and into italic text match the surrounding formatting in every
+    part, including the heading text with direct bold, before and after F9.
+  - Word's dialog: heading number = ` REF _Ref… \r \h `, heading text = ` REF _Ref… \h `, no
+    `\* MERGEFORMAT`, same font as ours. The only difference is `\r` (relative number) where we
+    use `\w` (full number); `\w` is kept on purpose, because the format is defined as the full
+    number (FR-012) and `\r` drops levels shared with the reference's position.
+  - Moving a heading (2.7): the reference to the moved heading followed it. A reference to
+    "Means of escape" then showed "Fire strategy" in heading style: the pasted heading landed at
+    the start of the bookmarked text and Word extended the bookmark over it. This is Word's
+    behaviour for any bookmark that starts a paragraph (its own `_Ref` bookmarks have the same
+    extent), so it is documented in `docs/known-behaviours.md` (T100), not worked around.
 
 ## R6. Bookmarks
 
@@ -131,16 +187,26 @@ KeyboardShortcuts 1.1 = 2408.
     (`getBookmarkRangeOrNullObject(name)` then `compareLocationWith`, WordApi 1.4/1.3). Spike 2
     confirms this works for hidden bookmarks and `_Toc…` bookmarks.
   - Create: `range.insertBookmark(name)` over the heading text (paragraph range minus the
-    paragraph mark).
+    paragraph mark), the same extent Word's cross-reference dialog gives its `_Ref…` bookmarks.
+  - Hands off (FR-011a): bookmarks and fields the add-in did not create are never renamed,
+    moved, removed or flagged, whatever their state. Advice on bad practice is for the backlinks
+    phase.
   - Naming: `_RC` + 10 characters from `[a-z0-9]` (random), checked against all existing names
     (case-insensitive) and regenerated on collision. 13 characters, inside the 40 limit; only
     letters, digits and underscore; the leading `_` hides it. The name never derives from heading
-    text or position, so it is stable under edits (FR-012).
+    text or position, so it is stable under edits (FR-012). Word's own `_Ref` + digits style was
+    considered and declined (2026-10-10) so the add-in's bookmarks stay identifiable.
 - **Rationale**: Word's naming rules (alphanumeric and underscore, start with a letter or `_` for
   hidden, max 40, case-insensitive; inserting an existing name moves it) are documented on
   `Word.Range.insertBookmark`.
 - **Alternatives**: deriving names from heading text like Word's `_Ref` + number (rejected:
   leaks content shape, no benefit); always creating a new bookmark (violates FR-011).
+- **Outcome (spike 2, 2026-10-11, Word 16.0.20430.20092)**: `getRange("Content")` excludes the
+  paragraph mark. `compareLocationWith` works on hidden bookmarks: `_Toc…`, `_Ref…`, `_Hlk…`,
+  `zeta` and `Alpha` report `Equal`; `WholeParagraph` reports `ContainsStart` and `PartOfText`
+  `Inside`, so the usability rule can be decided from the relation alone. Reusing `_Ref242545576`
+  for "Scope" created no bookmark; "Means of escape" (only `_Hlk`/`_Toc`) got a new `_RC…`
+  bookmark, which later inserts reused. **Decision: as planned.**
 
 ## R7. Reading headings and numbers — SPIKE 2
 
@@ -152,9 +218,34 @@ KeyboardShortcuts 1.1 = 2408.
   full-context number ("4.3"). If it returns only the level's own part ("3"), the core composes
   the full number from ancestor headings in `HeadingIndex`. The number is only for display and
   matching; the inserted field (`\w`) always gets Word's real number.
+- **Other stories** (FR-003, FR-003a): table-cell headings are body paragraphs with
+  `tableNestingLevel > 0` (`location: "tableCell"`). Footnotes and endnotes: `body.footnotes` and
+  `body.endnotes` (WordApi 1.5), then each item's `body.paragraphs`. Headers and footers:
+  `sections`, then `getHeader`/`getFooter` for primary, first-page and even-pages (WordApi 1.1);
+  a story linked to the previous section is read once. Text boxes: `body.shapes` filtered to text
+  boxes, then `shape.body.paragraphs` (WordApiDesktop 1.2, checked at runtime). Everything loads
+  in the same batched syncs as the body. Order: main text (table cells in place), text boxes,
+  footnotes, endnotes, headers, footers.
+  **Unverified**: bookmark creation and REF/PAGEREF resolution in each story, the Ctrl+click
+  jump, de-duplicating linked headers, and the extra read time at 300 headings. Spike 2 checks
+  all of them. **Fallback** per story: if bookmarks cannot be created or referenced there, that
+  story's headings are not listed and the spec is amended through `/speckit-refine-update`
+  (FR-003); if WordApiDesktop 1.2 is missing, text-box headings are not listed and this is
+  documented.
 - **Performance**: target palette ready < 500 ms at 300 headings. The index is cached in memory
   per document and refreshed in the background when the palette opens; the palette shows the
   cached list immediately and swaps in the fresh one without moving the selection.
+- **Outcome (spike 2, 2026-10-11, Word 16.0.20430.20092)**: `listString` returns the
+  **full-context number** ("1.1", "4.3"), so no composition is needed. Body text has outline
+  level 10. Reading all stories took **456 ms** for 301 main headings plus the other stories:
+  under the 500 ms target with no margin, so the cache-first design above is required, not
+  optional. Every story worked (2.11): bookmark creation, REF result, F9 and Ctrl+click in a
+  table cell, footnote, endnote, header, footer and text box (`textBoxSupport: true`). **Decision:
+  all stories listed; no FR-003 fallback.** New finding: a heading that is the first paragraph
+  of a footnote or endnote reads as `"\u0002 Heading in a footnote"`, with the note's reference
+  mark and a space at the start, and a REF to its content range repeats that mark. The core
+  strips a leading `\u0002` and whitespace from heading text, and the adapter starts the
+  bookmark after them.
 
 ## R8. Where the cursor is
 
@@ -162,10 +253,22 @@ KeyboardShortcuts 1.1 = 2408.
   first paragraph's `styleBuiltIn` and `outlineLevel`.
   - Allowed: `MainDoc`, `Footnote`, `Endnote`, `NoteItem`, and `TableCell` whose chain leads
     to the main document.
-  - Declined with a message: `Header`, `Footer`, `Unknown` (comments and text boxes are expected
-    to report this — spike 1 confirms), and any heading, Title or Subtitle paragraph.
+  - Declined with a message: `Header`, `Footer`, `Unknown` (comments) and `Shape` (text
+    boxes; spike 1 outcome below), and any heading, Title or Subtitle paragraph.
   - Read-only: check `document.protectionType` when WordApiDesktop 1.4 is available; otherwise
     catch the access-denied error on write and show the same message.
+- **Policy** (FR-001b): `checkInsertionPoint` and `insertReference` receive
+  `{ allowInHeadings }`. Gateways load raw facts and call the core's `classifyLocation`, so the
+  rules live once. With the setting on, heading, Title and Subtitle paragraphs are allowed; the
+  heading containing the cursor is reported as `inHeadingOrder` and left out of the list, and a
+  target equal to it is declined `selfReference` at Enter.
+- **Selection extent** (FR-008a): `extended` when the selection range has more than one
+  paragraph (`range.paragraphs`), or contains a table (`range.tables`, WordApi 1.3), an inline
+  picture (`range.inlinePictures`), a content control (`range.contentControls`) or a shape
+  (`range.shapes`, WordApiDesktop 1.2 when supported); otherwise `inline`. The core's
+  `classifySelection` decides from those counts. Equations and embedded objects are not
+  detected; this is documented. **Unverified**: whether a whole-paragraph selection that
+  includes its paragraph mark counts as one paragraph; spike 1 logs the counts.
 - **When the check runs** (spec FR-008): twice. When the palette opens, so a disallowed place is
   reported straight away and the above/below preview has a position. Then again inside the
   insertion transaction at Enter, reading Word's selection afresh: the reference goes wherever
@@ -173,12 +276,21 @@ KeyboardShortcuts 1.1 = 2408.
   transaction writes nothing and returns a decline reason. No range is tracked between open and
   Enter, which also avoids leaking tracked objects. Spike 1 checks that showing the pane does
   not move Word's selection and that it can be read from the pane.
+- **Outcome (spike 1, 2026-10-11, Word 16.0.20430.20092)**: `parentBody.type` reports `MainDoc`,
+  `Endnote`, `Header`, `Footer`, `TableCell` (with `parentOfBodyType: "MainDoc"`), and **`Shape`
+  for a text box**, not `Unknown`; a comment reports `Unknown` (style `Other`) and a footnote
+  `Footnote`.
+  A triple-clicked paragraph including its mark counts as **1** paragraph (inline); heading plus
+  body counts as 2; a whole table gives `tableCount: 1`; an inline picture counts as both
+  `pictureCount: 1` and `shapeCount: 1`. Showing the pane leaves Word's selection unchanged.
+  **Decision: as planned, with `Shape` added to the declined body types.**
 
 ## R9. Tracked changes and co-authoring — SPIKE 3
 
 - **Decision**: No special handling for insertion. Insert as normal with tracking on; the spike
   verifies the inserted text and fields appear as one tracked insertion and the reference still
-  updates. Co-authoring is a manual checklist item; results are recorded in user documentation.
+  updates, and that one Undo still restores the document (FR-013; more than one is a blocker).
+  Co-authoring is a manual checklist item; results are recorded in user documentation.
 - **Rejected references** (spec edge case): rejecting removes the text and fields; a bookmark
   created for the reference may remain on the heading. That is accepted: it is hidden, usable
   and reused by the next reference. The spike records what actually happens, and the user
@@ -188,6 +300,17 @@ KeyboardShortcuts 1.1 = 2408.
   `Range.getTrackedChanges()` (WordApi 1.6) filtered for type `deleted` covering the whole
   heading text. **Unverified** — spike 3 confirms the API on build 2408+; fallback is to list
   such headings with a "(deleted)" suffix rather than hide them, and note it.
+- **Outcome (spike 3, 2026-10-11, Word 16.0.20430.20092)**: WordApi 1.6 is supported;
+  `getTrackedChanges()` reports "Deleted heading" as `Deleted` and "Inserted heading" as `Added`,
+  so **deleted headings are hidden as planned; no fallback**. With tracking on, an insertion is
+  one tracked insertion and one Undo step. After Accept all, F9 and Ctrl+click work. Moving a
+  heading while tracking is on breaks REF updates (heading text shown as deleted, "unknown field
+  change", the number pointing at the wrong heading). The same happens to Word's own
+  cross-references and is a known Word issue, so it goes in `docs/known-behaviours.md` (T100).
+  Reject all (rerun on a spec-300 copy) removes the reference and **leaves the `_RC…` bookmark on
+  the heading** with the exact heading extent (`Equal`), as the rejected-references rule above
+  expects: it is reused by the next reference and documented (T100). Co-authoring (3.5) is
+  deferred until a second user is available; it stays on `docs/acceptance-checklist.md`.
 
 ## R10. UI layer
 
@@ -226,6 +349,13 @@ KeyboardShortcuts 1.1 = 2408.
 - **Unverified**: whether the WebView2 inside Word reflects Windows "reduce animation" in
   `prefers-reduced-motion`. Spike 1 logs `matchMedia` results. Fallback: an "Animations" on/off
   toggle in settings, off by default if the media query cannot be trusted.
+- **Outcome (spike 1, 2026-10-11, Word 16.0.20430.20092)**: `prefers-reduced-motion` follows the
+  Windows setting (false → true), so **no Animations setting; T099 is dropped**.
+  `prefers-color-scheme: dark` stays false even with Office's Black theme, while `officeTheme`
+  reports it correctly (Colorful: `themeId 0`, `isDarkTheme false`; Black: `themeId 2`,
+  `isDarkTheme true`; White: `themeId 3`). **Decision: theme comes only from
+  `Office.context.officeTheme.isDarkTheme`, applied as `data-theme` on the root. The
+  `prefers-color-scheme` media query is never relied on in the add-in.**
 
 ## R12. Fuzzy matching
 
@@ -243,7 +373,8 @@ KeyboardShortcuts 1.1 = 2408.
 ## R13. Persistence
 
 - **Decision**:
-  - User settings (default format, templates) are stored in `OfficeRuntime.storage` under one
+  - User settings (default format, templates, allow references in headings, show headings
+    outside the main text) are stored in `OfficeRuntime.storage` under one
     versioned JSON key. The shortcut itself is stored by Office (R4).
   - Recents are stored in `OfficeRuntime.storage` keyed by `Office.context.document.url`, as
     bookmark names, at most 5 per document, and at most 50 documents (oldest dropped).

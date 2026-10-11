@@ -12,7 +12,7 @@ Word's built-in Cross-reference dialog is modal, mouse-heavy and lists every hea
 
 ## How it works
 
-1. Place the cursor and press **Ctrl+Alt+K** (configurable).
+1. Place the cursor and press **Ctrl+Shift+Y** (configurable).
 2. Type to fuzzy-filter the document's headings.
 3. Use **↑ ↓** to choose, **Tab** to cycle the reference format, **Enter** to insert, **Esc** to cancel.
 

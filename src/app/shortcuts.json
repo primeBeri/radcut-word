@@ -1,0 +1,9 @@
+{
+  "actions": [
+    { "id": "OpenPalette", "type": "ExecuteFunction", "name": "Insert a cross-reference to a heading" },
+    { "id": "OpenSettings", "type": "ExecuteFunction", "name": "Open RAD·CUT settings" }
+  ],
+  "shortcuts": [
+    { "action": "OpenPalette", "key": { "default": "Ctrl+Shift+Y" } }
+  ]
+}

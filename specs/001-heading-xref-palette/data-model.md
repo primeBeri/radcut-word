@@ -8,7 +8,9 @@ types are TypeScript-style for precision; they describe shape, not implementatio
 ## Heading
 
 A paragraph with a built-in Heading 1–9 style or outline level 1–9 (FR-003, FR-004). Headings
-shown as tracked deletions are excluded from snapshots (FR-003).
+shown as tracked deletions are excluded from snapshots (FR-003). Headings in every story are
+included: main text (with table cells), text boxes, footnotes, endnotes, headers and footers
+(FR-003, FR-003a).
 
 | Field | Type | Rules |
 |---|---|---|
@@ -16,11 +18,12 @@ shown as tracked deletions are excluded from snapshots (FR-003).
 | `level` | `1..9` | From style (Heading N) or outline level. |
 | `text` | `string` | Paragraph text, trimmed; may be empty (listed as "(untitled heading)"). |
 | `number` | `string \| null` | Displayed number, e.g. "4.3"; `null` if unnumbered. Display and matching only. |
-| `order` | `number` | 0-based position among headings in document order, valid for one snapshot. |
+| `order` | `number` | 0-based position among headings in document order, valid for one snapshot. Document order is Word's story order: main text (table cells in place), then text boxes, footnotes, endnotes, headers, footers, each in its own order (research R7). |
+| `location` | `"main" \| "tableCell" \| "textBox" \| "footnote" \| "endnote" \| "header" \| "footer"` | Anything but `main` is outside the main text flow: shown with a badge and hidden when `showHeadingsOutsideMainText` is off (FR-003a). |
 | `bookmark` | `string \| null` | Usable bookmark already on the heading (see Heading Bookmark), if any. |
 
 **HeadingKey**: `{ kind: "bookmark", name }` when `bookmark` is set; otherwise
-`{ kind: "provisional", order, fingerprint }` where `fingerprint` = level + text. A provisional key
+`{ kind: "provisional", order, fingerprint }` where `fingerprint` = level + location + text. A provisional key
 is valid only within the snapshot it came from. Once a bookmark is created, the heading's key
 becomes the bookmark key (Constitution I: keyed by bookmark name, never by position or text).
 
@@ -56,6 +59,10 @@ including hidden ones; never derived from heading text or position.
 **Reuse rule** (FR-011): if any usable bookmark exists, choose the first by case-insensitive name
 order; create a new one only when none is usable; never modify or delete unusable bookmarks.
 
+**Hands off** (FR-011a): the add-in never renames, moves, removes or flags a bookmark or field it
+did not create. The extent and field layout mimic Word's own cross-reference dialog (spec
+Assumptions, research R5); only the name prefix differs (`_RC`, not Word's `_Ref`).
+
 ## InsertionPoint
 
 Read from Word's current selection, twice: when the palette opens (early decline message and
@@ -65,12 +72,19 @@ one used (FR-008). Nothing is kept or tracked between the two readings.
 | Field | Type | Rules |
 |---|---|---|
 | `location` | `"main" \| "footnote" \| "endnote" \| "tableCellInMain"` | Only allowed locations reach this type. |
-| `hasSelection` | `boolean` | If true, the reference replaces the selection. |
+| `selection` | `"none" \| "inline" \| "extended"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a table, picture, shape or content control; replaced only after confirmation (FR-008a). |
+| `inHeadingOrder` | `number \| null` | Order of the heading paragraph containing the cursor (only possible when `allowInHeadings` is on); that heading is not offered as a target (FR-001b). |
 | `precedingHeadingOrder` | `number \| null` | Heading order just before the point; used for the above/below preview. |
 
-**Location check** (FR-001a) produces either an `InsertionPoint` or a `Declined` reason:
+**Location check** (FR-001a, FR-001b) produces either an `InsertionPoint` or a `Declined` reason:
 `"header" | "footer" | "comment" | "textBox" | "headingParagraph" | "titleParagraph" |
-"protected" | "unknown"`.
+"selfReference" | "protected" | "unknown"`. `selfReference` arises only at Enter, when the target
+is the heading containing the cursor.
+
+**LocationPolicy** = `{ allowInHeadings: boolean }`, taken from `UserSettings`. With it on,
+heading, Title and Subtitle paragraphs are allowed. The rules live once in the core
+(`classifyLocation(facts, policy)` and `classifySelection(facts)`); both gateways read raw facts
+and call them, so the fake and Word cannot disagree on the rules.
 
 ## ReferenceFormat
 
@@ -95,7 +109,7 @@ order. Tab = next, Shift+Tab = previous, wrapping at both ends.
 | Field | Type | Rules |
 |---|---|---|
 | `text` | `string` | What the reference will display now, e.g. "§ 4.3 Fire strategy". |
-| `warnings` | `("noNumber" \| "pageUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered. |
+| `warnings` | `("noNumber" \| "pageUnknown" \| "positionUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered. `positionUnknown` when the format has an above/below part and the target is in a text box, header or footer (Word decides; preview shows "above/below ?"). |
 
 Page is shown as "page ?" because the page cannot be computed before insertion; above/below is
 computed from `InsertionPoint.precedingHeadingOrder` versus the target's `order`.
@@ -118,6 +132,8 @@ Stored per user, outside documents (FR-021).
 | `schemaVersion` | `1` | Bumped on breaking change; older versions are migrated, unknown versions reset to defaults with a message. |
 | `defaultFormatId` | `string` | Must name an existing format; falls back to `sectionNumberText` if the template was deleted. |
 | `templates` | `{ id, label, source }[]` | `source` is the template string; validated on save and on load. At most 20. |
+| `allowReferencesInHeadings` | `boolean` | Default `false` (FR-001b). Feeds `LocationPolicy.allowInHeadings`. |
+| `showHeadingsOutsideMainText` | `boolean` | Default `true` (FR-003a). When `false`, headings whose `location` is not `main` are left out of the list. |
 
 The shortcut is not part of `UserSettings`: Office stores it (research R4). The settings view
 reads and writes it through the `HostShell` port.
@@ -148,7 +164,11 @@ Open ──cog──▶ Settings(from=palette)                         FR-021a
 Open ──Esc──▶ Closed (no change, caret restored)             FR-006
 Open ──Enter──▶ Inserting
 Inserting ──ok──▶ Closed (caret after reference, recents updated)
-Inserting ──cursor now disallowed/protected──▶ Open (message, no change)   FR-008
+Inserting ──extended selection, not confirmed──▶ Confirming (warning, no change)   FR-008a
+Confirming ──Enter──▶ Inserting (confirmed)
+Confirming ──Esc──▶ Open (warning dismissed, no change)
+Confirming ──type/↑/↓/Tab──▶ Open (warning dismissed, key applied)
+Inserting ──cursor now disallowed/protected/self reference──▶ Open (message, no change)   FR-008
 Inserting ──stale target──▶ Open (message, list refreshed)   Edge case
 Inserting ──failed──▶ Open (message, document unchanged)     FR-014
 ```

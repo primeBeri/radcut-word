@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAD·CUT spike pane</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+      body { font: 13px "Segoe UI", sans-serif; margin: 12px; }
+      section { border-top: 1px solid #ccc; padding: 6px 0; }
+      .instructions { color: #444; margin: 2px 0 6px; }
+      #probe { width: 100%; box-sizing: border-box; font-size: 14px; padding: 4px; }
+      #log { white-space: pre-wrap; font: 12px Consolas, monospace; background: #f5f5f5; padding: 6px; }
+      button { margin: 2px 4px 2px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Spike pane</h1>
+    <p>Dev only. Results go to the log; copy them into research.md "Outcome" lines.</p>
+    <label for="probe">Focus probe (spike 1 types here)</label>
+    <input id="probe" type="search" autocomplete="off" />
+    <div id="spikes"></div>
+    <p>
+      <button id="copy" type="button">Copy log</button>
+      <button id="clear" type="button">Clear log</button>
+    </p>
+    <div id="log" role="log" aria-live="polite"></div>
+    <script type="module" src="./spike-pane.ts"></script>
+  </body>
+</html>

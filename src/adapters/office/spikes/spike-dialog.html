@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAD·CUT dialog probe</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+      body { font: 13px "Segoe UI", sans-serif; margin: 12px; }
+      input { width: 100%; box-sizing: border-box; font-size: 14px; padding: 4px; }
+    </style>
+  </head>
+  <body>
+    <label for="probe">Dialog focus probe: type without clicking, Esc to close</label>
+    <input id="probe" type="search" autocomplete="off" />
+    <script type="module" src="./spike-dialog.ts"></script>
+  </body>
+</html>

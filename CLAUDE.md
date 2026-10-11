@@ -2,11 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project state
+## Project state and commands
 
-Pre-code. `RAD·CUT - PRD.md` is the source of truth for scope, requirements (FR-01…FR-14), risks and roadmap. It is deliberately gitignored (it contains internal plans) and must never be committed to the public repo; it exists only in the local working copy. There is no scaffold, build, lint or test setup yet. Once the project is scaffolded, replace this section with the real commands (including how to run a single Vitest test).
+Scaffolded (Vite + Svelte 5 + TypeScript strict + Vitest), feature `001-heading-xref-palette` in progress; see `specs/001-heading-xref-palette/tasks.md`. `RAD·CUT - PRD.md` is the source of truth for scope, requirements, risks and roadmap. It is deliberately gitignored (it contains internal plans) and must never be committed to the public repo; it exists only in the local working copy.
 
-Phase 0 (three feasibility spikes on Windows desktop) comes before any MVP build: shortcut → task pane with focus in the search box; REF field to a hidden bookmark survives F9 and the hyperlink jumps; bookmark insertion under tracked changes and SharePoint co-authoring.
+- Install: `npm install`, then `npm run certs` once (trusted HTTPS certificate for `localhost:3000`).
+- Run in Word: `npm start` (dev server + sideload into Word desktop); `npm stop` to unload. Both go through `scripts/office-debug.mjs`, which sideloads a copy of `manifest.xml` from `%LOCALAPPDATA%\radcut-dev\`: Word silently ignores a manifest whose path contains the `·` in the repository folder name.
+- Dev panes in Word (spikes, contract suite, performance): `npm run start:dev-pane`; the task pane opens a launcher. Never part of the release build.
+- Tests: `npm test` (unit + component), `npm run test:unit`, `npm run test:component`.
+- Single test file: `npx vitest run tests/unit/fuzzy-matcher.test.ts`; single test by name: `npx vitest run -t "<name>"`.
+- Lint (includes the Office.js boundary rules): `npm run lint`. Types (TS + Svelte): `npm run typecheck`.
+- Release build (tokens, Vite, 150 KB gzip budget check): `npm run build`.
+- Matcher benchmark (not part of `npm test`): `npm run bench`.
+
+Office types exist only in `tsconfig.adapters.json` (all of `src/`); `tsconfig.json` type-checks everything except adapters and the entry points that start them, so Office use elsewhere fails to compile as well as to lint.
 
 ## Spec-driven workflow (spec-kit)
 
@@ -22,9 +31,9 @@ Community extensions (each offers an optional hook after the matching core step)
 
 ## What it is
 
-RAD·CUT (RadBeri) is a Word add-in in TypeScript on Office.js. Shortcut (default Ctrl+Alt+K) → palette of the document's headings → fuzzy filter → Enter inserts a native Word cross-reference at the cursor. Windows desktop only for the MVP; Mac and web are phase 4 on the same codebase.
+RAD·CUT (RadBeri) is a Word add-in in TypeScript on Office.js. Shortcut (default Ctrl+Shift+Y) → palette of the document's headings → fuzzy filter → Enter inserts a native Word cross-reference at the cursor. Windows desktop only for the MVP; Mac and web are phase 4 on the same codebase.
 
-Planned stack: TypeScript, Office.js with the **shared runtime** (required for custom keyboard shortcuts in Word), React or plain TS for the palette, Vitest, scaffolded with the Yeoman Office generator or Microsoft 365 Agents Toolkit.
+Stack: TypeScript (strict), Office.js with the **shared runtime** (required for custom keyboard shortcuts in Word), an add-in only XML manifest (`manifest.xml`, shortcuts in `src/app/shortcuts.json`), Svelte 5 views styled with Fluent 2 tokens (`src/ui/theme/tokens.css`, generated), Vite and Vitest. Phase 0 spikes (shortcut → focus; REF survives F9; tracked changes and co-authoring) run from the dev pane before any adapter work.
 
 ## Architecture (planned, ports and adapters)
 

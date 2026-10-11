@@ -10,17 +10,20 @@ interface IDocumentGateway {
   readHeadings(): Promise<HeadingSnapshot>;
 
   /** Read Word's current selection as an insertion point, or say why it is not allowed. Read-only. */
-  checkInsertionPoint(): Promise<InsertionPoint | Declined>;
+  checkInsertionPoint(policy: LocationPolicy): Promise<InsertionPoint | Declined>;
 
   /** All bookmark names in the document, including hidden ones. */
   listBookmarkNames(): Promise<string[]>;
 
   /**
    * Insert a reference in ONE document transaction:
-   * re-read the current selection and re-check location and protection (decline if now invalid),
+   * re-read the current selection and re-check location and protection (decline if now invalid,
+   * or `selfReference` if the target is the heading containing the cursor),
+   * stop with `needsConfirmation` if the selection is extended and not confirmed,
    * ensure a bookmark on the target (reuse usable one, else create `newBookmarkName`),
    * then write the format's parts at the selection and update the new fields.
-   * On any failure or decline the document is left unchanged.
+   * On any failure, decline or `needsConfirmation` the document is left unchanged.
+   * All writes go in one `sync` so the insertion is one Undo step (FR-013).
    */
   insertReference(request: InsertReferenceRequest): Promise<InsertReferenceResult>;
 
@@ -36,11 +39,13 @@ interface InsertReferenceRequest {
   expectedFingerprint: string;    // level + text when the palette listed the heading
   parts: FormatPart[];            // already validated by the core
   newBookmarkName: string;        // used only if no usable bookmark exists
+  policy: LocationPolicy;         // { allowInHeadings } from user settings
+  confirmExtendedSelection: boolean; // true only after the user confirmed the warning (FR-008a)
 }
 
 type InsertReferenceResult =
   | { ok: true; reference: InsertedReference; bookmark: string; bookmarkCreated: boolean }
-  | { ok: false; reason: "staleTarget" | "hostError"; detail?: string }
+  | { ok: false; reason: "staleTarget" | "hostError" | "needsConfirmation"; detail?: string }
   | { ok: false; reason: "declined"; declined: Declined };  // cursor now disallowed or document protected
 
 interface ReferenceRecord {
@@ -51,10 +56,18 @@ interface ReferenceRecord {
 }
 ```
 
+Both gateways read raw facts (story type, paragraph style and outline level, protection,
+paragraph/table/picture/shape/content-control counts in the selection) and decide with the
+core's `classifyLocation` and `classifySelection` (data-model.md), so the rules exist once.
+
 ## Behavioural contract (each line is at least one contract test)
 
 1. `readHeadings` returns only paragraphs with Heading 1–9 style or outline level 1–9, in
-   document order, with `level`, `text`, `number` (or `null`) and `order` 0..n-1.
+   document order, with `level`, `text`, `number` (or `null`), `location` and `order` 0..n-1.
+1a. Headings in table cells, text boxes, footnotes, endnotes, headers and footers are returned
+   with the matching `location`, in story order (main text with table cells in place, text
+   boxes, footnotes, endnotes, headers, footers); a header or footer shared by several sections
+   is returned once.
 2. Bold or large-font paragraphs without a heading style or outline level are not returned;
    headings shown as tracked deletions are not returned; tracked-insertion headings are.
 3. A heading with a usable bookmark reports it in `bookmark`; a heading whose only bookmarks
@@ -62,10 +75,15 @@ interface ReferenceRecord {
    `_Hlk…`, `_GoBack`) reports `null`.
 4. When several usable bookmarks exist, `bookmark` is the first by case-insensitive name order,
    every time.
-5. `checkInsertionPoint` returns `Declined` for header, footer, comment, text box, heading,
-   Title and Subtitle paragraphs, and protected documents; it returns an `InsertionPoint` for
-   main text, footnotes, endnotes and table cells in the main text. It never changes the
-   document.
+5. With `allowInHeadings: false`, `checkInsertionPoint` returns `Declined` for header, footer,
+   comment, text box, heading, Title and Subtitle paragraphs, and protected documents; it
+   returns an `InsertionPoint` for main text, footnotes, endnotes and table cells in the main
+   text. It never changes the document.
+5b. With `allowInHeadings: true`, heading, Title and Subtitle paragraphs return an
+   `InsertionPoint` (`inHeadingOrder` set for a heading, `null` for Title and Subtitle); header,
+   footer, comment, text box and protected cases are still declined.
+5c. `insertReference` whose target is the heading containing the cursor returns `declined` with
+   `selfReference`, and the document is unchanged.
 5a. If the selection moves between `checkInsertionPoint` and `insertReference`, the reference
    goes to the new selection; if the new selection is disallowed or the document is now
    protected, the result is `declined` and the document is unchanged.
@@ -77,16 +95,28 @@ interface ReferenceRecord {
 7a. The inserted reference has the character formatting of the text at the insertion point (for
    example bold inside bold text), not the heading's, before and after a field update (Word run
    only for the after-update part).
+7b. No insertion renames, moves or removes a bookmark it did not create, or changes the code or
+   result of a field it did not insert (FR-011a).
+7c. A heading in a table cell, text box, footnote, endnote, header or footer gets its bookmark
+   like any other, and a reference to it resolves (the Ctrl+click jump is checked in the Word
+   run only).
 8. The inserted content, read back, consists of the literal parts and one field per non-literal
    part, each with `\h`, pointing at the returned bookmark, with the switches in research R5.
 9. After insertion, each field's displayed result equals the core's preview for that format
    (page excepted, where the result is a positive integer).
-10. With a selection, the reference replaces the selected text.
+10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
+    selected text without confirmation.
+10a. With a selection spanning two paragraphs, or containing a table, picture, shape or content
+    control (`selection: "extended"`), `insertReference` with `confirmExtendedSelection: false`
+    returns `needsConfirmation` and the document is unchanged; with `true`, the reference
+    replaces the selection.
 11. If `expectedFingerprint` no longer matches the live heading, the result is
     `staleTarget` and the document is unchanged.
 12. A failure at any step leaves no new bookmark and no partial reference.
 13. `readReferences` returns one record per REF/PAGEREF field with its bookmark and switches.
 14. In the Word run only (not checked against the fake): after a field update (F9), every
     inserted reference still shows the correct value; after moving the target heading and
-    updating, it shows the new number; one Undo removes the insertion (or the exception is
-    recorded).
+    updating, it shows the new number; one Undo restores the document exactly (reference, any
+    new bookmark, any replaced selection), with no selection, an inline selection and a
+    confirmed extended selection, and with tracking on. More than one Undo step is a release
+    blocker (FR-013), never a recorded exception.

@@ -12,8 +12,8 @@ row; the manual acceptance checklist repeats the focus rows in real Word.
 | ↑ / ↓ | Move selection, no wrap; selected row scrolled into view | FR-006 |
 | Page Up / Page Down | Move selection by one visible page | (convenience) |
 | Tab / Shift+Tab | Next / previous format, wrapping; preview updates | FR-015 |
-| Enter | Insert selected heading in the shown format | FR-006 |
-| Esc | Close, no change, caret restored | FR-006 |
+| Enter | Insert selected heading in the shown format; with an extended selection the first Enter shows the selection warning and changes nothing, the second inserts | FR-006, FR-008a |
+| Esc | Close, no change, caret restored; while the selection warning is shown, dismiss the warning only | FR-006, FR-008a |
 | Ctrl+, | Open settings (same as clicking the cog) | FR-021a |
 
 Tab does not move focus while the palette is open; the cog is reached with Ctrl+, or by mouse.
@@ -25,15 +25,25 @@ The cog button stays in the accessibility tree with its shortcut announced
 - Search input: `role="combobox"`, `aria-expanded="true"`, `aria-controls` → list,
   `aria-activedescendant` → selected row, `aria-autocomplete="list"`.
 - Results: `role="listbox"`; each row `role="option"`, `aria-selected` on the selected row;
-  accessible name = number + text + level ("4.3 Fire strategy, level 2").
+  accessible name = number + text + level, plus location outside the main text ("4.3 Fire
+  strategy, level 2"; "Summary, level 1, in text box").
+- Location badge (FR-003a): rows for headings outside the main text show a text badge after the
+  heading text — "Table", "Text box", "Footnote", "Endnote", "Header" or "Footer" — styled with
+  Fluent tokens and never colour alone.
 - Recents group (empty query only): `role="group"` labelled "Recent", then a group labelled
   "All headings" (FR-022).
 - Highlighted characters use `<mark>` with bold weight and an underline as well as colour
   (FR-005a: not colour alone).
 - Format strip: current format name plus preview text, in a polite live region
   (`aria-live="polite"`) so screen readers announce format changes.
-- Messages (no headings, no matches, declined, stale, failed): one polite live region; Enter is a
-  no-op when there is no selectable row.
+- Messages (no headings, no matches, declined, stale, failed, selection warning): one polite live
+  region; Enter is a no-op when there is no selectable row. Fixed texts:
+  - Selection warning: "The selection covers more than one paragraph, a table or a picture.
+    Press Enter again to replace it, or Esc to keep it."
+  - Declined in a heading or title: "References can't go in headings or titles. To allow them,
+    turn on “Allow references in headings” in Settings."
+  - Self reference: "A heading can't refer to itself."
+- The heading containing the cursor is never listed (FR-001b).
 
 ## Look and motion
 
@@ -54,7 +64,13 @@ The cog button stays in the accessibility tree with its shortcut announced
   with add, edit, delete; editor shows live preview against a sample heading and inline
   validation errors from [format-templates.md](format-templates.md)); Shortcut (current value,
   "Record new shortcut" capture, reset to default; read-only with explanation when signed out);
-  Animations (only if research R11 fallback is needed).
+  Headings (two checkboxes, each with a description linked by `aria-describedby`):
+  - "Allow references in headings" (off): "Not recommended. Headings feed the table of
+    contents, the navigation pane and text references to that heading, so a reference inside a
+    heading gets copied into them and can nest or loop. A heading can never refer to itself."
+  - "Show headings outside the main text" (on): "List headings in tables, text boxes,
+    footnotes, endnotes, headers and footers, each marked with where it is."
+  No Animations setting: motion follows Windows through `prefers-reduced-motion` (research R11).
 - Saving validates everything; errors sit next to their fields and focus moves to the first one.
 - Esc or "Close" returns to where the user came from: the palette (if opened from it) with its
   query restored, otherwise the document (FR-021b). Unsaved changes prompt an in-pane

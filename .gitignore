@@ -54,3 +54,6 @@ tmp/
 
 # Internal planning drafts (never commit)
 /planning/
+
+# TypeScript build info for project references
+.tsbuild/

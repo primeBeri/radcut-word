@@ -10,6 +10,10 @@
 
 **Refined**: 2026-10-10 — Analysis fixes: minimum Word build stated in Assumptions (2408+, 2508+ for the full feature set, matching the plan); "Look and feel" requirements moved after "Privacy and feedback" so FR numbers read in order. No requirement changed meaning; plan already matches.
 
+**Refined**: 2026-10-10 — Resolved document-integrity checklist items CHK001, CHK003, CHK005, CHK013, CHK014, CHK025: the add-in never polices bookmarks or fields made elsewhere; output mimics Word's own cross-reference dialog; new setting to allow references inside headings (off by default, never self-referencing); selections spanning paragraphs or containing tables or pictures need confirmation; every insertion is one atomic undo step, and failing that is a blocker; headings outside the main text are listed with a location badge and can be hidden by a setting.
+
+**Refined**: 2026-10-11 — Default shortcut changed from Ctrl+Alt+K to Ctrl+Shift+Y (FR-001), from the spike 1 outcome (research R4): Word already uses Ctrl+Alt+K and prompts on conflict; a three-key combination was wanted, and Ctrl+Shift+Y is free in Word and has no AltGr clash on any layout. Still user-configurable; no other requirement changed.
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -34,6 +38,12 @@ user-facing features.
 - Q: Where should users change their settings: the default format, their templates and the shortcut? → A: A separate settings view in the add-in pane, opened from the ribbon, plus a cog icon in a corner of the palette that opens it directly.
 - Q: Should the palette use animation, or should every change appear instantly? → A: Subtle motion (≤150 ms, never blocks input), turned off when the system asks for reduced motion.
 - Q: If the cursor is somewhere other than the main text, should the palette insert the reference there, or decline with a message? → A: Insert in the main text, footnotes and endnotes, in any paragraph style (quotes, captions, list items, table cells) except headings, Title and Subtitle; decline everywhere else with a message.
+- Q: Should the add-in refuse to reuse or police bookmarks and fields that users made by hand or with Word's dialogs? → A: No. It only governs what it creates itself; existing bookmarks and fields are never altered or flagged. Advice on bad practice (circular references, references inside headings) belongs to the later backlinks and broken-reference phase.
+- Q: Should references ever be insertable inside headings? → A: Not by default. A setting, off by default, allows it, with an explanation of why it is discouraged. A heading can never refer to itself.
+- Q: What should the bookmark and reference look like? → A: Mimic what Word's own cross-reference dialog produces wherever possible. The add-in keeps its own `_RC…` bookmark names.
+- Q: What happens when the selection is large when Enter is pressed? → A: Any selection within one paragraph is replaced without warning. A selection spanning several paragraphs, or containing a table or picture, needs confirmation (Enter again, or Esc).
+- Q: How many undo steps may an insertion take? → A: Exactly one. A stream of undo entries is not acceptable; if Word's API cannot achieve one step, that blocks the release and is raised with the product owner.
+- Q: Should headings in table cells, text boxes, footnotes, endnotes, headers and footers be listed? → A: Yes, marked with a location badge; a setting (on by default) hides them.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -58,8 +68,9 @@ confirm the reference shows the new number and jumps to the heading when followe
 1. **Given** a document with Heading 1–9 paragraphs and the cursor in a non-heading paragraph of
    the main text, a footnote or an endnote, **When** the
    user presses the shortcut, **Then** the palette opens listing all headings in document order,
-   each with its level indentation and number (where the heading is numbered), and keystrokes go
-   straight into the search box.
+   each with its level indentation and number (where the heading is numbered), headings outside
+   the main text flow marked with a location badge, and keystrokes go straight into the search
+   box.
 2. **Given** the palette is open, **When** the user types a query, **Then** the list filters on
    each keystroke by fuzzy match against heading text and number, best matches first, with the
    matched characters highlighted in each result.
@@ -83,8 +94,11 @@ confirm the reference shows the new number and jumps to the heading when followe
    updated on a machine without the add-in, **Then** every reference displays and updates
    correctly.
 10. **Given** a reference has just been inserted, **When** the user presses Undo once, **Then**
-    the reference (and any bookmark added for it) is removed in that single step, where Word
-    allows it.
+    the reference, any bookmark added for it and any replaced selection are reverted in that
+    single step.
+11. **Given** the selection spans more than one paragraph or contains a table or picture,
+    **When** the user presses Enter, **Then** the palette shows an inline warning and changes
+    nothing; a second Enter replaces the selection with the reference, Esc cancels.
 
 ---
 
@@ -208,7 +222,16 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   only part of the text): those bookmarks are left untouched and one new hidden bookmark is
   created.
 - **Text selected when Enter is pressed**: the reference replaces the selection, as typing
-  would.
+  would. A selection within one paragraph, of any length, is replaced without warning. A
+  selection spanning more than one paragraph, or containing a table, picture or other object, is
+  likely a mis-click: the palette shows an inline warning (never a browser dialog) and needs a
+  second Enter to go ahead; Esc cancels. Either way, one Undo restores the selection.
+- **Headings outside the main text flow** (in table cells, text boxes, footnotes, endnotes,
+  headers or footers): listed in document order with a badge naming the location, and hidden
+  when the user turns off "Show headings outside the main text". A heading in a header or footer
+  repeats on every page, so its "page" and "above/below" parts show whatever Word computes.
+- **Bookmarks and fields made outside the add-in** (by hand or with Word's dialogs): never
+  altered, removed or flagged. Usable ones are reused (FR-011); everything else is left alone.
 - **Cursor moved while the palette is open** (for example the user clicks into the document):
   the reference goes to where the cursor is when Enter is pressed. If that place is not allowed
   (FR-001a) or the document has become protected, the palette shows a message, stays open and
@@ -218,9 +241,11 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - **Rejecting a tracked reference**: the reference text and fields are removed; a hidden bookmark
   created for it may remain on the heading. This is harmless, is reused by later references,
   and is documented.
-- **Cursor in a heading, Title or Subtitle paragraph**: the palette explains that references
-  cannot be inserted in headings or titles and makes no change (this also rules out a heading
-  referring to itself).
+- **Cursor in a heading, Title or Subtitle paragraph**: by default the palette explains that
+  references cannot be inserted in headings or titles, points to the setting that allows it, and
+  makes no change. With "Allow references in headings" turned on, insertion works as in a normal
+  paragraph, except that the heading containing the cursor is not offered as a target (a heading
+  never refers to itself).
 - **Cursor in a quote, caption, list item or table cell** in the main text, a footnote or an
   endnote: insertion works as in a normal paragraph.
 - **Cursor in a header, footer, comment or text box**: the palette explains that insertion is
@@ -247,16 +272,26 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 **Opening and listing**
 
 - **FR-001**: Users MUST be able to open the palette with a keyboard shortcut (default
-  Ctrl+Alt+K) from anywhere in the document.
+  Ctrl+Shift+Y) from anywhere in the document.
 - **FR-001a**: Insertion MUST be supported in the main text, footnotes and endnotes, in any
   paragraph style (including quotes, captions, list items and table cells) except paragraphs that
   are headings (heading style or outline level), Title or Subtitle. In those excluded paragraphs,
   and in headers, footers, comments and text boxes, the palette MUST decline with a message and
   make no change.
+- **FR-001b**: A per-user setting "Allow references in headings", off by default, MUST lift the
+  exclusion of heading, Title and Subtitle paragraphs in FR-001a. The setting MUST carry a short
+  explanation of why it is discouraged (headings feed the table of contents, the navigation pane
+  and text references to that heading, so references inside them can nest or loop). Whatever the
+  setting, the heading containing the cursor MUST NOT be offered as a target.
 - **FR-002**: When the palette opens, keyboard input MUST go to its search box without any click.
 - **FR-003**: The palette MUST list every heading in the document (paragraphs using built-in
   Heading 1–9 styles or an outline level), in document order, showing level indentation and the
   heading number where one exists. Headings shown as tracked deletions MUST NOT be listed.
+  Headings in table cells, text boxes, footnotes, endnotes, headers and footers MUST be listed.
+- **FR-003a**: Headings outside the main text flow (table cells, text boxes, footnotes, endnotes,
+  headers, footers) MUST carry a visible location badge, not relying on colour alone. A per-user
+  setting "Show headings outside the main text", on by default, MUST hide them from the list when
+  turned off.
 - **FR-004**: Paragraphs formatted to look like headings without a heading style or outline level
   MUST NOT be listed.
 
@@ -278,6 +313,10 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   the cursor to the document immediately after the reference. The location rules (FR-001a) and
   document protection MUST be re-checked at that moment; if they now forbid insertion, the
   palette MUST show a message, stay open and leave the document unchanged.
+- **FR-008a**: A selection within a single paragraph MUST be replaced without warning. If the
+  selection spans more than one paragraph or contains a table, picture or other non-text object,
+  the first Enter MUST show an inline warning in the palette (not a browser or system dialog) and
+  change nothing; a second Enter MUST go ahead and Esc MUST cancel.
 - **FR-009**: References MUST consist only of Word's native bookmarks and hyperlinked
   cross-reference fields plus fixed literal text, so that documents display, update and navigate
   correctly without the add-in.
@@ -292,12 +331,19 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - **FR-012**: Bookmarks the add-in creates MUST span the heading's text without the paragraph
   mark, be hidden from Word's normal bookmark list, be unique in the document, stay unchanged by
   later edits to heading text, numbering, style or position, and fit within Word's bookmark-name
-  length limit.
+  length limit. This extent matches the bookmarks Word's own cross-reference dialog creates; where
+  a choice is open, the add-in's output MUST mimic that dialog's output.
+- **FR-011a**: The add-in MUST NOT alter, remove or flag bookmarks or fields it did not create,
+  including those made by hand or with Word's dialogs.
 - **FR-012a**: An inserted reference MUST take the character formatting of the surrounding text
   at the insertion point, not the heading's formatting, and MUST keep it after fields are
   updated. The add-in MUST NOT apply any character formatting of its own in this phase.
-- **FR-013**: Each insertion MUST be undoable as a single step wherever Word allows; any case
-  where it cannot be MUST be documented.
+- **FR-013**: ~~Each insertion MUST be undoable as a single step wherever Word allows; any case
+  where it cannot be MUST be documented.~~ (replaced 2026-10-10: documenting exceptions is not
+  enough.) Each insertion, covering any replaced selection, any new bookmark, literal text and
+  fields, MUST be one atomic Undo step; the add-in MUST NOT leave a series of Undo entries. If the
+  feasibility checks show Word's API cannot achieve this, it is a release blocker to be raised
+  with the product owner, not a documented exception.
 - **FR-014**: If insertion fails, the document MUST be left unchanged (no orphan bookmark, no
   partial reference) and the user MUST see a short message saying what happened.
 
@@ -319,7 +365,8 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - **FR-019**: Users SHOULD be able to open the same palette from a ribbon button.
 - **FR-020**: Users MUST be able to change the shortcut; Ctrl+@ and combinations reserved by Word
   or the system MUST be refused with an explanation.
-- **FR-021**: Settings (default format, templates, shortcut) MUST persist per user across
+- **FR-021**: Settings (default format, templates, shortcut, "Allow references in headings",
+  "Show headings outside the main text") MUST persist per user across
   documents and Word restarts, and MUST NOT be stored in the documents themselves.
 - **FR-021a**: Settings MUST be edited in a dedicated settings view in the add-in pane, separate
   from the palette. The settings view MUST be reachable from the ribbon and from a cog icon in a
@@ -356,16 +403,17 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 ### Key Entities
 
 - **Heading**: a paragraph in the document with a heading style or outline level. Attributes:
-  level (1–9), text, displayed number (may be absent), position in document order, and its
-  bookmark identity once one exists. Identified by its bookmark, never by position or text.
+  level (1–9), text, displayed number (may be absent), position in document order, location
+  (main text, table cell, text box, footnote, endnote, header, footer), and its bookmark
+  identity once one exists. Identified by its bookmark, never by position or text.
 - **Heading Bookmark**: Word's named marker on a heading that references point to. Either
   pre-existing (reused) or created by the add-in (hidden, unique, stable).
 - **Cross-Reference**: inserted content made of fixed literal text and one or more live fields
   pointing at a single Heading Bookmark.
 - **Reference Format**: a named recipe for a Cross-Reference — built-in or user-defined
   template — combining literal text with number, text, page and above/below parts.
-- **User Settings**: per-user preferences — default format, templates, shortcut — edited in the
-  settings view.
+- **User Settings**: per-user preferences — default format, templates, shortcut, allow
+  references in headings, show headings outside the main text — edited in the settings view.
 - **Recent Headings**: per-document list of the headings most recently referenced, in recency
   order.
 
@@ -389,8 +437,10 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   document is opened on a machine without the add-in.
 - **SC-008**: Every user flow in this specification can be completed without touching the mouse
   (except the ribbon-button story, which is mouse-first by design).
-- **SC-009**: A single Undo removes an inserted reference in every case where Word allows it,
-  and every exception is documented.
+- **SC-009**: ~~A single Undo removes an inserted reference in every case where Word allows it,
+  and every exception is documented.~~ (replaced 2026-10-10, see FR-013.) In 100 % of tested
+  insertions on the supported build, including selection replacement, new bookmarks and tracked
+  changes, a single Undo restores the document exactly as it was.
 
 ## Assumptions
 
@@ -412,4 +462,8 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - Out of scope for this feature: links between documents; backlinks or graph views; references to
   figures, tables, captions or arbitrary bookmarks; a command that validates or repairs broken
   references; changing heading text or numbering; applying character styles to all or part of a
-  reference (a later phase); store publication (distribution is by sideloading).
+  reference (a later phase); store publication (distribution is by sideloading); advisory
+  reporting of bad practice such as circular references or references inside headings (planned
+  for the backlinks and broken-reference phase).
+- Where the specification leaves a detail of the output open, the add-in follows what Word's own
+  cross-reference dialog would produce.

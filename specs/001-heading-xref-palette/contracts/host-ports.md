@@ -16,10 +16,10 @@ interface IHostShell {
   /** Register the handler for the "OpenSettings" ribbon action. */
   onOpenSettings(handler: () => void): void;
 
-  showPane(): Promise<void>;      // task pane, or dialog fallback per spike 1
+  showPane(): Promise<void>;      // task pane (spike 1: no dialog fallback needed)
   hidePane(): Promise<void>;
 
-  theme(): HostTheme;             // read on every show
+  theme(): HostTheme;             // read on every show from officeTheme, never prefers-color-scheme
   prefersReducedMotion(): boolean;
 
   shortcut: {
