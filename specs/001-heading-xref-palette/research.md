@@ -96,8 +96,8 @@ KeyboardShortcuts 1.1 = 2408.
   complete: Ctrl+Shift+C (copy formatting) and Ctrl+Alt+R/T (® and ™) are Word shortcuts
   reported as free. **Decision (product owner, 2026-10-11): default `Ctrl+Shift+Y`.** Three keys
   rather than four (Ctrl+Shift+Alt+K was rejected as too long), free in Word, and with no Alt
-  there is no AltGr clash on any layout. It must be pressed once in Word to confirm no prompt
-  appears before release; if one does, the next choice is Ctrl+Alt+J.
+  there is no AltGr clash on any layout. Confirmed in Word the same day: Ctrl+Shift+Y opens the
+  pane with no conflict prompt. If a later build claims it, the next choice is Ctrl+Alt+J.
 
 ## R5. Inserting cross-references — SPIKE 2
 
