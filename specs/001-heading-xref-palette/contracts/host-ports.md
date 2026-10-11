@@ -18,6 +18,7 @@ interface IHostShell {
 
   showPane(): Promise<void>;      // task pane (spike 1: no dialog fallback needed)
   hidePane(): Promise<void>;
+  onPaneHidden(handler: () => void): void; // hidden by hidePane or by the user's ×
 
   theme(): HostTheme;             // read on every show from officeTheme, never prefers-color-scheme
   prefersReducedMotion(): boolean;
@@ -46,6 +47,8 @@ Behaviour:
    boolean.
 6. `replace(combo)` followed by `current()` returns `combo`; `replace(null)` restores the
    manifest default.
+7. `onPaneHidden` handlers run whenever the pane is hidden, whether by `hidePane` or by the user
+   closing it with ×; the app then drops the loaded palette, so the next shortcut opens afresh.
 
 ## `ISettingsStore`
 

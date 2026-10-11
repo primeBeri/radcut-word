@@ -8,6 +8,8 @@ export interface IHostShell {
   /** Task pane, or dialog fallback per spike 1. */
   showPane(): Promise<void>;
   hidePane(): Promise<void>;
+  /** Called whenever the pane is hidden, by `hidePane` or by the user closing it with ×. */
+  onPaneHidden(handler: () => void): void;
 
   /** Read on every show. */
   theme(): HostTheme;

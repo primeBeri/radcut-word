@@ -65,6 +65,8 @@ export interface FakeSelection {
   pictures: number;
   shapes: number;
   contentControls: number;
+  /** The cursor is inside the first field of the paragraph. */
+  inField: boolean;
 }
 
 export interface FakeDocumentState {
@@ -101,6 +103,7 @@ export interface SelectOptions {
   pictures?: number;
   shapes?: number;
   contentControls?: number;
+  inField?: boolean;
 }
 
 export class FakeDocumentBuilder {
@@ -202,7 +205,7 @@ export class FakeDocumentBuilder {
 }
 
 export function emptySelection(paragraphId: number): FakeSelection {
-  return { paragraphId, length: 0, paragraphs: 1, tables: 0, pictures: 0, shapes: 0, contentControls: 0 };
+  return { paragraphId, length: 0, paragraphs: 1, tables: 0, pictures: 0, shapes: 0, contentControls: 0, inField: false };
 }
 
 export function fakeDocument(): FakeDocumentBuilder {

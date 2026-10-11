@@ -1,6 +1,7 @@
 import { chooseUsableBookmark } from "../../src/core/bookmarks/selection";
-import type { FormatPart } from "../../src/core/formats/types";
+import { fieldFor, type FieldPartKind } from "../../src/core/formats/fields";
 import { headingFingerprint, headingKeyFor } from "../../src/core/headings/key";
+import { normaliseHeadingText } from "../../src/core/headings/normalise-text";
 import type { Heading, HeadingLevel, HeadingLocation, HeadingSnapshot } from "../../src/core/headings/types";
 import { classifyLocation } from "../../src/core/location/rules";
 import { classifySelection } from "../../src/core/location/selection";
@@ -23,6 +24,7 @@ import {
   type FakeDocumentState,
   type FakeField,
   type FakeInlineContent,
+  type FakeInsertion,
   type FakeParagraph,
   type FakeStory,
   type SelectOptions,
@@ -42,14 +44,6 @@ const STORY_RANK: Record<FakeStory, number> = {
 /** Paragraphs per page, so PAGEREF results are plausible positive integers. */
 const PARAGRAPHS_PER_PAGE = 40;
 
-/** Field switches per part (research R5). */
-const FIELD_FOR_PART: Record<Exclude<FormatPart["kind"], "literal">, Pick<FakeField, "type" | "switches">> = {
-  number: { type: "ref", switches: ["\\w", "\\h"] },
-  text: { type: "ref", switches: ["\\h"] },
-  page: { type: "pageRef", switches: ["\\h"] },
-  aboveBelow: { type: "ref", switches: ["\\p", "\\h"] },
-};
-
 interface ListedHeading {
   readonly heading: Heading;
   readonly paragraph: FakeParagraph;
@@ -62,7 +56,7 @@ interface ListedHeading {
  */
 export class FakeGateway implements IDocumentGateway {
   private state: FakeDocumentState;
-  private failNext = false;
+  private failNext: { duringWrite: boolean } | null = null;
   private snapshotClock = 0;
   private nextInsertion = 1;
   /** Set by returnFocus, for assertions. */
@@ -102,16 +96,18 @@ export class FakeGateway implements IDocumentGateway {
     if (point.inHeadingOrder !== null && point.inHeadingOrder === target.heading.order) {
       return { ok: false, reason: "declined", declined: { kind: "declined", reason: "selfReference" } };
     }
-    if (point.selection === "extended" && !request.confirmExtendedSelection) {
-      return { ok: false, reason: "needsConfirmation" };
+    if ((point.selection === "extended" || point.selection === "field") && !request.confirmExtendedSelection) {
+      return { ok: false, reason: "needsConfirmation", confirm: point.selection === "field" ? "field" : "selection" };
     }
 
     // Everything below happens on a copy, committed only if every step succeeds.
     const draft = structuredClone(this.state);
     try {
       if (this.failNext) {
-        this.failNext = false;
-        throw new Error("Simulated host failure.");
+        const { duringWrite } = this.failNext;
+        this.failNext = null;
+        // Word's write batch is not transactional; the fake still leaves the document unchanged.
+        return { ok: false, reason: "hostError", partialWrite: duringWrite, detail: "Simulated host failure." };
       }
       const reused = target.heading.bookmark;
       let bookmark = reused;
@@ -130,6 +126,14 @@ export class FakeGateway implements IDocumentGateway {
       }
 
       const at = paragraphById(draft, draft.selection.paragraphId);
+      // A confirmed field selection replaces the whole field the cursor is in (FR-008b).
+      let replaced = point.selection === "none" ? "" : selectedText(draft);
+      if (point.selection === "field") {
+        const old = draft.fields.find((f) => f.paragraphId === at.id);
+        if (!old) throw new Error("The selection is inside a field the paragraph does not have.");
+        draft.fields = draft.fields.filter((f) => f !== old);
+        replaced = old.result;
+      }
       const content: FakeInlineContent[] = [];
       for (const part of request.parts) {
         if (part.kind === "literal") {
@@ -140,7 +144,8 @@ export class FakeGateway implements IDocumentGateway {
         draft.fields.push({
           id,
           paragraphId: at.id,
-          ...structuredClone(FIELD_FOR_PART[part.kind]),
+          type: fieldFor(part.kind).type,
+          switches: [...fieldFor(part.kind).switches],
           bookmark,
           result: this.fieldResult(part.kind, target, at),
           charFormat: at.charFormat,
@@ -154,7 +159,7 @@ export class FakeGateway implements IDocumentGateway {
         id,
         paragraphId: at.id,
         content,
-        replacedText: point.selection === "none" ? "" : selectedText(draft),
+        replacedText: replaced,
         charFormat: at.charFormat,
       });
       draft.selection = emptySelection(at.id);
@@ -162,7 +167,7 @@ export class FakeGateway implements IDocumentGateway {
       this.state = draft;
       return { ok: true, reference: { id }, bookmark, bookmarkCreated: reused === null };
     } catch (error) {
-      return { ok: false, reason: "hostError", detail: (error as Error).message };
+      return { ok: false, reason: "hostError", partialWrite: false, detail: (error as Error).message };
     }
   }
 
@@ -190,9 +195,12 @@ export class FakeGateway implements IDocumentGateway {
     this.state.protected = value;
   }
 
-  /** The next insertReference fails with hostError after its checks, changing nothing. */
-  failNextWrite(): void {
-    this.failNext = true;
+  /**
+   * The next insertReference fails with hostError after its checks, changing nothing. With
+   * `duringWrite` it reports the failure as Word does when the write batch itself fails.
+   */
+  failNextWrite(options: { duringWrite?: boolean } = {}): void {
+    this.failNext = { duringWrite: options.duringWrite ?? false };
   }
 
   /** Edit a paragraph's text (e.g. to make a listed heading stale). */
@@ -225,11 +233,19 @@ export class FakeGateway implements IDocumentGateway {
 
   /** Displayed text of an insertion: literals plus field results. */
   insertionText(id: string): string {
-    const insertion = this.state.insertions.find((i) => i.id === id);
-    if (!insertion) throw new Error(`No insertion ${id}.`);
-    return insertion.content
-      .map((c) => (c.kind === "literal" ? c.text : this.fieldById(c.fieldId).result))
+    return this.insertionById(id)
+      .content.map((c) => (c.kind === "literal" ? c.text : this.fieldById(c.fieldId).result))
       .join("");
+  }
+
+  /** Text of the paragraph an insertion went into, as it was before the insertion. */
+  insertionParagraph(id: string): string {
+    return paragraphById(this.state, this.insertionById(id).paragraphId).text;
+  }
+
+  /** The selected text an insertion replaced ("" for a caret). */
+  replacedText(id: string): string {
+    return this.insertionById(id).replacedText;
   }
 
   // ---- Internals --------------------------------------------------------------------------
@@ -246,7 +262,7 @@ export class FakeGateway implements IDocumentGateway {
       );
       const base = {
         level: headingLevelOf(paragraph) as HeadingLevel,
-        text: paragraph.text.trim(),
+        text: normaliseHeadingText(paragraph.text),
         number: paragraph.number,
         order,
         location: headingLocationOf(paragraph),
@@ -290,6 +306,7 @@ export class FakeGateway implements IDocumentGateway {
       pictureCount: selection.pictures,
       shapeCount: selection.shapes,
       contentControlCount: selection.contentControls,
+      insideField: selection.inField,
     };
     return classifyLocation(locationFacts, classifySelection(selectionFacts), policy);
   }
@@ -306,23 +323,26 @@ export class FakeGateway implements IDocumentGateway {
     return headings.find((h) => h.paragraph.id === bookmark.paragraphId) ?? null;
   }
 
-  private fieldResult(
-    kind: Exclude<FormatPart["kind"], "literal">,
-    target: ListedHeading,
-    at: FakeParagraph,
-  ): string {
+  private fieldResult(kind: FieldPartKind, target: ListedHeading, at: FakeParagraph): string {
+    // Positions by id: `at` may be a paragraph of a draft copy, not of the live state.
+    const ordered = this.orderedParagraphs().map((p) => p.id);
+    const targetPosition = ordered.indexOf(target.paragraph.id);
     switch (kind) {
       case "number":
         return target.heading.number ?? "";
       case "text":
         return target.heading.text;
       case "page":
-        return String(1 + Math.floor(this.orderedParagraphs().indexOf(target.paragraph) / PARAGRAPHS_PER_PAGE));
-      case "aboveBelow": {
-        const ordered = this.orderedParagraphs();
-        return ordered.indexOf(target.paragraph) < ordered.indexOf(at) ? "above" : "below";
-      }
+        return String(1 + Math.floor(targetPosition / PARAGRAPHS_PER_PAGE));
+      case "aboveBelow":
+        return targetPosition < ordered.indexOf(at.id) ? "above" : "below";
     }
+  }
+
+  private insertionById(id: string): FakeInsertion {
+    const insertion = this.state.insertions.find((i) => i.id === id);
+    if (!insertion) throw new Error(`No insertion ${id}.`);
+    return insertion;
   }
 
   private fieldById(id: number): FakeField {

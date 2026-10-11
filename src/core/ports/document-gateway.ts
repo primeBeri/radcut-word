@@ -18,10 +18,12 @@ export interface IDocumentGateway {
 
   /**
    * Insert a reference in ONE document transaction: re-read the selection and re-check location
-   * and protection, stop with `needsConfirmation` for an unconfirmed extended selection, ensure a
-   * bookmark on the target (reuse a usable one, else create `newBookmarkName`), then write the
-   * format's parts and update the new fields. On any failure, decline or `needsConfirmation` the
-   * document is left unchanged. All writes go in one `sync` (one Undo step, FR-013).
+   * and protection, decline a selection containing a table, stop with `needsConfirmation` for an
+   * unconfirmed extended selection or field, ensure a bookmark on the target (reuse a usable
+   * one, else create `newBookmarkName`), then write the format's parts (replacing a confirmed
+   * field whole) and update the new fields. On any decline or `needsConfirmation` the document is
+   * left unchanged. All writes go in one `sync` (one Undo step, FR-013); that batch is not
+   * transactional, so a failure inside it is reported with `partialWrite: true` (FR-014).
    */
   insertReference(request: InsertReferenceRequest): Promise<InsertReferenceResult>;
 
@@ -42,7 +44,7 @@ export interface InsertReferenceRequest {
   /** Used only if no usable bookmark exists. */
   readonly newBookmarkName: string;
   readonly policy: LocationPolicy;
-  /** True only after the user confirmed the selection warning (FR-008a). */
+  /** True only after the user confirmed the selection or field warning (FR-008a, FR-008b). */
   readonly confirmExtendedSelection: boolean;
 }
 
@@ -58,9 +60,13 @@ export type InsertReferenceResult =
       readonly bookmark: string;
       readonly bookmarkCreated: boolean;
     }
+  | { readonly ok: false; readonly reason: "staleTarget" }
+  | { readonly ok: false; readonly reason: "needsConfirmation"; readonly confirm: "selection" | "field" }
   | {
       readonly ok: false;
-      readonly reason: "staleTarget" | "hostError" | "needsConfirmation";
+      readonly reason: "hostError";
+      /** True when Word failed inside the write batch, so part of the reference may be in the document. */
+      readonly partialWrite: boolean;
       readonly detail?: string;
     }
   /** Cursor now disallowed, self reference, or document protected. */

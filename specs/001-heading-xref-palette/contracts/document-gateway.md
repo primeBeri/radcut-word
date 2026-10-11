@@ -19,10 +19,14 @@ interface IDocumentGateway {
    * Insert a reference in ONE document transaction:
    * re-read the current selection and re-check location and protection (decline if now invalid,
    * or `selfReference` if the target is the heading containing the cursor),
-   * stop with `needsConfirmation` if the selection is extended and not confirmed,
+   * decline `tableSelected` if the selection contains a table (FR-008a),
+   * stop with `needsConfirmation` if the selection is extended, or inside a field, and not
+   * confirmed (FR-008a, FR-008b); a confirmed field is replaced whole,
    * ensure a bookmark on the target (reuse usable one, else create `newBookmarkName`),
    * then write the format's parts at the selection and update the new fields.
-   * On any failure, decline or `needsConfirmation` the document is left unchanged.
+   * On any decline or `needsConfirmation` the document is left unchanged. Every check runs
+   * before the first write; if Word fails during the write itself, `hostError` carries
+   * `partialWrite: true`, because Office.js batches are not transactional (FR-014).
    * All writes go in one `sync` so the insertion is one Undo step (FR-013).
    */
   insertReference(request: InsertReferenceRequest): Promise<InsertReferenceResult>;
@@ -45,7 +49,9 @@ interface InsertReferenceRequest {
 
 type InsertReferenceResult =
   | { ok: true; reference: InsertedReference; bookmark: string; bookmarkCreated: boolean }
-  | { ok: false; reason: "staleTarget" | "hostError" | "needsConfirmation"; detail?: string }
+  | { ok: false; reason: "staleTarget" }
+  | { ok: false; reason: "needsConfirmation"; confirm: "selection" | "field" }
+  | { ok: false; reason: "hostError"; partialWrite: boolean; detail?: string }
   | { ok: false; reason: "declined"; declined: Declined };  // cursor now disallowed or document protected
 
 interface ReferenceRecord {
@@ -106,13 +112,20 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
    (page excepted, where the result is a positive integer).
 10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
     selected text without confirmation.
-10a. With a selection spanning two paragraphs, or containing a table, picture, shape or content
+10a. With a selection spanning two paragraphs, or containing a picture, shape or content
     control (`selection: "extended"`), `insertReference` with `confirmExtendedSelection: false`
-    returns `needsConfirmation` and the document is unchanged; with `true`, the reference
-    replaces the selection.
+    returns `needsConfirmation` with `confirm: "selection"` and the document is unchanged; with
+    `true`, the reference replaces the selection.
+10b. With a selection containing a table, `checkInsertionPoint` and `insertReference` decline
+    with `tableSelected`, confirmed or not, and the document is unchanged.
+10c. With the cursor inside an existing REF field (`selection: "field"`), `insertReference`
+    returns `needsConfirmation` with `confirm: "field"` and the document is unchanged; with
+    `confirmExtendedSelection: true`, the field is removed and the reference takes its place in
+    the same paragraph.
 11. If `expectedFingerprint` no longer matches the live heading, the result is
     `staleTarget` and the document is unchanged.
-12. A failure at any step leaves no new bookmark and no partial reference.
+12. A failure before the write leaves no new bookmark and no partial reference, and reports
+    `hostError` with `partialWrite: false`.
 13. `readReferences` returns one record per REF/PAGEREF field with its bookmark and switches.
 14. In the Word run only (not checked against the fake): after a field update (F9), every
     inserted reference still shows the correct value; after moving the target heading and

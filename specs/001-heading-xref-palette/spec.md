@@ -14,6 +14,8 @@
 
 **Refined**: 2026-10-11 — Default shortcut changed from Ctrl+Alt+K to Ctrl+Shift+Y (FR-001), from the spike 1 outcome (research R4): Word already uses Ctrl+Alt+K and prompts on conflict; a three-key combination was wanted, and Ctrl+Shift+Y is free in Word and has no AltGr clash on any layout. Still user-configurable; no other requirement changed.
 
+**Refined**: 2026-10-11 — From the US1 acceptance run (T055): a selection containing a table is now declined rather than replaced after confirmation (FR-008a); a cursor inside an existing field asks for confirmation and then replaces the field (new FR-008b); a write that fails part-way must not claim the document is unchanged (FR-014).
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -223,9 +225,14 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   created.
 - **Text selected when Enter is pressed**: the reference replaces the selection, as typing
   would. A selection within one paragraph, of any length, is replaced without warning. A
-  selection spanning more than one paragraph, or containing a table, picture or other object, is
+  selection spanning more than one paragraph, or containing a picture or other object, is
   likely a mis-click: the palette shows an inline warning (never a browser dialog) and needs a
-  second Enter to go ahead; Esc cancels. Either way, one Undo restores the selection.
+  second Enter to go ahead; Esc cancels. Either way, one Undo restores the selection. A
+  selection containing a table is declined with a message (FR-008a).
+- **Cursor inside an existing field** (for example inside another cross-reference): inserting
+  there would put the new reference inside the old field's result, where the next field update
+  erases it. The palette warns that the field will be replaced; a second Enter replaces the whole
+  field, Esc cancels (FR-008b).
 - **Headings outside the main text flow** (in table cells, text boxes, footnotes, endnotes,
   headers or footers): listed in document order with a badge naming the location, and hidden
   when the user turns off "Show headings outside the main text". A heading in a header or footer
@@ -314,9 +321,16 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   document protection MUST be re-checked at that moment; if they now forbid insertion, the
   palette MUST show a message, stay open and leave the document unchanged.
 - **FR-008a**: A selection within a single paragraph MUST be replaced without warning. If the
-  selection spans more than one paragraph or contains a table, picture or other non-text object,
+  selection spans more than one paragraph or contains a picture or other non-text object,
   the first Enter MUST show an inline warning in the palette (not a browser or system dialog) and
-  change nothing; a second Enter MUST go ahead and Esc MUST cancel.
+  change nothing; a second Enter MUST go ahead and Esc MUST cancel. ~~A selection containing a
+  table is replaced after the same confirmation.~~ (changed 2026-10-11 after the US1 acceptance
+  run: replacing a table is not an intended use and Word handled it badly.) A selection
+  containing a table MUST be declined with a message and no change.
+- **FR-008b**: If the cursor or selection is inside an existing field (for example a
+  cross-reference), the first Enter MUST show an inline warning that the field will be replaced
+  and change nothing; a second Enter MUST replace the whole field with the new reference, and Esc
+  MUST cancel. The replacement is one Undo step like any other insertion (FR-013).
 - **FR-009**: References MUST consist only of Word's native bookmarks and hyperlinked
   cross-reference fields plus fixed literal text, so that documents display, update and navigate
   correctly without the add-in.
@@ -345,7 +359,10 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   feasibility checks show Word's API cannot achieve this, it is a release blocker to be raised
   with the product owner, not a documented exception.
 - **FR-014**: If insertion fails, the document MUST be left unchanged (no orphan bookmark, no
-  partial reference) and the user MUST see a short message saying what happened.
+  partial reference) and the user MUST see a short message saying what happened. Every check MUST
+  run before the first write. If Word nevertheless fails part-way through writing, the message
+  MUST NOT claim the document is unchanged; it MUST say part of the reference may have been
+  written and that one Undo removes it.
 
 **Formats**
 

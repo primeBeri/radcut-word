@@ -37,8 +37,10 @@ The result of one read of the document's headings.
 | `headings` | `Heading[]` | In document order; `order` is 0..n-1 without gaps. |
 | `takenAt` | `number` | Monotonic timestamp, for cache freshness. |
 
-**HeadingIndex** (core unit) builds and caches the snapshot per document, composes full numbers
-when the host returns only level parts (research R7), and answers `byKey(key)`.
+**HeadingIndex** (core unit) caches the snapshot (one runtime per document), refreshes it in the
+background, and answers `byKey(key)`. Numbers are Word's `listString`, which is already the full
+number (research R7 outcome). Gateways normalise heading text with the core's
+`normaliseHeadingText` (a note's leading reference mark is dropped).
 
 ## Heading Bookmark
 
@@ -72,13 +74,13 @@ one used (FR-008). Nothing is kept or tracked between the two readings.
 | Field | Type | Rules |
 |---|---|---|
 | `location` | `"main" \| "footnote" \| "endnote" \| "tableCellInMain"` | Only allowed locations reach this type. |
-| `selection` | `"none" \| "inline" \| "extended"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a table, picture, shape or content control; replaced only after confirmation (FR-008a). |
+| `selection` | `"none" \| "inline" \| "extended" \| "field"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a picture, shape or content control; replaced only after confirmation (FR-008a). `field`: the cursor or selection is inside an existing field; the whole field is replaced only after confirmation (FR-008b). A selection containing a table is declined (`tableSelected`). |
 | `inHeadingOrder` | `number \| null` | Order of the heading paragraph containing the cursor (only possible when `allowInHeadings` is on); that heading is not offered as a target (FR-001b). |
-| `precedingHeadingOrder` | `number \| null` | Heading order just before the point; used for the above/below preview. |
+| `precedingHeadingOrder` | `number \| null` | Heading order just before the point; used for the above/below preview. In Word it is the count of heading paragraphs before the cursor in the main text, so it is approximate when tracked deletions precede the cursor and null in notes (Word decides the real value). |
 
 **Location check** (FR-001a, FR-001b) produces either an `InsertionPoint` or a `Declined` reason:
 `"header" | "footer" | "comment" | "textBox" | "headingParagraph" | "titleParagraph" |
-"selfReference" | "protected" | "unknown"`. `selfReference` arises only at Enter, when the target
+"selfReference" | "protected" | "tableSelected" | "unknown"`. `selfReference` arises only at Enter, when the target
 is the heading containing the cursor.
 
 **LocationPolicy** = `{ allowInHeadings: boolean }`, taken from `UserSettings`. With it on,

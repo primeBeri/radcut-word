@@ -12,9 +12,11 @@ row; the manual acceptance checklist repeats the focus rows in real Word.
 | ↑ / ↓ | Move selection, no wrap; selected row scrolled into view | FR-006 |
 | Page Up / Page Down | Move selection by one visible page | (convenience) |
 | Tab / Shift+Tab | Next / previous format, wrapping; preview updates | FR-015 |
-| Enter | Insert selected heading in the shown format; with an extended selection the first Enter shows the selection warning and changes nothing, the second inserts | FR-006, FR-008a |
+| Enter | Insert selected heading in the shown format; with an extended selection, or the cursor inside a field, the first Enter shows the warning and changes nothing, the second inserts | FR-006, FR-008a, FR-008b |
 | Esc | Close, no change, caret restored; while the selection warning is shown, dismiss the warning only | FR-006, FR-008a |
 | Ctrl+, | Open settings (same as clicking the cog) | FR-021a |
+| Shortcut, with the palette still on screen | Search box focused again; query, format and selection kept; the list refreshes in place | FR-002 |
+| Shortcut, after the pane was closed (Esc, insert or ×) | A fresh palette: empty query, default format, cursor checked again | FR-002 |
 
 Tab does not move focus while the palette is open; the cog is reached with Ctrl+, or by mouse.
 The cog button stays in the accessibility tree with its shortcut announced
@@ -29,7 +31,9 @@ The cog button stays in the accessibility tree with its shortcut announced
   strategy, level 2"; "Summary, level 1, in text box").
 - Location badge (FR-003a): rows for headings outside the main text show a text badge after the
   heading text — "Table", "Text box", "Footnote", "Endnote", "Header" or "Footer" — styled with
-  Fluent tokens and never colour alone.
+  Fluent tokens and never colour alone. Each location has its own Fluent palette tint
+  (`colorPalette<Name>Background2` / `Foreground2` / `BorderActive`), so they can be told apart
+  at a glance; the text still names the location.
 - Recents group (empty query only): `role="group"` labelled "Recent", then a group labelled
   "All headings" (FR-022).
 - Highlighted characters use `<mark>` with bold weight and an underline as well as colour
@@ -38,8 +42,18 @@ The cog button stays in the accessibility tree with its shortcut announced
   (`aria-live="polite"`) so screen readers announce format changes.
 - Messages (no headings, no matches, declined, stale, failed, selection warning): one polite live
   region; Enter is a no-op when there is no selectable row. Fixed texts:
-  - Selection warning: "The selection covers more than one paragraph, a table or a picture.
+  - Selection warning: "The selection covers more than one paragraph or a picture.
     Press Enter again to replace it, or Esc to keep it."
+  - Field warning (FR-008b): "The cursor is inside a field. Press Enter again to replace the
+    whole field, or Esc to keep it."
+  - Table selected (FR-008a): "References can't replace a table. Select text, or put the cursor
+    where the reference should go."
+  - Failed before writing: "The reference couldn't be inserted. The document hasn't been changed."
+  - Failed while writing (FR-014): "Word stopped part-way through inserting the reference. Press
+    Ctrl+Z once to remove anything it wrote."
+  - Both warnings appear directly under the selected row (still in the polite live region), so
+    they sit next to what the second Enter will insert; other messages stay at the foot of the
+    list.
   - Declined in a heading or title: "References can't go in headings or titles. To allow them,
     turn on “Allow references in headings” in Settings."
   - Self reference: "A heading can't refer to itself."

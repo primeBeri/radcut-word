@@ -10,7 +10,10 @@ export interface ContractMatchers {
   toMatch(expected: RegExp): void;
   toHaveLength(expected: number): void;
   toBeGreaterThan(expected: number): void;
+  /** Substring of a string, or an array item by identity. */
   toContain(expected: unknown): void;
+  /** An array item structurally equal to `expected`. */
+  toContainEqual(expected: unknown): void;
   readonly not: Omit<ContractMatchers, "not">;
 }
 

@@ -13,6 +13,8 @@ defineHostShellContract(
       shell,
       pressShortcut: async () => shell.pressShortcut(),
       clickCrossReferenceButton: async () => shell.clickCrossReferenceButton(),
+      paneVisible: async () => shell.visible,
+      closePaneByUser: async () => shell.closePaneByUser(),
     };
   },
   vitestApi,

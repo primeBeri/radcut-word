@@ -98,8 +98,13 @@ function matchers(actual: unknown, negated: boolean): ContractMatchers {
     toContain: (expected) =>
       check(
         (typeof actual === "string" && typeof expected === "string" && actual.includes(expected)) ||
-          (Array.isArray(actual) && actual.some((item) => deepEqual(item, expected))),
+          (Array.isArray(actual) && actual.includes(expected)),
         `${show(actual)} to contain ${show(expected)}`,
+      ),
+    toContainEqual: (expected) =>
+      check(
+        Array.isArray(actual) && actual.some((item) => deepEqual(item, expected)),
+        `${show(actual)} to contain an item equal to ${show(expected)}`,
       ),
   };
   return negated ? { ...base, not: base } : { ...base, not: matchers(actual, true) };

@@ -19,8 +19,16 @@ export async function fakeGatewayHarness(fixture: ContractFixture): Promise<Gate
         extent: b.extent,
       })),
     fields: async () =>
-      gateway.fields().map((f) => ({ type: f.type, bookmark: f.bookmark, switches: f.switches, result: f.result })),
+      gateway.fields().map((f) => ({
+        type: f.type,
+        bookmark: f.bookmark,
+        switches: f.switches,
+        result: f.result,
+        format: { bold: f.charFormat === "bold", italic: f.charFormat === "italic" },
+      })),
     insertionText: async (reference: InsertedReference) => gateway.insertionText(reference.id),
+    insertionParagraph: async (reference: InsertedReference) => gateway.insertionParagraph(reference.id),
+    replacedText: async (reference: InsertedReference) => gateway.replacedText(reference.id),
     documentState: async () => gateway.documentState(),
   };
 }

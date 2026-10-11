@@ -3,10 +3,14 @@ export type InsertionLocation = "main" | "footnote" | "endnote" | "tableCellInMa
 
 /**
  * `inline`: within one paragraph, replaced without warning.
- * `extended`: more than one paragraph, or a table, picture, shape or content control;
+ * `extended`: more than one paragraph, or a picture, shape or content control;
  * replaced only after confirmation (FR-008a).
+ * `field`: inside an existing field; the whole field is replaced only after confirmation (FR-008b).
  */
-export type SelectionExtent = "none" | "inline" | "extended";
+export type SelectionExtent = "none" | "inline" | "extended" | "field";
+
+/** What `classifySelection` decides: an extent, or a table selection, which is declined (FR-008a). */
+export type SelectionClass = SelectionExtent | "table";
 
 export interface InsertionPoint {
   readonly kind: "insertionPoint";
@@ -27,6 +31,7 @@ export type DeclinedReason =
   | "titleParagraph"
   | "selfReference"
   | "protected"
+  | "tableSelected"
   | "unknown";
 
 export interface Declined {
@@ -76,4 +81,6 @@ export interface SelectionFacts {
   readonly pictureCount: number;
   readonly shapeCount: number;
   readonly contentControlCount: number;
+  /** The cursor or selection lies inside an existing field's result or code. */
+  readonly insideField: boolean;
 }

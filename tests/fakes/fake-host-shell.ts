@@ -15,6 +15,7 @@ export class FakeHostShell implements IHostShell {
 
   private openPalette: (() => void) | null = null;
   private openSettings: (() => void) | null = null;
+  private readonly paneHidden: (() => void)[] = [];
 
   onOpenPalette(handler: () => void): void {
     this.openPalette = handler;
@@ -31,7 +32,22 @@ export class FakeHostShell implements IHostShell {
 
   async hidePane(): Promise<void> {
     this.calls.push("hide");
+    this.hide();
+  }
+
+  onPaneHidden(handler: () => void): void {
+    this.paneHidden.push(handler);
+  }
+
+  /** Simulate the user closing the pane with its × button. */
+  closePaneByUser(): void {
+    this.hide();
+  }
+
+  private hide(): void {
+    const wasVisible = this.visible;
     this.visible = false;
+    if (wasVisible) this.paneHidden.forEach((handler) => handler());
   }
 
   theme(): HostTheme {

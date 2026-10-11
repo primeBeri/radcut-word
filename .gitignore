@@ -57,3 +57,6 @@ tmp/
 
 # TypeScript build info for project references
 .tsbuild/
+
+# Word lock files for open documents
+~$*

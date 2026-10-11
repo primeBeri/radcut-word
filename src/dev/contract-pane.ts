@@ -7,8 +7,11 @@ import {
 } from "../../tests/contract/host-ports.contract";
 import { FakeHostShell } from "../../tests/fakes/fake-host-shell";
 import { FakeSettingsStore } from "../../tests/fakes/fake-settings-store";
+import { registerOfficeContracts } from "../adapters/office/dev-registration";
 import { registerContract, registeredContracts } from "./contract-registry";
 import { MiniTest } from "./mini-test";
+
+await registerOfficeContracts();
 
 // The fakes run here too, which checks the in-browser shim against the Node results.
 registerContract({
@@ -31,6 +34,8 @@ registerContract({
           shell,
           pressShortcut: async () => shell.pressShortcut(),
           clickCrossReferenceButton: async () => shell.clickCrossReferenceButton(),
+          paneVisible: async () => shell.visible,
+          closePaneByUser: async () => shell.closePaneByUser(),
         };
       },
       api,
