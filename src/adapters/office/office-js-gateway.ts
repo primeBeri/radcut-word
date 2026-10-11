@@ -65,8 +65,12 @@ const PARAGRAPH_FIELDS = `${STYLE_FIELDS},items/text`;
  */
 const INSIDE_FIELD = new Set<string>(["Equal", "Contains", "ContainsStart", "ContainsEnd", "OverlapsBefore", "OverlapsAfter"]);
 
-/** A tracked deletion that covers the heading text removes the heading (FR-003, research R9). */
-const COVERS = new Set<string>(["Equal", "Contains"]);
+/**
+ * Relations of A to B where A covers all of B. Word reports "ContainsStart"/"ContainsEnd", not
+ * "Contains", when the two share an edge, which a heading bookmark always does (it starts where
+ * the paragraph starts), so all four must count.
+ */
+const COVERS = new Set<string>(["Equal", "Contains", "ContainsStart", "ContainsEnd"]);
 
 function supports(set: string, version: string): boolean {
   return Office.context.requirements.isSetSupported(set, version);
@@ -333,7 +337,7 @@ export class OfficeJsGateway implements IDocumentGateway {
   }
 
   /**
-   * Leave out headings whose text a tracked deletion covers. Only looked at when the main text
+   * Leave out headings whose text a tracked deletion covers (FR-003, research R9). Only looked at when the main text
    * has a tracked deletion at all, so ordinary documents pay nothing. Position, not text, decides:
    * a deletion that also takes part of the next paragraph still removes the heading.
    */
@@ -480,7 +484,7 @@ export class OfficeJsGateway implements IDocumentGateway {
       const possible = candidates.filter(matches);
       const relations = possible.map((c) => c.paragraph.getRange("Whole").compareLocationWith(range));
       await context.sync();
-      found = possible.find((_, i) => relations[i]!.value === "Contains" || relations[i]!.value === "Equal") ?? null;
+      found = possible.find((_, i) => COVERS.has(relations[i]!.value)) ?? null;
     }
     if (!found) return null;
     const [target] = await this.describe(context, [found], { numbers: false });
