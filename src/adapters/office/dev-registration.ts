@@ -18,9 +18,10 @@ import { defineDocumentGatewayContract } from "../../../tests/contract/document-
 import { defineHostShellContract } from "../../../tests/contract/host-ports.contract";
 import type { InsertedReference } from "../../core/ports/document-gateway";
 import { normaliseHeadingText } from "../../core/headings/normalise-text";
+import { parseFieldCode } from "../../core/references/field-code";
 import { registerContract } from "../../dev/contract-registry";
 import { OfficeHostShell } from "./office-host-shell";
-import { OfficeJsGateway } from "./office-js-gateway";
+import { OfficeJsGateway, storyBodies } from "./office-js-gateway";
 
 /** A heading each fixture has and the others do not, to tell which document is open. */
 const FIXTURE_MARKER: Record<ContractFixture, string> = {
@@ -30,7 +31,8 @@ const FIXTURE_MARKER: Record<ContractFixture, string> = {
   "plain-headings": "Outline-level heading",
 };
 
-let snapshot: string | null = null;
+/** The main text as the first case found it, per document (the pane may outlive a document). */
+let snapshot: { url: string; ooxml: string } | null = null;
 
 async function storyParagraphs(context: Word.RequestContext): Promise<Word.Paragraph[]> {
   const body = context.document.body;
@@ -50,31 +52,38 @@ async function storyParagraphs(context: Word.RequestContext): Promise<Word.Parag
   return collections.flatMap((c) => c.items);
 }
 
-async function paragraphByText(context: Word.RequestContext, text: string): Promise<Word.Paragraph> {
+/**
+ * Paragraph texts as Word reports them where they differ from the shared fixture text: Word
+ * includes field results in paragraph text, the fake does not (contract run 1).
+ */
+const WORD_TEXT: Record<string, string> = {
+  "References made by Word: see section and heading.": "References made by Word: see section 1.1 and heading Scope.",
+};
+
+async function paragraphByText(context: Word.RequestContext, fixtureText: string): Promise<Word.Paragraph> {
+  const text = WORD_TEXT[fixtureText] ?? fixtureText;
   const found = (await storyParagraphs(context)).find((p) => normaliseHeadingText(p.text) === text);
   if (!found) throw new Error(`No paragraph "${text}" reachable from script (comments: put the cursor there by hand).`);
   return found;
 }
 
-function parseCode(code: string): { bookmark: string | null; switches: string[] } {
-  const tokens = code.trim().split(/\s+/);
-  const switches: string[] = [];
-  for (let i = 2; i < tokens.length; i++) {
-    const token = tokens[i]!;
-    switches.push(token === "\\*" && tokens[i + 1] ? `${token} ${tokens[++i]}` : token);
-  }
-  return { bookmark: tokens[1] ?? null, switches };
-}
-
 async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHarness> {
   await Word.run(async (context) => {
     const body = context.document.body;
-    if (snapshot === null) {
+    const url = Office.context.document.url;
+    if (snapshot === null || snapshot.url !== url) {
       const ooxml = body.getOoxml();
       await context.sync();
-      snapshot = ooxml.value;
+      snapshot = { url, ooxml: ooxml.value };
     } else {
-      body.insertOoxml(snapshot, "Replace");
+      // With change tracking on, the restore itself would be tracked and leave a deleted copy of
+      // every paragraph (contract run on tracked.docx), so switch tracking off around it.
+      const document = context.document.load("changeTrackingMode");
+      await context.sync();
+      const mode = document.changeTrackingMode;
+      document.changeTrackingMode = Word.ChangeTrackingMode.off;
+      body.insertOoxml(snapshot.ooxml, "Replace");
+      document.changeTrackingMode = mode;
       await context.sync();
     }
     const paragraphs = body.paragraphs.load("items/text");
@@ -109,10 +118,11 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
       await context.sync();
       return all.items.map((field, i) => {
         const type = field.type === Word.FieldType.ref ? "ref" : field.type === Word.FieldType.pageRef ? "pageRef" : "other";
-        const parsed = type === "other" ? { bookmark: null, switches: [] } : parseCode(field.code);
+        const parsed = type === "other" ? { bookmark: null, switches: [] } : parseFieldCode(field.code);
         return {
           type,
-          ...parsed,
+          bookmark: parsed.bookmark,
+          switches: [...parsed.switches],
           result: results[i]!.text,
           format: { bold: results[i]!.font.bold === true, italic: results[i]!.font.italic === true },
         };
@@ -121,9 +131,11 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
 
   const bookmarks = async (): Promise<BookmarkInfo[]> =>
     Word.run(async (context) => {
-      const names = context.document.body.getRange("Whole").getBookmarks(true, true);
+      const lists = (await storyBodies(context)).map((body) => body.getRange("Whole").getBookmarks(true, true));
       await context.sync();
-      const entries = names.value.map((name) => {
+      // Linked headers and footers repeat their bookmarks; list each name once.
+      const names = [...new Set(lists.flatMap((list) => list.value))];
+      const entries = names.map((name) => {
         const range = context.document.getBookmarkRangeOrNullObject(name);
         const paragraph = range.paragraphs.getFirst().load("text");
         return {
@@ -160,6 +172,9 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
           throw new Error("The fixture has no content control; check this case by hand.");
         } else if ((selection.paragraphs ?? 1) > 1) {
           range = paragraph.getRange("Whole").expandTo(paragraph.getNext().getRange("Whole"));
+        } else if (selection.caretOffset) {
+          const before = paragraph.search(paragraph.text.slice(0, selection.caretOffset), { matchCase: true }).getFirst();
+          range = before.getRange("End");
         } else if (selection.length) {
           range = paragraph.search(paragraph.text.slice(0, selection.length), { matchCase: true }).getFirst();
         }

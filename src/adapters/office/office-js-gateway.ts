@@ -2,6 +2,7 @@ import { chooseUsableBookmark } from "../../core/bookmarks/selection";
 import { fieldFor } from "../../core/formats/fields";
 import { headingFingerprint, headingKeyFor } from "../../core/headings/key";
 import { normaliseHeadingText } from "../../core/headings/normalise-text";
+import { parseFieldCode } from "../../core/references/field-code";
 import type { Heading, HeadingLevel, HeadingLocation, HeadingSnapshot } from "../../core/headings/types";
 import { classifyLocation, isHeadingParagraph } from "../../core/location/rules";
 import { classifySelection } from "../../core/location/selection";
@@ -66,6 +67,13 @@ const PARAGRAPH_FIELDS = `${STYLE_FIELDS},items/text`;
 const INSIDE_FIELD = new Set<string>(["Equal", "Contains", "ContainsStart", "ContainsEnd", "OverlapsBefore", "OverlapsAfter"]);
 
 /**
+ * Protection that stops a reference going in. "AllowOnlyRevisions" still allows edits (tracked),
+ * so it is not here. Editable regions in a read-only document are not detected: there the palette
+ * declines although Word would accept the edit (a known behaviour for T100).
+ */
+const BLOCKING_PROTECTION = new Set<string>(["AllowOnlyComments", "AllowOnlyFormFields", "AllowOnlyReading"]);
+
+/**
  * Relations of A to B where A covers all of B. Word reports "ContainsStart"/"ContainsEnd", not
  * "Contains", when the two share an edge, which a heading bookmark always does (it starts where
  * the paragraph starts), so all four must count.
@@ -105,6 +113,8 @@ interface SelectionReading {
   readonly paragraph: Word.Paragraph | null;
   /** The field the selection is inside, if any (FR-008b). */
   readonly field: Word.Field | null;
+  /** Inline pictures and shapes in the selection. */
+  readonly objects: number;
 }
 
 export class OfficeJsGateway implements IDocumentGateway {
@@ -129,9 +139,12 @@ export class OfficeJsGateway implements IDocumentGateway {
 
   async listBookmarkNames(): Promise<string[]> {
     return Word.run(async (context) => {
-      const names = context.document.body.getRange("Whole").getBookmarks(true, true);
+      // A range lists only its own story's bookmarks, but names are unique document-wide.
+      const lists = (await storyBodies(context)).map((body) => body.getRange("Whole").getBookmarks(true, true));
       await context.sync();
-      return names.value;
+      const seen = new Map<string, string>();
+      for (const name of lists.flatMap((list) => list.value)) seen.set(name.toLowerCase(), name);
+      return [...seen.values()];
     });
   }
 
@@ -141,7 +154,7 @@ export class OfficeJsGateway implements IDocumentGateway {
     try {
       return await Word.run(async (context) => {
         // Reads: as many syncs as needed. Nothing is written until every check has passed.
-        const { point, selection, paragraph, field } = await this.readInsertionPoint(context, request.policy, {
+        const { point, selection, paragraph, field, objects } = await this.readInsertionPoint(context, request.policy, {
           positions: false,
         });
         if (point.kind === "declined") return { ok: false, reason: "declined", declined: point };
@@ -177,11 +190,16 @@ export class OfficeJsGateway implements IDocumentGateway {
           replacing.select();
           anchor = context.document.getSelection();
         }
+        // Word refuses insertField next to a selected picture or shape (contract run 3), so such a
+        // selection is cleared first and the reference goes where it was.
+        const clearFirst = replacing === null && point.selection !== "none" && objects > 0;
+        if (clearFirst) anchor.delete();
         const reused = target.heading.bookmark;
         const bookmark = reused ?? request.newBookmarkName;
         if (reused === null) target.textRange.insertBookmark(bookmark);
         const fields: Word.Field[] = [];
-        let first: Word.Range | null = null;
+        /** The first part's range, for the dev-pane span: a literal, or the first field. */
+        let first: Word.Range | Word.Field | null = null;
         for (const part of request.parts) {
           if (part.kind === "literal") {
             const inserted = anchor.insertText(part.text, "Before");
@@ -191,13 +209,16 @@ export class OfficeJsGateway implements IDocumentGateway {
           const spec = fieldFor(part.kind);
           const type = spec.type === "ref" ? Word.FieldType.ref : Word.FieldType.pageRef;
           const inserted = anchor.insertField("Before", type, `${bookmark} ${spec.switches.join(" ")}`, true);
-          first ??= inserted.result;
+          first ??= inserted;
           fields.push(inserted);
         }
         if (replacing && supports("WordApi", "1.5")) replacing.delete();
-        else if (point.selection !== "none") anchor.insertText("", "Replace");
+        else if (point.selection !== "none" && !clearFirst) anchor.insertText("", "Replace");
         fields.forEach((f) => f.updateResult());
-        const span = this.debug.onInserted && first ? first.expandTo(anchor.getRange("Start")).track() : null;
+        // A field's result is read only after updateResult is queued: a range taken before the
+        // update comes back empty (contract run 1).
+        const start = first instanceof Word.Field ? first.result : first;
+        const span = this.debug.onInserted && start ? start.expandTo(anchor.getRange("Start")).track() : null;
         writing = true;
         await context.sync();
 
@@ -209,7 +230,10 @@ export class OfficeJsGateway implements IDocumentGateway {
       if (isAccessDenied(error)) {
         return { ok: false, reason: "declined", declined: { kind: "declined", reason: "protected" } };
       }
-      const detail = error instanceof Error ? error.message : String(error);
+      // Word's bare "GeneralException" says nothing; its debug info names the failing call.
+      const location = error instanceof OfficeExtension.Error ? error.debugInfo.errorLocation : undefined;
+      const message = error instanceof Error ? error.message : String(error);
+      const detail = location ? `${message} at ${location}` : message;
       return { ok: false, reason: "hostError", partialWrite: writing, detail };
     }
   }
@@ -228,23 +252,10 @@ export class OfficeJsGateway implements IDocumentGateway {
       fields.load("items/code,items/type");
       await context.sync();
       return fields.items.flatMap((field): ReferenceRecord[] => {
-        // " REF _RC… \w \h \* CHARFORMAT " → bookmark and switches ("\*" joins its argument).
-        const tokens = field.code.trim().split(/\s+/);
-        const bookmark = tokens[1];
+        const { bookmark, switches } = parseFieldCode(field.code);
         if (!bookmark) return [];
-        const switches: string[] = [];
-        for (let i = 2; i < tokens.length; i++) {
-          const token = tokens[i]!;
-          switches.push(token === "\\*" && tokens[i + 1] ? `${token} ${tokens[++i]}` : token);
-        }
-        return [
-          {
-            bookmark,
-            fieldType: field.type === Word.FieldType.pageRef ? "pageRef" : "ref",
-            switches,
-            location: "main",
-          },
-        ];
+        const fieldType = field.type === Word.FieldType.pageRef ? "pageRef" : "ref";
+        return [{ bookmark, fieldType, switches, location: "main" }];
       });
     });
   }
@@ -341,21 +352,25 @@ export class OfficeJsGateway implements IDocumentGateway {
    * has a tracked deletion at all, so ordinary documents pay nothing. Position, not text, decides:
    * a deletion that also takes part of the next paragraph still removes the heading.
    */
-  private async withoutTrackedDeletions<T extends { readonly textRange: Word.Range }>(
-    context: Word.RequestContext,
-    candidates: T[],
-    tracked: Word.TrackedChangeCollection | null,
-  ): Promise<T[]> {
+  private async withoutTrackedDeletions<
+    T extends { readonly paragraph: Word.Paragraph; readonly textRange: Word.Range; readonly text: string },
+  >(context: Word.RequestContext, candidates: T[], tracked: Word.TrackedChangeCollection | null): Promise<T[]> {
     if (!tracked?.items.some((change) => change.type === "Deleted")) return candidates;
-    const changes = candidates.map((c) => c.textRange.getTrackedChanges().load("items/type"));
+    // The paragraph's changes, not the text range's: a deletion that also takes the paragraph
+    // mark or the next paragraph may not be listed for the text range alone.
+    const changes = candidates.map((c) => c.paragraph.getTrackedChanges().load("items/type,items/text"));
     await context.sync();
-    const relations = changes.map((list, i) =>
-      list.items
-        .filter((change) => change.type === "Deleted")
-        .map((change) => change.getRange("Whole").compareLocationWith(candidates[i]!.textRange)),
+    const deletions = changes.map((list) => list.items.filter((change) => change.type === "Deleted"));
+    const relations = deletions.map((list, i) =>
+      list.map((change) => change.getRange("Whole").compareLocationWith(candidates[i]!.textRange)),
     );
     await context.sync();
-    return candidates.filter((_, i) => !relations[i]!.some((relation) => COVERS.has(relation.value)));
+    return candidates.filter((c, i) => {
+      const covered = relations[i]!.some((relation) => COVERS.has(relation.value));
+      // Word may split one deletion into several changes; together they still spell the heading.
+      const spelled = c.text !== "" && normaliseHeadingText(deletions[i]!.map((d) => d.text).join("")).includes(c.text);
+      return !covered && !spelled;
+    });
   }
 
   /** Numbers (optional) and bookmarks for the given candidates. */
@@ -412,6 +427,7 @@ export class OfficeJsGateway implements IDocumentGateway {
   ): Promise<SelectionReading> {
     const selection = context.document.getSelection();
     selection.load("isEmpty");
+    const doc = supports("WordApiDesktop", "1.4") ? context.document.load("protectionType") : null;
     const body = selection.parentBody.load("type");
     const parentOfBody = body.parentBodyOrNullObject.load("type");
     const paragraphs = selection.paragraphs.load(STYLE_FIELDS);
@@ -445,8 +461,8 @@ export class OfficeJsGateway implements IDocumentGateway {
       inTable: body.type === "TableCell" || (first?.tableNestingLevel ?? 0) > 0,
       styleBuiltIn: first?.styleBuiltIn ?? null,
       outlineLevel: first?.outlineLevel ?? null,
-      // Protection is detected when a write is refused (AccessDenied → declined "protected").
-      protected: false,
+      // Read up front where Word reports it; otherwise only a refused write (AccessDenied) shows it.
+      protected: doc !== null && BLOCKING_PROTECTION.has(doc.protectionType),
       headingOrder: before && own && count > 0 ? count - 1 : null,
       precedingHeadingOrder: before && preceding >= 0 ? preceding : null,
     };
@@ -459,7 +475,8 @@ export class OfficeJsGateway implements IDocumentGateway {
       contentControlCount: controls.items.length,
       insideField: field !== null,
     });
-    return { point: classifyLocation(facts, extent, policy), selection, paragraph: first, field };
+    const objects = pictures.items.length + (shapes?.items.length ?? 0);
+    return { point: classifyLocation(facts, extent, policy), selection, paragraph: first, field, objects };
   }
 
   /**
@@ -490,6 +507,28 @@ export class OfficeJsGateway implements IDocumentGateway {
     const [target] = await this.describe(context, [found], { numbers: false });
     return target ?? null;
   }
+}
+
+/**
+ * Every story's body: main text, text boxes, footnotes, endnotes, headers and footers. Office.js
+ * ranges see only their own story's bookmarks, so document-wide lists go through these.
+ */
+export async function storyBodies(context: Word.RequestContext): Promise<Word.Body[]> {
+  const body = context.document.body;
+  const footnotes = body.footnotes.load("items");
+  const endnotes = body.endnotes.load("items");
+  const sections = context.document.sections.load("items");
+  const shapes = supports("WordApiDesktop", "1.2") ? body.shapes.load("items/type") : null;
+  await context.sync();
+  return [
+    body,
+    ...(shapes?.items ?? []).filter((shape) => shape.type === "TextBox").map((shape) => shape.body),
+    ...footnotes.items.map((note) => note.body),
+    ...endnotes.items.map((note) => note.body),
+    ...sections.items.flatMap((section) =>
+      HEADER_TYPES.flatMap((type) => [section.getHeader(type), section.getFooter(type)]),
+    ),
+  ];
 }
 
 /**

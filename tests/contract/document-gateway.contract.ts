@@ -19,6 +19,8 @@ export type ContractFixture = "spec-300" | "guide-500" | "tracked" | "plain-head
 export interface SelectionRequest {
   /** Selected characters from the start of the paragraph; 0 = caret. */
   length?: number;
+  /** Caret this many characters into the paragraph instead of at its start (with no selection). */
+  caretOffset?: number;
   /** Paragraphs the selection touches. */
   paragraphs?: number;
   tables?: number;
@@ -152,10 +154,14 @@ export function defineDocumentGatewayContract(
       expect(lastMain.order).toBeGreaterThan(cell.order);
     });
 
-    it("2. look-alike headings and tracked deletions are not returned; tracked insertions are", async () => {
+    // One fixture per case: in Word the harness can only use the document that is open.
+    it("2. look-alike headings are not returned; outline-level headings are", async () => {
       const plain = (await (await setup("plain-headings")).gateway.readHeadings()).headings.map((x) => x.text);
       expect(plain).not.toContain("Bold fake heading");
       expect(plain).toContain("Outline-level heading");
+    });
+
+    it("2a. tracked deletions are not returned; tracked insertions are", async () => {
       const tracked = (await (await setup("tracked")).gateway.readHeadings()).headings.map((x) => x.text);
       expect(tracked).not.toContain("Deleted heading");
       expect(tracked).toContain("Inserted heading");
@@ -311,10 +317,12 @@ export function defineDocumentGatewayContract(
         ["Italic body text.", { bold: false, italic: true }],
       ] as const) {
         const h = await setup("spec-300");
-        await h.select(text);
-        const before = (await h.fields()).length;
-        await insertOk(h, "Heading with bold word");
-        const added = (await h.fields()).slice(before);
+        // Mid-text: at the very start of a paragraph Word takes no surrounding formatting, as with
+        // its own cross-reference dialog (FR-012a, contract run 3).
+        await h.select(text, { caretOffset: 4 });
+        const result = await insertOk(h, "Heading with bold word");
+        // Word lists fields in document order, so find the new ones by their (new) bookmark.
+        const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
         expect(added).toHaveLength(2);
         for (const field of added) expect(field.format).toEqual(format);
       }
@@ -333,11 +341,12 @@ export function defineDocumentGatewayContract(
       await insertOk(h, "Definitions");
       const afterBookmarks = await h.bookmarks();
       for (const b of bookmarks) expect(afterBookmarks).toContainEqual(b);
-      expect((await h.fields()).slice(0, fields.length)).toEqual(fields);
+      // Word lists fields in document order, so the new ones may sit anywhere among the old.
+      const afterFields = await h.fields();
+      for (const f of fields) expect(afterFields).toContainEqual(f);
     });
 
     it("7c. headings in every other story get a bookmark and a resolving reference", async () => {
-      const h = await setup("spec-300");
       for (const text of [
         "Heading in a table cell",
         "Heading in a text box",
@@ -346,6 +355,8 @@ export function defineDocumentGatewayContract(
         "Heading in the header",
         "Heading in the footer",
       ]) {
+        // Fresh document each time: in Word the previous reference changes BODY's text.
+        const h = await setup("spec-300");
         await h.select(BODY);
         const result = await insertOk(h, text, { parts: TEXT });
         expect(await h.insertionText(result.reference)).toBe(text);
@@ -359,9 +370,8 @@ export function defineDocumentGatewayContract(
 
     it("8. inserted content is the literals plus one hyperlinked field per part, with the R5 switches", async () => {
       const h = await setup("spec-300");
-      const before = (await h.fields()).length;
       const result = await insertOk(h, "Fire strategy");
-      const added = (await h.fields()).slice(before);
+      const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
       expect(added.map((f) => ({ type: f.type, bookmark: f.bookmark, switches: f.switches }))).toEqual([
         { type: "ref", bookmark: result.bookmark, switches: fieldFor("number").switches },
         { type: "ref", bookmark: result.bookmark, switches: fieldFor("text").switches },
@@ -403,7 +413,7 @@ export function defineDocumentGatewayContract(
         });
         expect(await h.documentState()).toEqual(before);
         const confirmed = await h.gateway.insertReference(await request(h.gateway, target, { confirmExtendedSelection: true }));
-        expect(confirmed.ok).toBe(true);
+        if (!confirmed.ok) throw new Error(`Confirmed insert failed for ${JSON.stringify(extended)}: ${JSON.stringify(confirmed)}`);
       }
     });
 
@@ -442,7 +452,8 @@ export function defineDocumentGatewayContract(
       if (!confirmed.ok) throw new Error(`Insert failed: ${JSON.stringify(confirmed)}`);
       // One field out (the old one), one in (the new text reference).
       expect(await h.fields()).toHaveLength(fieldsBefore);
-      expect(await h.insertionParagraph(confirmed.reference)).toBe(paragraph);
+      // In Word the paragraph text also shows the remaining field's result, so match its start.
+      expect(await h.insertionParagraph(confirmed.reference)).toMatch(/^References made by Word: see section/);
     });
 
     it("11. a stale fingerprint gives staleTarget and changes nothing", async () => {

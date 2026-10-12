@@ -16,6 +16,8 @@
 
 **Refined**: 2026-10-11 — From the US1 acceptance run (T055): a selection containing a table is now declined rather than replaced after confirmation (FR-008a); a cursor inside an existing field asks for confirmation and then replaces the field (new FR-008b); a write that fails part-way must not claim the document is unchanged (FR-014).
 
+**Refined**: 2026-10-12 — From the in-Word contract run: at the very start of a paragraph a reference takes the paragraph's own formatting, as Word's own dialog does (FR-012a clarified; no behaviour change).
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -351,7 +353,10 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   including those made by hand or with Word's dialogs.
 - **FR-012a**: An inserted reference MUST take the character formatting of the surrounding text
   at the insertion point, not the heading's formatting, and MUST keep it after fields are
-  updated. The add-in MUST NOT apply any character formatting of its own in this phase.
+  updated. The add-in MUST NOT apply any character formatting of its own in this phase. At the
+  very start of a paragraph there is no preceding text to take formatting from; the reference
+  then has the paragraph's own formatting, exactly as Word's cross-reference dialog gives
+  (checked 2026-10-12; Word's dialog does not take surrounding formatting anywhere).
 - **FR-013**: ~~Each insertion MUST be undoable as a single step wherever Word allows; any case
   where it cannot be MUST be documented.~~ (replaced 2026-10-10: documenting exceptions is not
   enough.) Each insertion, covering any replaced selection, any new bookmark, literal text and

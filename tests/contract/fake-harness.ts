@@ -8,7 +8,8 @@ export async function fakeGatewayHarness(fixture: ContractFixture): Promise<Gate
   const gateway = new FakeGateway(fakeFixtures[fixture]());
   return {
     gateway,
-    select: async (text, selection: SelectionRequest = {}) => gateway.select(text, selection),
+    // The fake has no character positions, so a caret offset changes nothing there.
+    select: async (text, { caretOffset: _, ...selection }: SelectionRequest = {}) => gateway.select(text, selection),
     setProtected: async (on) => gateway.setProtected(on),
     failNextWrite: async () => gateway.failNextWrite(),
     setParagraphText: async (from, to) => gateway.setParagraphText(from, to),

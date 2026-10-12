@@ -52,3 +52,33 @@ Rerun after T107–T112, 2026-10-11:
 - Scenario 27: the field under the caret is replaced. Only that field is replaced, so with the
   caret in the text part of "§ 4.3 Fire strategy" the "§ 4.3 " part stays (backlog item).
 - Closing the pane with × and pressing the shortcut again gives an empty search box.
+
+## In-Word contract run (T051), 2026-10-12
+
+`IDocumentGateway: OfficeJsGateway` on scratch copies of `spec-300.docx`, four runs. Run 4:
+32 passed, 6 failed, every failure a case the script cannot drive.
+
+Fixed along the way: field codes carry control characters (`parseFieldCode`); a heading bookmark
+shares its start with the paragraph, so Word reports "ContainsStart" rather than "Contains";
+bookmark lists are per story, so document-wide lists cover every story (`storyBodies`); Word
+refuses `insertField` next to a selected picture, so such a selection is cleared first; several
+harness and test assumptions that only held for the fake (field order, paragraph text with field
+results, the debug span read before the field update).
+
+Still to check by hand:
+
+- [x] Case 2 on `plain-headings.docx` and case 2a on `tracked.docx` (after the harness switched change tracking off while restoring).
+- [x] Cases 5 and 5b, comment: cursor in a comment, open the palette, expect the comment message.
+- [x] Cases 5 and 5a, protected: Review → Restrict Editing, open the palette and press Enter;
+      the protected message now appears as the palette opens.
+- [x] Case 10a, content control: select a content control, Enter (warning), Enter (replaced),
+      then one Ctrl+Z restores it.
+- [x] Case 10a, picture: after the replacement, one Ctrl+Z restores the picture (FR-013).
+- [x] `IHostShell: OfficeHostShell` suite (shortcut, ribbon and × cases by hand).
+
+Hand checks, 2026-10-12: comment message, content control (warning, replace, one Undo), picture
+(one Undo restores it) and the host-shell suite all pass. Case 2 needed two fixtures in one case,
+so it could pass in neither document; it is now 2 (`plain-headings`) and 2a (`tracked`). A
+protected document gave the part-way write message instead of the protected one, because Word
+did not refuse with AccessDenied; protection is now read up front (`protectionType`, WordApiDesktop
+1.4), so the palette declines as it opens.
