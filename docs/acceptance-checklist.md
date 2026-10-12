@@ -82,3 +82,9 @@ so it could pass in neither document; it is now 2 (`plain-headings`) and 2a (`tr
 protected document gave the part-way write message instead of the protected one, because Word
 did not refuse with AccessDenied; protection is now read up front (`protectionType`, WordApiDesktop
 1.4), so the palette declines as it opens.
+
+## US1 rerun (T055), 2026-10-12
+
+After T107–T112 and the in-Word contract fixes: scenarios 4, 6, 23, 26 and 27 pass. With the
+first run (1–3, 5, 12, 13, 19–21, 25 default settings part), every T055 scenario passes. US1 is
+complete.
