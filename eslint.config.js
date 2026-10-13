@@ -25,7 +25,7 @@ const coreImportBan = {
 };
 
 export default tseslint.config(
-  { ignores: ["dist/", "coverage/", "node_modules/", ".tsbuild/", "src/ui/theme/tokens.css"] },
+  { ignores: ["dist/", "dist-dev/", "coverage/", "node_modules/", ".tsbuild/", "src/ui/theme/tokens.css"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...svelte.configs.recommended,

@@ -1,7 +1,9 @@
 # Fixture documents
 
-Word documents for the spikes (T014–T016) and the in-Word contract run. Make them by hand in
-Word for Windows and save them here. `tests/fakes/fake-documents.ts` builds the in-memory
+Word documents for the spikes (T014–T016) and the in-Word contract run. `make-fixtures.ps1`
+builds them by driving Word for Windows, so Word-owned details (list numbering, `_Toc` and `_Ref`
+bookmarks, tracked revisions) are genuine, and writes a `.manifest.txt` beside each one listing
+every paragraph, bookmark and revision. `tests/fakes/fake-documents.ts` builds the in-memory
 equivalent of each one for FakeGateway, using the **same paragraph texts**, because contract
 cases find paragraphs by their text. Keep the two in step: if you change a text here, change it
 in the fake, and the other way round.

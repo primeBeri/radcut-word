@@ -17,7 +17,8 @@ import type {
 import { defineDocumentGatewayContract } from "../../../tests/contract/document-gateway.contract";
 import { defineHostShellContract } from "../../../tests/contract/host-ports.contract";
 import type { InsertedReference } from "../../core/ports/document-gateway";
-import { normaliseHeadingText } from "../../core/headings/normalise-text";
+import { normaliseHeadingText, startsWithNoteMark } from "../../core/headings/normalise-text";
+import { withoutLinkedCopies } from "../../core/headings/scan";
 import { parseFieldCode } from "../../core/references/field-code";
 import { registerContract } from "../../dev/contract-registry";
 import { OfficeHostShell } from "./office-host-shell";
@@ -54,7 +55,7 @@ async function storyParagraphs(context: Word.RequestContext): Promise<Word.Parag
 
 /**
  * Paragraph texts as Word reports them where they differ from the shared fixture text: Word
- * includes field results in paragraph text, the fake does not (contract run 1).
+ * includes field results in paragraph text, the fake does not (the in-Word contract run, docs/acceptance-checklist.md).
  */
 const WORD_TEXT: Record<string, string> = {
   "References made by Word: see section and heading.": "References made by Word: see section 1.1 and heading Scope.",
@@ -93,13 +94,20 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     }
   });
 
-  let failNext = false;
+  let failNext: "beforeWrite" | "duringWrite" | null = null;
   const spans = new Map<string, { span: Word.Range; replaced: string }>();
   const gateway = new OfficeJsGateway({
     beforeWrite: () => {
-      if (failNext) {
-        failNext = false;
+      if (failNext === "beforeWrite") {
+        failNext = null;
         throw new Error("Simulated host failure.");
+      }
+    },
+    duringWrite: (anchor) => {
+      if (failNext === "duringWrite") {
+        failNext = null;
+        // An invalid bookmark name fails at the sync, after the reference's own writes.
+        anchor.insertBookmark("1 not a valid name");
       }
     },
     onInserted: (id, span, replaced) => spans.set(id, { span, replaced }),
@@ -110,13 +118,21 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     return found;
   };
 
+  /** Every story's fields, as the fake lists them; a linked header or footer is listed once. */
   const fields = async (): Promise<FieldInfo[]> =>
     Word.run(async (context) => {
-      const all = context.document.body.fields.load("items/code,items/type");
+      const stories = (await storyBodies(context)).map(({ location, body }) => ({
+        location,
+        fields: body.fields.load("items/code,items/type"),
+        text: location === "header" || location === "footer" ? body.load("text") : null,
+      }));
       await context.sync();
-      const results = all.items.map((f) => f.result.load("text,font/bold,font/italic"));
+      const all = withoutLinkedCopies(stories, (s) => (s.text ? `${s.location}:${s.text.text}` : null)).flatMap(
+        (s) => s.fields.items,
+      );
+      const results = all.map((f) => f.result.load("text,font/bold,font/italic"));
       await context.sync();
-      return all.items.map((field, i) => {
+      return all.map((field, i) => {
         const type = field.type === Word.FieldType.ref ? "ref" : field.type === Word.FieldType.pageRef ? "pageRef" : "other";
         const parsed = type === "other" ? { bookmark: null, switches: [] } : parseFieldCode(field.code);
         return {
@@ -131,7 +147,7 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
 
   const bookmarks = async (): Promise<BookmarkInfo[]> =>
     Word.run(async (context) => {
-      const lists = (await storyBodies(context)).map((body) => body.getRange("Whole").getBookmarks(true, true));
+      const lists = (await storyBodies(context)).map(({ body }) => body.getRange("Whole").getBookmarks(true, true));
       await context.sync();
       // Linked headers and footers repeat their bookmarks; list each name once.
       const names = [...new Set(lists.flatMap((list) => list.value))];
@@ -153,44 +169,61 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
       }));
     });
 
+  const selectOnce = (text: string, selection: SelectionRequest) =>
+    Word.run(async (context) => {
+      const paragraph = await paragraphByText(context, text);
+      let range: Word.Range = paragraph.getRange("Start");
+      if (selection.tables) {
+        range = context.document.body.tables.getFirst().getRange("Whole");
+      } else if (selection.pictures || selection.shapes) {
+        range = (await paragraphByText(context, "Paragraph with an inline picture.")).inlinePictures.getFirst().getRange("Whole");
+      } else if (selection.inField) {
+        // Two characters into the field's result: clearly inside it, not at an edge.
+        const fields = paragraph.fields.load("items");
+        await context.sync();
+        const field = fields.items[selection.fieldIndex ?? 0];
+        if (!field) throw new Error(`The paragraph has no field ${selection.fieldIndex ?? 0}.`);
+        const result = field.result.load("text");
+        await context.sync();
+        range = result.search(result.text.slice(0, 2), { matchCase: true }).getFirst().getRange("End");
+      } else if (selection.contentControls) {
+        throw new Error("The fixture has no content control; check this case by hand.");
+      } else if ((selection.paragraphs ?? 1) > 1) {
+        range = paragraph.getRange("Whole").expandTo(paragraph.getNext().getRange("Whole"));
+      } else if (selection.caretOffset) {
+        const before = paragraph.search(paragraph.text.slice(0, selection.caretOffset), { matchCase: true }).getFirst();
+        range = before.getRange("End");
+      } else if (selection.length) {
+        range = paragraph.search(paragraph.text.slice(0, selection.length), { matchCase: true }).getFirst();
+      }
+      range.select();
+      await context.sync();
+    });
+
   return {
     gateway,
     async select(text: string, selection: SelectionRequest = {}) {
-      await Word.run(async (context) => {
-        const paragraph = await paragraphByText(context, text);
-        let range: Word.Range = paragraph.getRange("Start");
-        if (selection.tables) {
-          range = context.document.body.tables.getFirst().getRange("Whole");
-        } else if (selection.pictures || selection.shapes) {
-          range = (await paragraphByText(context, "Paragraph with an inline picture.")).inlinePictures.getFirst().getRange("Whole");
-        } else if (selection.inField) {
-          // Two characters into the first field's result: clearly inside it, not at an edge.
-          const result = paragraph.fields.getFirst().result.load("text");
-          await context.sync();
-          range = result.search(result.text.slice(0, 2), { matchCase: true }).getFirst().getRange("End");
-        } else if (selection.contentControls) {
-          throw new Error("The fixture has no content control; check this case by hand.");
-        } else if ((selection.paragraphs ?? 1) > 1) {
-          range = paragraph.getRange("Whole").expandTo(paragraph.getNext().getRange("Whole"));
-        } else if (selection.caretOffset) {
-          const before = paragraph.search(paragraph.text.slice(0, selection.caretOffset), { matchCase: true }).getFirst();
-          range = before.getRange("End");
-        } else if (selection.length) {
-          range = paragraph.search(paragraph.text.slice(0, selection.length), { matchCase: true }).getFirst();
-        }
-        range.select();
-        await context.sync();
-      });
+      // Selecting inside a text box sometimes fails with GeneralException at Range.select and
+      // works when tried again (in-Word contract runs, 2026-10-12); this is the harness, not the add-in.
+      try {
+        await selectOnce(text, selection);
+      } catch {
+        await selectOnce(text, selection);
+      }
     },
     async setProtected(on: boolean) {
       if (on) throw new Error("Protect the document by hand (Review → Restrict Editing); not scriptable.");
     },
-    async failNextWrite() {
-      failNext = true;
+    async failNextWrite(options = {}) {
+      failNext = options.duringWrite ? "duringWrite" : "beforeWrite";
     },
     async setParagraphText(current: string, next: string) {
       await Word.run(async (context) => {
-        (await paragraphByText(context, current)).getRange("Content").insertText(next, "Replace");
+        const paragraph = await paragraphByText(context, current);
+        // A note's first paragraph starts with its reference mark, which must stay.
+        const inNote = startsWithNoteMark(paragraph.text);
+        const range = inNote ? paragraph.search(current, { matchCase: true }).getFirst() : paragraph.getRange("Content");
+        range.insertText(next, "Replace");
         await context.sync();
       });
     },

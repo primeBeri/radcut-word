@@ -9,6 +9,9 @@ export type InsertionLocation = "main" | "footnote" | "endnote" | "tableCellInMa
  */
 export type SelectionExtent = "none" | "inline" | "extended" | "field";
 
+/** What the user confirms before a selection (FR-008a) or a field (FR-008b) is replaced. */
+export type Confirmation = "selection" | "field";
+
 /** What `classifySelection` decides: an extent, or a table selection, which is declined (FR-008a). */
 export type SelectionClass = SelectionExtent | "table";
 
@@ -16,9 +19,20 @@ export interface InsertionPoint {
   readonly kind: "insertionPoint";
   readonly location: InsertionLocation;
   readonly selection: SelectionExtent;
-  /** Order of the heading paragraph containing the cursor (only when headings are allowed). */
+  /**
+   * Snapshot order of the heading paragraph containing the cursor (only when headings are
+   * allowed); null outside the main text, where the gateways do not count headings.
+   */
   readonly inHeadingOrder: number | null;
-  /** Order of the heading just before the cursor; used for the above/below preview. */
+  /**
+   * Fingerprint of the heading containing the cursor, in any story, so the palette can leave it
+   * out where its order is unknown (FR-001b).
+   */
+  readonly inHeadingFingerprint: string | null;
+  /**
+   * Snapshot order of the last heading before the cursor's paragraph, for the above/below
+   * preview; null with none before it, and always null outside the main text.
+   */
   readonly precedingHeadingOrder: number | null;
 }
 
@@ -57,7 +71,8 @@ export type SelectionStory =
 
 /**
  * Raw facts a gateway reads about the cursor position. The core's `classifyLocation` decides,
- * so FakeGateway and OfficeJsGateway cannot disagree on the rules.
+ * so FakeGateway and OfficeJsGateway cannot disagree on the rules (the facts themselves are
+ * checked by the contract suite).
  */
 export interface LocationFacts {
   readonly story: SelectionStory;
@@ -68,7 +83,12 @@ export interface LocationFacts {
   /** Outline level of the first selected paragraph, 1–9 for headings; null or 10 for body text. */
   readonly outlineLevel: number | null;
   readonly protected: boolean;
-  /** Order of the heading paragraph containing the cursor, if it is a listed heading. */
+  /** Text of the first selected paragraph as headings are listed (`normaliseHeadingText`). */
+  readonly text: string;
+  /**
+   * Main text only (else null): snapshot orders of the heading containing the cursor and of the
+   * last heading before the cursor's paragraph, as `headingPositions` counts them.
+   */
   readonly headingOrder: number | null;
   readonly precedingHeadingOrder: number | null;
 }

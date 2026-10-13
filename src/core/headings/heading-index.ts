@@ -1,4 +1,5 @@
-import { headingFingerprint } from "./key";
+import { sameBookmarkName } from "../bookmarks/naming";
+import { atProvisionalKey } from "./key";
 import type { Heading, HeadingKey, HeadingSnapshot } from "./types";
 
 /**
@@ -41,11 +42,7 @@ export class HeadingIndex {
    */
   byKey(key: HeadingKey): Heading | null {
     const headings = this.snapshot?.headings ?? [];
-    if (key.kind === "bookmark") {
-      const name = key.name.toLowerCase();
-      return headings.find((h) => h.bookmark?.toLowerCase() === name) ?? null;
-    }
-    const found = headings[key.order];
-    return found && headingFingerprint(found) === key.fingerprint ? found : null;
+    if (key.kind === "bookmark") return headings.find((h) => h.bookmark !== null && sameBookmarkName(h.bookmark, key.name)) ?? null;
+    return atProvisionalKey(headings, key);
   }
 }

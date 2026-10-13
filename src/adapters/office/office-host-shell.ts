@@ -38,10 +38,13 @@ export class OfficeHostShell implements IHostShell {
   }
 
   onPaneHidden(handler: () => void): void {
-    // Fires for Office.addin.hide() and for the user's × alike.
-    void Office.addin.onVisibilityModeChanged((args) => {
-      if (args.visibilityMode === Office.VisibilityMode.hidden) handler();
-    });
+    // Fires for Office.addin.hide() and for the user's × alike. Without it the next shortcut would
+    // refocus a palette the user has closed, so a failed registration is at least logged.
+    Office.addin
+      .onVisibilityModeChanged((args) => {
+        if (args.visibilityMode === Office.VisibilityMode.hidden) handler();
+      })
+      .catch((error: unknown) => console.error("[radcut:visibility-handler]", error));
   }
 
   theme(): HostTheme {
@@ -63,8 +66,10 @@ export class OfficeHostShell implements IHostShell {
       try {
         await Office.actions.getShortcuts();
         return true;
-      } catch {
-        // Custom shortcuts need a signed-in Microsoft 365 account (research R4).
+      } catch (error) {
+        // Custom shortcuts need a signed-in Microsoft 365 account (research R4); Word reports
+        // that as a failure, but so would anything else, so it is logged.
+        console.error("[radcut:can-customise]", error);
         return false;
       }
     },
@@ -73,8 +78,9 @@ export class OfficeHostShell implements IHostShell {
       return result?.inUse ?? false;
     },
     async replace(combo) {
-      // Settings UI (US4) passes the manifest default to reset.
-      if (combo !== null) await Office.actions.replaceShortcuts({ [OPEN_PALETTE]: combo });
+      // Nothing resets the shortcut before the settings view (US4); fail loudly rather than do nothing.
+      if (combo === null) throw new Error("Resetting the shortcut is not implemented yet (T085).");
+      await Office.actions.replaceShortcuts({ [OPEN_PALETTE]: combo });
     },
   };
 }

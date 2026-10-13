@@ -9,7 +9,7 @@ describe("parseFieldCode", () => {
     });
   });
 
-  it("ignores the control characters Word leaves in field code text (contract run 1)", () => {
+  it("ignores the control characters Word leaves in field code text (in-Word contract run)", () => {
     expect(parseFieldCode(" REF _Ref242545576 \\r \\h \u0001")).toEqual({
       bookmark: "_Ref242545576",
       switches: ["\\r", "\\h"],

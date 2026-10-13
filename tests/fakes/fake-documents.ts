@@ -59,14 +59,15 @@ export interface FakeSelection {
   paragraphId: number;
   /** Selected characters in the first paragraph; 0 = caret. */
   length: number;
-  /** Paragraphs the selection touches (1 = within one paragraph). */
+  /** Paragraphs the selection touches, from `paragraphId` on in story order (1 = within one paragraph). */
   paragraphs: number;
   tables: number;
   pictures: number;
   shapes: number;
   contentControls: number;
-  /** The cursor is inside the first field of the paragraph. */
+  /** The cursor is inside a field of the paragraph: the one at `fieldIndex` (0-based) among its fields. */
   inField: boolean;
+  fieldIndex: number;
 }
 
 export interface FakeDocumentState {
@@ -104,6 +105,7 @@ export interface SelectOptions {
   shapes?: number;
   contentControls?: number;
   inField?: boolean;
+  fieldIndex?: number;
 }
 
 export class FakeDocumentBuilder {
@@ -205,7 +207,17 @@ export class FakeDocumentBuilder {
 }
 
 export function emptySelection(paragraphId: number): FakeSelection {
-  return { paragraphId, length: 0, paragraphs: 1, tables: 0, pictures: 0, shapes: 0, contentControls: 0, inField: false };
+  return {
+    paragraphId,
+    length: 0,
+    paragraphs: 1,
+    tables: 0,
+    pictures: 0,
+    shapes: 0,
+    contentControls: 0,
+    inField: false,
+    fieldIndex: 0,
+  };
 }
 
 export function fakeDocument(): FakeDocumentBuilder {

@@ -7,6 +7,11 @@ const RANDOM_LENGTH = 10;
 /** 36^10 names make a collision run this long practically impossible with a real source. */
 const MAX_ATTEMPTS = 100;
 
+/** Word treats bookmark names case-insensitively, so every comparison of names does too. */
+export function sameBookmarkName(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 /**
  * A new hidden bookmark name `_RC` + 10 characters from [a-z0-9] (research R6, FR-012), unique
  * case-insensitively against `existing` (every bookmark in the document, hidden ones included).

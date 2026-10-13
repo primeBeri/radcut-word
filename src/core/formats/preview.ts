@@ -1,13 +1,15 @@
 import type { Heading } from "../headings/types";
+import type { InsertionLocation, InsertionPoint } from "../location/types";
 import type { FormatPart, PreviewWarning, ReferencePreview } from "./types";
 
-export interface PreviewContext {
-  /** From the insertion point: the heading just before the cursor, or null if none. */
-  readonly precedingHeadingOrder: number | null;
-}
+/** From the insertion point: where the cursor is, and the heading just before it. */
+export type PreviewContext = Pick<InsertionPoint, "precedingHeadingOrder" | "location">;
 
-/** Word decides above/below for these itself; the add-in cannot tell before inserting. */
+/** Word decides above/below for targets here itself; the add-in cannot tell before inserting. */
 const POSITION_UNKNOWN: ReadonlySet<Heading["location"]> = new Set(["textBox", "header", "footer"]);
+
+/** Cursor places where the gateways do not count headings, so above/below is not known. */
+const CURSOR_POSITION_UNKNOWN: ReadonlySet<InsertionLocation> = new Set(["footnote", "endnote"]);
 
 /**
  * What a reference will display now (FR-015). Page cannot be known before insertion; above/below
@@ -33,7 +35,7 @@ export function previewReference(
           warnings.add("pageUnknown");
           return "?";
         case "aboveBelow":
-          if (POSITION_UNKNOWN.has(target.location)) {
+          if (POSITION_UNKNOWN.has(target.location) || CURSOR_POSITION_UNKNOWN.has(context.location)) {
             warnings.add("positionUnknown");
             return "above/below ?";
           }

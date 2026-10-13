@@ -39,7 +39,7 @@ function devPaneLauncher(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const url = req.url ?? "";
-        // `?app` opens the real app from the launcher.
+        // `?app=1` opens the real app from the launcher.
         if (url.startsWith("/app/taskpane.html") && !url.includes("app=1")) {
           req.url = "/dev/index.html";
         }
@@ -83,7 +83,8 @@ export default defineConfig(async ({ command, mode }) => {
     server: { host, port: 3000, strictPort: true, ...(https ? { https } : {}) },
     preview: { host, port: 3000, strictPort: true },
     build: {
-      outDir: resolve(import.meta.dirname, "dist"),
+      // Never the same folder: a dev-pane build left in dist/ would ship the dev pages.
+      outDir: resolve(import.meta.dirname, mode === "devpane" ? "dist-dev" : "dist"),
       emptyOutDir: true,
       target: "es2022",
       rolldownOptions: {

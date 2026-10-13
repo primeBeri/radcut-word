@@ -1,16 +1,17 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { previewReference } from "../../core/formats/preview";
+  import { headingIdentity } from "../../core/headings/key";
   import { rankHeadings } from "../../core/matching/fuzzy-matcher";
-  import { messageText, type MessageId } from "../../core/messages";
+  import { confirmationFor } from "../../core/location/rules";
+  import type { Confirmation } from "../../core/location/types";
+  import { messageText, warningFor, type ConfirmationWarning, type MessageId } from "../../core/messages";
   import FormatStrip from "./FormatStrip.svelte";
-  import { selectionIdentity } from "./labels";
   import MessageRegion from "./MessageRegion.svelte";
   import ResultRow from "./ResultRow.svelte";
-  import type { PaletteProps, Warning } from "./types";
+  import type { PaletteProps } from "./types";
 
-  let { headings, format, point, insert, cancel, openSettings, message: initialMessage = null }: PaletteProps =
-    $props();
+  let { headings, format, point, insert, cancel, openSettings }: PaletteProps = $props();
 
   const LIST_ID = "radcut-palette-list";
   const optionId = (index: number) => `radcut-option-${index}`;
@@ -22,8 +23,9 @@
   let query = $state("");
   /** Survives refreshes of `headings`; null = first row. */
   let selectedIdentity = $state<string | null>(null);
-  /** Shown after the first Enter; the second Enter confirms (FR-008a, FR-008b). */
-  let warning = $state<Warning | null>(null);
+  /** Asked for after the first Enter; the second Enter confirms exactly this (FR-008a, FR-008b). */
+  let pending = $state<Confirmation | null>(null);
+  const warning = $derived<ConfirmationWarning | null>(pending === null ? null : warningFor(pending));
   let message = $state<MessageId | null>(null);
   /** Offset of the warning popover from the top of the list area, just under the selected row. */
   let popoverTop = $state(0);
@@ -32,7 +34,7 @@
   const rows = $derived(rankHeadings(query, headings));
   const selectedIndex = $derived.by(() => {
     if (selectedIdentity === null) return 0;
-    const found = rows.findIndex((r) => selectionIdentity(r.heading) === selectedIdentity);
+    const found = rows.findIndex((r) => headingIdentity(r.heading) === selectedIdentity);
     return found >= 0 ? found : 0;
   });
   const selected = $derived(rows[selectedIndex]?.heading ?? null);
@@ -40,7 +42,6 @@
   const status = $derived<MessageId | null>(warning ?? message ?? (rows.length === 0 ? "noMatches" : null));
 
   onMount(() => {
-    message = initialMessage;
     input.focus();
   });
 
@@ -65,7 +66,7 @@
 
   function select(index: number): void {
     const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
-    if (row) selectedIdentity = selectionIdentity(row.heading);
+    if (row) selectedIdentity = headingIdentity(row.heading);
   }
 
   function pageSize(): number {
@@ -75,7 +76,7 @@
   }
 
   function dismiss(): void {
-    warning = null;
+    pending = null;
     message = null;
   }
 
@@ -89,45 +90,50 @@
   async function enter(): Promise<void> {
     if (busy || selected === null) return;
     const target = selected;
-    if (warning === null && (point.selection === "extended" || point.selection === "field")) {
+    const confirmation = confirmationFor(point.selection);
+    if (pending === null && confirmation !== null) {
       message = null;
-      warning = point.selection === "field" ? "fieldWarning" : "selectionWarning";
+      pending = confirmation;
       return;
     }
-    const confirmed = warning !== null;
-    warning = null;
+    const confirmed = pending;
+    pending = null;
     busy = true;
     try {
       const feedback = await insert(target, confirmed);
-      if (feedback.kind === "needsConfirmation") warning = feedback.message;
+      if (feedback.kind === "needsConfirmation") pending = feedback.confirm;
       else if (feedback.kind === "message") message = feedback.message;
+    } catch {
+      message = "hostError";
     } finally {
       busy = false;
     }
   }
 
+  function move(delta: number): void {
+    dismiss();
+    select(selectedIndex + delta);
+  }
+
   function onKeydown(event: KeyboardEvent): void {
-    if (event.ctrlKey && event.key === ",") {
+    // Only once there is a settings view to open (US2); until then Ctrl+, is left alone.
+    if (openSettings && event.ctrlKey && event.key === ",") {
       event.preventDefault();
-      openSettings?.();
+      openSettings();
       return;
     }
     switch (event.key) {
       case "ArrowDown":
-        dismiss();
-        select(selectedIndex + 1);
+        move(1);
         break;
       case "ArrowUp":
-        dismiss();
-        select(selectedIndex - 1);
+        move(-1);
         break;
       case "PageDown":
-        dismiss();
-        select(selectedIndex + pageSize());
+        move(pageSize());
         break;
       case "PageUp":
-        dismiss();
-        select(selectedIndex - pageSize());
+        move(-pageSize());
         break;
       case "Tab":
         // Format cycling arrives with US2; Tab never moves focus out of the palette.
@@ -136,7 +142,7 @@
         void enter();
         break;
       case "Escape":
-        if (warning) warning = null;
+        if (pending) pending = null;
         else cancel();
         break;
       default:
@@ -169,21 +175,23 @@
       oninput={onInput}
       onkeydown={onKeydown}
     />
-    <button
-      type="button"
-      class="cog"
-      tabindex="-1"
-      aria-label="Settings"
-      aria-keyshortcuts="Control+Comma"
-      onclick={() => openSettings?.()}
-    >
-      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-        <path
-          fill="currentColor"
-          d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0Zm4.6-7.7a1 1 0 0 0-.98-.8H8.88a1 1 0 0 0-.98.8l-.3 1.53a6.5 6.5 0 0 0-1.3.75l-1.48-.5a1 1 0 0 0-1.19.45L2.5 6.5a1 1 0 0 0 .2 1.26l1.18 1.03a6.6 6.6 0 0 0 0 1.5L2.7 11.3a1 1 0 0 0-.2 1.25l1.12 1.95a1 1 0 0 0 1.2.45l1.47-.5c.4.3.84.55 1.3.75l.3 1.53a1 1 0 0 0 .99.8h2.24a1 1 0 0 0 .98-.8l.3-1.53c.47-.2.9-.45 1.3-.75l1.48.5a1 1 0 0 0 1.19-.45l1.12-1.95a1 1 0 0 0-.2-1.25l-1.18-1.04a6.6 6.6 0 0 0 0-1.5l1.18-1.03a1 1 0 0 0 .2-1.26L16.38 4.53a1 1 0 0 0-1.2-.45l-1.47.5a6.5 6.5 0 0 0-1.3-.75l-.3-1.53Zm-3.27 1.9.3-1.7h1.74l.3 1.7a.5.5 0 0 0 .33.38c.56.2 1.07.5 1.52.87a.5.5 0 0 0 .48.09l1.64-.55.87 1.5-1.31 1.15a.5.5 0 0 0-.16.46 5.6 5.6 0 0 1 0 1.8.5.5 0 0 0 .16.46l1.3 1.15-.86 1.5-1.64-.55a.5.5 0 0 0-.48.09c-.45.37-.96.67-1.52.87a.5.5 0 0 0-.33.38l-.3 1.7H9.13l-.3-1.7a.5.5 0 0 0-.33-.38 5.5 5.5 0 0 1-1.52-.87.5.5 0 0 0-.48-.09l-1.64.55-.87-1.5 1.31-1.15a.5.5 0 0 0 .16-.46 5.6 5.6 0 0 1 0-1.8.5.5 0 0 0-.16-.46l-1.3-1.15.86-1.5 1.64.55a.5.5 0 0 0 .48-.09c.45-.37.96-.67 1.52-.87a.5.5 0 0 0 .33-.38Z"
-        />
-      </svg>
-    </button>
+    {#if openSettings}
+      <button
+        type="button"
+        class="cog"
+        tabindex="-1"
+        aria-label="Settings"
+        aria-keyshortcuts="Control+Comma"
+        onclick={openSettings}
+      >
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+          <path
+            fill="currentColor"
+            d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0Zm4.6-7.7a1 1 0 0 0-.98-.8H8.88a1 1 0 0 0-.98.8l-.3 1.53a6.5 6.5 0 0 0-1.3.75l-1.48-.5a1 1 0 0 0-1.19.45L2.5 6.5a1 1 0 0 0 .2 1.26l1.18 1.03a6.6 6.6 0 0 0 0 1.5L2.7 11.3a1 1 0 0 0-.2 1.25l1.12 1.95a1 1 0 0 0 1.2.45l1.47-.5c.4.3.84.55 1.3.75l.3 1.53a1 1 0 0 0 .99.8h2.24a1 1 0 0 0 .98-.8l.3-1.53c.47-.2.9-.45 1.3-.75l1.48.5a1 1 0 0 0 1.19-.45l1.12-1.95a1 1 0 0 0-.2-1.25l-1.18-1.04a6.6 6.6 0 0 0 0-1.5l1.18-1.03a1 1 0 0 0 .2-1.26L16.38 4.53a1 1 0 0 0-1.2-.45l-1.47.5a6.5 6.5 0 0 0-1.3-.75l-.3-1.53Zm-3.27 1.9.3-1.7h1.74l.3 1.7a.5.5 0 0 0 .33.38c.56.2 1.07.5 1.52.87a.5.5 0 0 0 .48.09l1.64-.55.87 1.5-1.31 1.15a.5.5 0 0 0-.16.46 5.6 5.6 0 0 1 0 1.8.5.5 0 0 0 .16.46l1.3 1.15-.86 1.5-1.64-.55a.5.5 0 0 0-.48.09c-.45.37-.96.67-1.52.87a.5.5 0 0 0-.33.38l-.3 1.7H9.13l-.3-1.7a.5.5 0 0 0-.33-.38 5.5 5.5 0 0 1-1.52-.87.5.5 0 0 0-.48-.09l-1.64.55-.87-1.5 1.31-1.15a.5.5 0 0 0 .16-.46 5.6 5.6 0 0 1 0-1.8.5.5 0 0 0-.16-.46l-1.3-1.15.86-1.5 1.64.55a.5.5 0 0 0 .48-.09c.45-.37.96-.67 1.52-.87a.5.5 0 0 0 .33-.38Z"
+          />
+        </svg>
+      </button>
+    {/if}
   </div>
 
   <div class="list-area">
@@ -195,7 +203,7 @@
       aria-label="Headings"
       onscroll={() => warning && placePopover()}
     >
-      {#each rows as row, index (selectionIdentity(row.heading) + "#" + row.heading.order)}
+      {#each rows as row, index (headingIdentity(row.heading) + "#" + row.heading.order)}
         <ResultRow
           id={optionId(index)}
           ranked={row}

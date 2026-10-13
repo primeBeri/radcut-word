@@ -27,7 +27,6 @@ export type OpenPaletteState =
       /** Filtered, in story order; from the cache when there is one. */
       readonly headings: readonly Heading[];
       readonly format: ReferenceFormat;
-      readonly selectedIndex: 0;
       /** The fresh list when `headings` came from the cache, else null. */
       readonly refreshed: Promise<Heading[]> | null;
     };
@@ -44,6 +43,7 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
     filterHeadings(headings, {
       showHeadingsOutsideMainText: options.showHeadingsOutsideMainText,
       inHeadingOrder: point.inHeadingOrder,
+      inHeadingFingerprint: point.inHeadingFingerprint,
     });
 
   const cached = deps.index.cached();
@@ -57,7 +57,6 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
     point,
     headings,
     format,
-    selectedIndex: 0,
     refreshed: cached === null ? null : deps.index.refresh().then((fresh) => filter(fresh.headings)),
   };
 }

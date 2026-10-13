@@ -14,7 +14,8 @@
     "src/dev/contract-pane.ts",
     "src/dev/perf-pane.ts",
     "node_modules",
-    "dist"
+    "dist",
+    "dist-dev"
   ],
   "references": [{ "path": "./tsconfig.adapters.json" }]
 }

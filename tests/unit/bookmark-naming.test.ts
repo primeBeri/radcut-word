@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateBookmarkName } from "../../src/core/bookmarks/naming";
+import { generateBookmarkName, sameBookmarkName } from "../../src/core/bookmarks/naming";
 
 /** Deterministic random source cycling through the given values in [0, 1). */
 function sequence(...values: number[]): () => number {
@@ -42,5 +42,12 @@ describe("bookmark naming", () => {
     const b = generateBookmarkName([], sequence(0.5));
     expect(a).toBe(b);
     expect(generateBookmarkName.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("sameBookmarkName", () => {
+  it("compares as Word does, ignoring case", () => {
+    expect(sameBookmarkName("_Ref1", "_REF1")).toBe(true);
+    expect(sameBookmarkName("_Ref1", "_Ref2")).toBe(false);
   });
 });

@@ -44,20 +44,20 @@ describe("previewReference", () => {
   const sectionNumberText = formatById("sectionNumberText")!.parts;
 
   it('previews "§ 4.3 Fire strategy"', () => {
-    expect(previewReference(sectionNumberText, fireStrategy, { precedingHeadingOrder: 20 })).toEqual({
+    expect(previewReference(sectionNumberText, fireStrategy, { precedingHeadingOrder: 20, location: "main" })).toEqual({
       text: "§ 4.3 Fire strategy",
       warnings: [],
     });
   });
 
   it("warns noNumber for an unnumbered heading", () => {
-    const preview = previewReference(sectionNumberText, { ...fireStrategy, number: null }, { precedingHeadingOrder: 20 });
+    const preview = previewReference(sectionNumberText, { ...fireStrategy, number: null }, { precedingHeadingOrder: 20, location: "main" });
     expect(preview.warnings).toEqual(["noNumber"]);
     expect(preview.text).toBe("§  Fire strategy");
   });
 
   it("shows page as ? with pageUnknown", () => {
-    expect(previewReference([{ kind: "page" }], fireStrategy, { precedingHeadingOrder: 20 })).toEqual({
+    expect(previewReference([{ kind: "page" }], fireStrategy, { precedingHeadingOrder: 20, location: "main" })).toEqual({
       text: "?",
       warnings: ["pageUnknown"],
     });
@@ -65,20 +65,32 @@ describe("previewReference", () => {
 
   it("computes above/below from the preceding heading", () => {
     const parts = [{ kind: "aboveBelow" } as const];
-    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 20 }).text).toBe("above");
-    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 17 }).text).toBe("above");
-    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 3 }).text).toBe("below");
-    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: null }).text).toBe("below");
+    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 20, location: "main" }).text).toBe("above");
+    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 17, location: "main" }).text).toBe("above");
+    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: 3, location: "main" }).text).toBe("below");
+    expect(previewReference(parts, fireStrategy, { precedingHeadingOrder: null, location: "main" }).text).toBe("below");
   });
 
   it.each(["textBox", "header", "footer"] as const)("cannot tell above/below for a target in a %s", (location) => {
     expect(
-      previewReference([{ kind: "aboveBelow" }], { ...fireStrategy, location }, { precedingHeadingOrder: 20 }),
+      previewReference([{ kind: "aboveBelow" }], { ...fireStrategy, location }, { precedingHeadingOrder: 20, location: "main" }),
     ).toEqual({ text: "above/below ?", warnings: ["positionUnknown"] });
   });
 
+  it.each(["footnote", "endnote"] as const)("cannot tell above/below with the cursor in a %s", (location) => {
+    expect(previewReference([{ kind: "aboveBelow" }], fireStrategy, { precedingHeadingOrder: null, location })).toEqual({
+      text: "above/below ?",
+      warnings: ["positionUnknown"],
+    });
+  });
+
+  it("tells above/below with the cursor in a table cell of the main text", () => {
+    const context = { precedingHeadingOrder: 20, location: "tableCellInMain" } as const;
+    expect(previewReference([{ kind: "aboveBelow" }], fireStrategy, context).text).toBe("above");
+  });
+
   it("names an empty heading text in the preview", () => {
-    expect(previewReference([{ kind: "text" }], { ...fireStrategy, text: "" }, { precedingHeadingOrder: 0 }).text).toBe(
+    expect(previewReference([{ kind: "text" }], { ...fireStrategy, text: "" }, { precedingHeadingOrder: 0, location: "main" }).text).toBe(
       "",
     );
   });

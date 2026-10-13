@@ -26,10 +26,3 @@ export function accessibleName(heading: Heading): string {
   const where = heading.location === "main" ? "" : `, in ${LOCATION_BADGE[heading.location].toLowerCase()}`;
   return `${fullTitle(heading)}, level ${heading.level}${where}`;
 }
-
-/** Identity that survives a refresh: the bookmark, else level + location + text. */
-export function selectionIdentity(heading: Heading): string {
-  return heading.bookmark !== null
-    ? `b:${heading.bookmark.toLowerCase()}`
-    : `t:${heading.level}|${heading.location}|${heading.text}`;
-}

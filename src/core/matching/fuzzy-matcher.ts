@@ -50,12 +50,27 @@ function hasMatch(query: string, candidate: string): boolean {
 }
 
 /**
+ * Lower case one character at a time, keeping the length: "İ" lower-cases to two characters,
+ * which would shift every later position and so the highlights. A character whose lower case is
+ * longer keeps only its first character ("İ" → "i").
+ */
+function foldCase(text: string): string {
+  let folded = "";
+  for (let i = 0; i < text.length; i++) {
+    const lower = text[i]!.toLowerCase();
+    folded += lower.length === 1 ? lower : lower[0]!;
+  }
+  return folded;
+}
+
+/**
  * Score `query` against `candidate` (both compared case-insensitively), or null if the query's
- * characters do not all appear in order. `query` must be non-empty.
+ * characters do not all appear in order, or the candidate is longer than 1024 characters.
+ * `query` must be non-empty.
  */
 export function matchCandidate(query: string, candidate: string): CandidateMatch | null {
-  const q = query.toLowerCase();
-  const c = candidate.toLowerCase();
+  const q = foldCase(query);
+  const c = foldCase(candidate);
   const n = q.length;
   const m = c.length;
   if (n === 0 || n > m || m > MAX_CANDIDATE || !hasMatch(q, c)) return null;
@@ -122,7 +137,7 @@ export function rankHeadings(query: string, headings: readonly Heading[]): Ranke
   if (trimmed === "") {
     return headings.map((heading) => ({
       heading,
-      match: { key: heading.key, score: 0, numberRanges: [], textRanges: [] },
+      match: { score: 0, numberRanges: [], textRanges: [] },
     }));
   }
   const ranked: RankedHeading[] = [];
@@ -134,7 +149,6 @@ export function rankHeadings(query: string, headings: readonly Heading[]): Ranke
     ranked.push({
       heading,
       match: {
-        key: heading.key,
         score: found.score,
         numberRanges: toRanges(found.positions, 0, numberLength),
         textRanges: toRanges(found.positions, prefix.length, Infinity),

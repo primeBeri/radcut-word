@@ -53,7 +53,7 @@ export class MiniTest {
           result = {
             name: c.name,
             status: "fail",
-            error: error instanceof Error ? error.message : String(error),
+            error: describeError(error),
           };
         }
       }
@@ -122,4 +122,11 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   const keys = (o: object) => Object.keys(o).filter((k) => record(o)[k] !== undefined);
   const ka = keys(a);
   return ka.length === keys(b).length && ka.every((k) => deepEqual(record(a)[k], record(b)[k]));
+}
+
+/** The message, plus where Word failed when it says only "GeneralException" (Office.js debug info). */
+function describeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const location = (error as { debugInfo?: { errorLocation?: unknown } } | null)?.debugInfo?.errorLocation;
+  return typeof location === "string" && location !== "" ? `${message} (at ${location})` : message;
 }

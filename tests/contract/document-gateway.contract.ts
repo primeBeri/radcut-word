@@ -27,8 +27,10 @@ export interface SelectionRequest {
   pictures?: number;
   shapes?: number;
   contentControls?: number;
-  /** Put the cursor inside the first field of the paragraph. */
+  /** Put the cursor inside a field of the paragraph: the first, or the one at `fieldIndex`. */
   inField?: boolean;
+  /** 0-based, among the paragraph's fields. */
+  fieldIndex?: number;
 }
 
 export interface BookmarkInfo {
@@ -55,14 +57,20 @@ export interface GatewayContractHarness {
   readonly gateway: IDocumentGateway;
   select(paragraphText: string, selection?: SelectionRequest): Promise<void>;
   setProtected(on: boolean): Promise<void>;
-  /** Make the next insertReference fail after its checks. */
-  failNextWrite(): Promise<void>;
+  /**
+   * Make the next insertReference fail after its checks: before any write, or with
+   * `duringWrite` inside the write batch, where Word may have applied part of it.
+   */
+  failNextWrite(options?: { duringWrite?: boolean }): Promise<void>;
   setParagraphText(currentText: string, newText: string): Promise<void>;
   bookmarks(): Promise<BookmarkInfo[]>;
   fields(): Promise<FieldInfo[]>;
   /** Displayed text of an inserted reference (literals and field results). */
   insertionText(reference: InsertedReference): Promise<string>;
-  /** Text of the paragraph the reference went into, as it was before the insertion. */
+  /**
+   * Text of the paragraph the reference went into, without the reference. In Word it is read after
+   * the insertion, so text the reference replaced is gone and other fields' results are included.
+   */
   insertionParagraph(reference: InsertedReference): Promise<string>;
   /** The selected text the reference replaced ("" for a caret). */
   replacedText(reference: InsertedReference): Promise<string>;
@@ -77,6 +85,15 @@ const ON: LocationPolicy = { allowInHeadings: true };
 const BODY = "The fire strategy is described here.";
 const SECTION_NUMBER_TEXT = formatById("sectionNumberText")!.parts;
 const TEXT = formatById("text")!.parts;
+const ABOVE_BELOW = formatById("aboveBelow")!.parts;
+
+/**
+ * A Word-only case checked by hand. It fails with the steps instead of passing silently, so the
+ * dev pane never shows it as checked; record the outcome in docs/acceptance-checklist.md.
+ */
+function manual(steps: string): never {
+  throw new Error(`Manual check: ${steps}.`);
+}
 
 async function headingByText(gateway: IDocumentGateway, text: string): Promise<Heading> {
   const found = (await gateway.readHeadings()).headings.find((h) => h.text === text);
@@ -95,7 +112,7 @@ async function request(
     parts: SECTION_NUMBER_TEXT,
     newBookmarkName: generateBookmarkName(await gateway.listBookmarkNames()),
     policy: OFF,
-    confirmExtendedSelection: false,
+    confirmed: null,
     ...overrides,
   };
 }
@@ -152,6 +169,19 @@ export function defineDocumentGatewayContract(
       const cell = headings.find((x) => x.location === "tableCell")!;
       const lastMain = headings.filter((x) => x.location === "main").at(-1)!;
       expect(lastMain.order).toBeGreaterThan(cell.order);
+    });
+
+    it("1b. a heading that opens a footnote is listed and referenced even when long or containing ^", async () => {
+      for (const text of [`Long footnote heading ${"x".repeat(280)}`, "Footnote heading with ^p and ^ in it"]) {
+        const h = await setup("spec-300");
+        await h.setParagraphText("Heading in a footnote", text);
+        const heading = await headingByText(h.gateway, text);
+        expect(heading.location).toBe("footnote");
+        await h.select(BODY);
+        const result = await insertOk(h, text, { parts: TEXT });
+        expect(await h.insertionText(result.reference)).toBe(text);
+        expect((await h.bookmarks()).find((b) => b.name === result.bookmark)?.paragraphText).toBe(text);
+      }
     });
 
     // One fixture per case: in Word the harness can only use the document that is open.
@@ -318,7 +348,7 @@ export function defineDocumentGatewayContract(
       ] as const) {
         const h = await setup("spec-300");
         // Mid-text: at the very start of a paragraph Word takes no surrounding formatting, as with
-        // its own cross-reference dialog (FR-012a, contract run 3).
+        // its own cross-reference dialog (FR-012a, in-Word contract run).
         await h.select(text, { caretOffset: 4 });
         const result = await insertOk(h, "Heading with bold word");
         // Word lists fields in document order, so find the new ones by their (new) bookmark.
@@ -329,7 +359,7 @@ export function defineDocumentGatewayContract(
     });
 
     wordOnly("7a (after update). formatting is kept after F9", async () => {
-      // Run by hand in Word: select all, F9, then re-read fields (manual step in the dev pane).
+      manual("insert into bold and italic text, select all, press F9, and check each reference keeps that formatting");
     });
 
     it("7b. no insertion changes bookmarks or fields the add-in did not make", async () => {
@@ -364,8 +394,34 @@ export function defineDocumentGatewayContract(
       }
     });
 
+    it("7d. a second reference to the same heading reuses the bookmark the first one created, in every story", async () => {
+      for (const text of [
+        "Fire strategy",
+        "Heading in a table cell",
+        "Heading in a text box",
+        "Heading in a footnote",
+        "Heading in an endnote",
+      ]) {
+        const h = await setup("spec-300");
+        const before = (await h.bookmarks()).length;
+        await h.select(BODY);
+        const first = await insertOk(h, text, { parts: TEXT });
+        expect(first.bookmarkCreated).toBe(true);
+        // Listed again, as the palette would after the first insert. BODY's text has changed in
+        // Word, so the second reference goes elsewhere.
+        await h.select("Scope body.");
+        const second = await insertOk(h, text, { parts: TEXT });
+        expect({ text, created: second.bookmarkCreated, bookmark: second.bookmark }).toEqual({
+          text,
+          created: false,
+          bookmark: first.bookmark,
+        });
+        expect(await h.bookmarks()).toHaveLength(before + 1);
+      }
+    });
+
     wordOnly("7c (jump). Ctrl+click on each reference jumps to its heading", async () => {
-      // Checked by hand in Word.
+      manual("Ctrl+click each reference from case 7c and check it jumps to its heading");
     });
 
     it("8. inserted content is the literals plus one hyperlinked field per part, with the R5 switches", async () => {
@@ -393,6 +449,80 @@ export function defineDocumentGatewayContract(
       }
     });
 
+    describe("9b. writing with the cursor in a footnote, an endnote or a table cell", () => {
+      for (const place of ["Footnote text.", "Endnote text.", "Cell text in the main table."]) {
+        it(`at "${place}": the R5 fields, showing what the preview said`, async () => {
+          for (const id of ["sectionNumberText", "textAboveBelow"]) {
+            const parts = formatById(id)!.parts;
+            const h = await setup("spec-300");
+            await h.select(place);
+            const point = await h.gateway.checkInsertionPoint(OFF);
+            if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+            // No usable bookmark yet, so only this reference's fields point at the new one.
+            const target = await headingByText(h.gateway, "Fire strategy");
+            const result = await insertOk(h, "Fire strategy", { parts });
+            const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+            const expected = parts.flatMap((p) => (p.kind === "literal" ? [] : [fieldFor(p.kind)]));
+            expect(added.map((f) => ({ type: f.type, switches: f.switches }))).toEqual(expected);
+            const shown = await h.insertionText(result.reference);
+            const preview = previewReference(parts, target, point);
+            // In a note Word shows the heading text for \\p, not above/below (in-Word contract run,
+            // 2026-10-12); the preview warns that it cannot tell.
+            if (preview.warnings.includes("positionUnknown")) expect(shown).toMatch(/^Fire strategy (above|below|Fire strategy)$/);
+            else expect(shown).toBe(preview.text);
+          }
+        });
+      }
+    });
+
+    describe("9a. heading orders index the readHeadings snapshot in the main text and are null outside it", () => {
+      it("in a table cell of the main text: the preceding heading's order, and above/below as Word shows it", async () => {
+        const h = await setup("spec-300");
+        const { headings } = await h.gateway.readHeadings();
+        await h.select("Cell text in the main table.");
+        const point = await h.gateway.checkInsertionPoint(OFF);
+        if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+        expect(point.precedingHeadingOrder).toBe(headings.find((x) => x.text === "Heading with bold word")!.order);
+        for (const text of ["Heading in a table cell", "Scope"]) {
+          const target = headings.find((x) => x.text === text)!;
+          const h2 = await setup("spec-300");
+          await h2.select("Cell text in the main table.");
+          const result = await insertOk(h2, text, { parts: ABOVE_BELOW });
+          expect(await h2.insertionText(result.reference)).toBe(previewReference(ABOVE_BELOW, target, point).text);
+        }
+      });
+
+      it("in a note: no orders, and the preview does not guess above/below", async () => {
+        const h = await setup("spec-300");
+        for (const text of ["Footnote text.", "Endnote text."]) {
+          await h.select(text);
+          const point = await h.gateway.checkInsertionPoint(OFF);
+          if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+          expect([point.precedingHeadingOrder, point.inHeadingOrder]).toEqual([null, null]);
+          const scope = await headingByText(h.gateway, "Scope");
+          expect(previewReference(ABOVE_BELOW, scope, point).warnings).toContain("positionUnknown");
+        }
+      });
+
+      it("in a heading in a note (headings allowed): no order, but the heading's fingerprint", async () => {
+        const h = await setup("spec-300");
+        await h.select("Heading in a footnote");
+        const point = await h.gateway.checkInsertionPoint(ON);
+        if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+        expect(point.inHeadingOrder).toBeNull();
+        expect(point.inHeadingFingerprint).toBe(headingFingerprint(await headingByText(h.gateway, "Heading in a footnote")));
+      });
+
+      it("after a tracked-deleted heading: the deleted heading is not counted", async () => {
+        const h = await setup("tracked");
+        const { headings } = await h.gateway.readHeadings();
+        await h.select("Body under the inserted heading.");
+        const point = await h.gateway.checkInsertionPoint(OFF);
+        if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+        expect(point.precedingHeadingOrder).toBe(headings.find((x) => x.text === "Inserted heading")!.order);
+      });
+    });
+
     it("10. an inline selection is replaced without confirmation", async () => {
       const h = await setup("spec-300");
       await h.select(BODY, { length: 4 });
@@ -412,9 +542,27 @@ export function defineDocumentGatewayContract(
           confirm: "selection",
         });
         expect(await h.documentState()).toEqual(before);
-        const confirmed = await h.gateway.insertReference(await request(h.gateway, target, { confirmExtendedSelection: true }));
+        const confirmed = await h.gateway.insertReference(await request(h.gateway, target, { confirmed: "selection" }));
         if (!confirmed.ok) throw new Error(`Confirmed insert failed for ${JSON.stringify(extended)}: ${JSON.stringify(confirmed)}`);
+        // Replacing the selection never takes the target's bookmark with it.
+        expect((await h.bookmarks()).find((b) => b.name === confirmed.bookmark)?.paragraphText).toBe("Scope");
       }
+    });
+
+    it("10d. a selection that covers the target heading is declined selfReference, confirmed or not, unchanged", async () => {
+      const h = await setup("spec-300");
+      // BODY is followed by the heading "Heading with bold word"; the selection runs into it.
+      await h.select(BODY, { paragraphs: 2, length: 5 });
+      const before = await h.documentState();
+      const target = await headingByText(h.gateway, "Heading with bold word");
+      for (const confirmed of [null, "selection"] as const) {
+        expect(await h.gateway.insertReference(await request(h.gateway, target, { confirmed }))).toEqual({
+          ok: false,
+          reason: "declined",
+          declined: { kind: "declined", reason: "selfReference" },
+        });
+      }
+      expect(await h.documentState()).toEqual(before);
     });
 
     it("10b. a selection containing a table is declined tableSelected, confirmed or not, unchanged", async () => {
@@ -423,8 +571,8 @@ export function defineDocumentGatewayContract(
       const before = await h.documentState();
       expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason: "tableSelected" });
       const target = await headingByText(h.gateway, "Scope");
-      for (const confirmExtendedSelection of [false, true]) {
-        expect(await h.gateway.insertReference(await request(h.gateway, target, { confirmExtendedSelection }))).toEqual({
+      for (const confirmed of [null, "selection"] as const) {
+        expect(await h.gateway.insertReference(await request(h.gateway, target, { confirmed }))).toEqual({
           ok: false,
           reason: "declined",
           declined: { kind: "declined", reason: "tableSelected" },
@@ -447,13 +595,38 @@ export function defineDocumentGatewayContract(
       });
       expect(await h.documentState()).toEqual(before);
       const confirmed = await h.gateway.insertReference(
-        await request(h.gateway, target, { parts: TEXT, confirmExtendedSelection: true }),
+        await request(h.gateway, target, { parts: TEXT, confirmed: "field" }),
       );
       if (!confirmed.ok) throw new Error(`Insert failed: ${JSON.stringify(confirmed)}`);
       // One field out (the old one), one in (the new text reference).
       expect(await h.fields()).toHaveLength(fieldsBefore);
       // In Word the paragraph text also shows the remaining field's result, so match its start.
       expect(await h.insertionParagraph(confirmed.reference)).toMatch(/^References made by Word: see section/);
+    });
+
+    it("10e. confirming the selection warning does not confirm replacing a field; the field the cursor is in is replaced", async () => {
+      const h = await setup("spec-300");
+      const paragraph = "References made by Word: see section and heading.";
+      // The second of the paragraph's two fields: the plain heading-text reference.
+      await h.select(paragraph, { inField: true, fieldIndex: 1 });
+      const before = await h.documentState();
+      // Word names its own cross-reference bookmark (_Ref + a number of its choosing), so take it
+      // from Scope. In Word, case 10c has already replaced the paragraph's first field in the open
+      // document, so compare with what is there now rather than with the fresh fixture.
+      const wordBookmark = (await headingByText(h.gateway, "Scope")).bookmark;
+      const oldBefore = (await h.fields()).filter((f) => f.bookmark === wordBookmark).map((f) => f.switches);
+      const target = await headingByText(h.gateway, "Fire strategy");
+      expect(await h.gateway.insertReference(await request(h.gateway, target, { parts: TEXT, confirmed: "selection" }))).toEqual({
+        ok: false,
+        reason: "needsConfirmation",
+        confirm: "field",
+      });
+      expect(await h.documentState()).toEqual(before);
+      await insertOk(h, "Fire strategy", { parts: TEXT, confirmed: "field" });
+      // Only the heading-text field the cursor was in has gone; the section-number one stays.
+      const oldAfter = (await h.fields()).filter((f) => f.bookmark === wordBookmark).map((f) => f.switches);
+      expect(oldBefore).toContainEqual(["\\h"]);
+      expect(oldAfter).toEqual(oldBefore.filter((s) => JSON.stringify(s) !== JSON.stringify(["\\h"])));
     });
 
     it("11. a stale fingerprint gives staleTarget and changes nothing", async () => {
@@ -466,7 +639,7 @@ export function defineDocumentGatewayContract(
       expect(await h.documentState()).toEqual(before);
     });
 
-    it("12. a failure at any step leaves no new bookmark and no partial reference", async () => {
+    it("12. a failure before the write leaves no new bookmark and no partial reference", async () => {
       const h = await setup("spec-300");
       const before = await h.documentState();
       await h.failNextWrite();
@@ -474,6 +647,15 @@ export function defineDocumentGatewayContract(
       if (result.ok || result.reason !== "hostError") throw new Error(`Expected hostError: ${JSON.stringify(result)}`);
       expect(result.partialWrite).toBe(false);
       expect(await h.documentState()).toEqual(before);
+    });
+
+    it("12a. a failure inside the write batch reports partialWrite exactly when the document changed", async () => {
+      const h = await setup("spec-300");
+      const before = JSON.stringify(await h.documentState());
+      await h.failNextWrite({ duringWrite: true });
+      const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, "Fire strategy")));
+      if (result.ok || result.reason !== "hostError") throw new Error(`Expected hostError: ${JSON.stringify(result)}`);
+      expect(result.partialWrite).toBe(JSON.stringify(await h.documentState()) !== before);
     });
 
     it("13. readReferences returns one record per REF/PAGEREF field with bookmark and switches", async () => {
@@ -489,8 +671,21 @@ export function defineDocumentGatewayContract(
       ]);
     });
 
+    it("13a. readReferences finds references in footnotes and endnotes with their location", async () => {
+      for (const [text, location] of [
+        ["Footnote text.", "footnote"],
+        ["Endnote text.", "endnote"],
+      ] as const) {
+        const h = await setup("spec-300");
+        await h.select(text);
+        const result = await insertOk(h, "Fire strategy", { parts: TEXT });
+        const ours = (await h.gateway.readReferences()).filter((r) => r.bookmark === result.bookmark);
+        expect(ours.map((r) => ({ fieldType: r.fieldType, location: r.location }))).toEqual([{ fieldType: "ref", location }]);
+      }
+    });
+
     wordOnly("14. after F9 and moving the heading the references update, and one Undo restores the document", async () => {
-      // Checked by hand in Word per docs/spike-runbook.md and the acceptance checklist (FR-013).
+      manual("follow docs/spike-runbook.md and the acceptance checklist (FR-013): F9, move the heading, F9, one Undo");
     });
   });
 }

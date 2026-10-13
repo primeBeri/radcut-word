@@ -28,7 +28,7 @@ export type HeadingKey =
 export interface Heading {
   readonly key: HeadingKey;
   readonly level: HeadingLevel;
-  /** Paragraph text, trimmed; may be empty. */
+  /** Paragraph text as `normaliseHeadingText` gives it: trimmed, no note reference mark; may be empty. */
   readonly text: string;
   /** Displayed number such as "4.3"; null if unnumbered. Display and matching only. */
   readonly number: string | null;
@@ -44,6 +44,4 @@ export interface HeadingSnapshot {
   readonly documentId: string | null;
   /** In document order; `order` is 0..n-1 without gaps. */
   readonly headings: readonly Heading[];
-  /** Monotonic timestamp, for cache freshness. */
-  readonly takenAt: number;
 }

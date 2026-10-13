@@ -1,9 +1,10 @@
+import { sameBookmarkName } from "../../src/core/bookmarks/naming";
 import { chooseUsableBookmark } from "../../src/core/bookmarks/selection";
 import { fieldFor, type FieldPartKind } from "../../src/core/formats/fields";
-import { headingFingerprint, headingKeyFor } from "../../src/core/headings/key";
+import { atProvisionalKey, headingFingerprint, makeHeading } from "../../src/core/headings/key";
 import { normaliseHeadingText } from "../../src/core/headings/normalise-text";
-import type { Heading, HeadingLevel, HeadingLocation, HeadingSnapshot } from "../../src/core/headings/types";
-import { classifyLocation } from "../../src/core/location/rules";
+import type { Heading, HeadingLocation, HeadingSnapshot } from "../../src/core/headings/types";
+import { classifyLocation, confirmationFor, headingLevelOf } from "../../src/core/location/rules";
 import { classifySelection } from "../../src/core/location/selection";
 import type {
   Declined,
@@ -52,12 +53,12 @@ interface ListedHeading {
 /**
  * In-memory IDocumentGateway. Writes are all-or-nothing; location and selection decisions go
  * through the core's classifyLocation/classifySelection, and the usable-bookmark choice through
- * chooseUsableBookmark, so the fake cannot disagree with Word on the rules.
+ * chooseUsableBookmark, so the fake cannot disagree with Word on the rules; the facts it
+ * gathers are kept in step with Word by the contract suite.
  */
 export class FakeGateway implements IDocumentGateway {
   private state: FakeDocumentState;
-  private failNext: { duringWrite: boolean } | null = null;
-  private snapshotClock = 0;
+  private failNext: { duringWrite: boolean; landed: boolean } | null = null;
   private nextInsertion = 1;
   /** Set by returnFocus, for assertions. */
   focusReturned: { after: string | null } | null = null;
@@ -72,7 +73,6 @@ export class FakeGateway implements IDocumentGateway {
     return {
       documentId: this.state.documentId,
       headings: this.listHeadings().map((h) => h.heading),
-      takenAt: ++this.snapshotClock,
     };
   }
 
@@ -93,28 +93,25 @@ export class FakeGateway implements IDocumentGateway {
     if (headingFingerprint(target.heading) !== request.expectedFingerprint) {
       return { ok: false, reason: "staleTarget" };
     }
-    if (point.inHeadingOrder !== null && point.inHeadingOrder === target.heading.order) {
+    // The cursor in the heading, or a selection that runs into it: replacing it would delete the target.
+    if (this.selectedParagraphIds().includes(target.paragraph.id)) {
       return { ok: false, reason: "declined", declined: { kind: "declined", reason: "selfReference" } };
     }
-    if ((point.selection === "extended" || point.selection === "field") && !request.confirmExtendedSelection) {
-      return { ok: false, reason: "needsConfirmation", confirm: point.selection === "field" ? "field" : "selection" };
-    }
+    const confirm = confirmationFor(point.selection);
+    if (confirm !== null && request.confirmed !== confirm) return { ok: false, reason: "needsConfirmation", confirm };
 
     // Everything below happens on a copy, committed only if every step succeeds.
     const draft = structuredClone(this.state);
     try {
-      if (this.failNext) {
-        const { duringWrite } = this.failNext;
-        this.failNext = null;
-        // Word's write batch is not transactional; the fake still leaves the document unchanged.
-        return { ok: false, reason: "hostError", partialWrite: duringWrite, detail: "Simulated host failure." };
+      const failure = this.failNext;
+      this.failNext = null;
+      if (failure && !failure.duringWrite) {
+        return { ok: false, reason: "hostError", partialWrite: false, detail: "Simulated host failure." };
       }
       const reused = target.heading.bookmark;
       let bookmark = reused;
       if (bookmark === null) {
-        const taken = draft.bookmarks.some(
-          (b) => b.name.toLowerCase() === request.newBookmarkName.toLowerCase(),
-        );
+        const taken = draft.bookmarks.some((b) => sameBookmarkName(b.name, request.newBookmarkName));
         if (taken) throw new Error(`Bookmark ${request.newBookmarkName} already exists.`);
         draft.bookmarks.push({
           name: request.newBookmarkName,
@@ -124,12 +121,19 @@ export class FakeGateway implements IDocumentGateway {
         });
         bookmark = request.newBookmarkName;
       }
+      if (failure) {
+        // Word's write batch is not transactional: what went in before the failure stays, and
+        // partialWrite says whether anything did, as OfficeJsGateway checks afterwards.
+        const landed = failure.landed && reused === null;
+        if (landed) this.state = draft;
+        return { ok: false, reason: "hostError", partialWrite: landed, detail: "Simulated host failure." };
+      }
 
       const at = paragraphById(draft, draft.selection.paragraphId);
       // A confirmed field selection replaces the whole field the cursor is in (FR-008b).
       let replaced = point.selection === "none" ? "" : selectedText(draft);
       if (point.selection === "field") {
-        const old = draft.fields.find((f) => f.paragraphId === at.id);
+        const old = draft.fields.filter((f) => f.paragraphId === at.id)[draft.selection.fieldIndex];
         if (!old) throw new Error("The selection is inside a field the paragraph does not have.");
         draft.fields = draft.fields.filter((f) => f !== old);
         replaced = old.result;
@@ -197,10 +201,11 @@ export class FakeGateway implements IDocumentGateway {
 
   /**
    * The next insertReference fails with hostError after its checks, changing nothing. With
-   * `duringWrite` it reports the failure as Word does when the write batch itself fails.
+   * `duringWrite` it fails inside the write batch as Word can: by default after the bookmark has
+   * gone in (`landed`), or before anything was applied (`landed: false`).
    */
-  failNextWrite(options: { duringWrite?: boolean } = {}): void {
-    this.failNext = { duringWrite: options.duringWrite ?? false };
+  failNextWrite(options: { duringWrite?: boolean; landed?: boolean } = {}): void {
+    this.failNext = { duringWrite: options.duringWrite ?? false, landed: options.landed ?? true };
   }
 
   /** Edit a paragraph's text (e.g. to make a listed heading stale). */
@@ -227,7 +232,7 @@ export class FakeGateway implements IDocumentGateway {
 
   /** Text of the paragraph holding a bookmark, or null if the bookmark does not exist. */
   bookmarkTarget(name: string): string | null {
-    const bookmark = this.state.bookmarks.find((b) => b.name.toLowerCase() === name.toLowerCase());
+    const bookmark = this.state.bookmarks.find((b) => sameBookmarkName(b.name, name));
     return bookmark ? paragraphById(this.state, bookmark.paragraphId).text : null;
   }
 
@@ -238,7 +243,7 @@ export class FakeGateway implements IDocumentGateway {
       .join("");
   }
 
-  /** Text of the paragraph an insertion went into, as it was before the insertion. */
+  /** Text of the paragraph an insertion went into, without the insertion (the fake keeps text and insertions apart). */
   insertionParagraph(id: string): string {
     return paragraphById(this.state, this.insertionById(id).paragraphId).text;
   }
@@ -252,7 +257,7 @@ export class FakeGateway implements IDocumentGateway {
 
   private listHeadings(): ListedHeading[] {
     const ordered = this.orderedParagraphs().filter(
-      (p) => p.story !== "comment" && !p.trackedDeletion && headingLevelOf(p) !== null,
+      (p) => p.story !== "comment" && !p.trackedDeletion && headingLevelOf(p.style, p.outlineLevel) !== null,
     );
     return ordered.map((paragraph, order) => {
       const bookmark = chooseUsableBookmark(
@@ -260,15 +265,15 @@ export class FakeGateway implements IDocumentGateway {
           .filter((b) => b.paragraphId === paragraph.id)
           .map((b) => ({ name: b.name, spansHeadingText: b.extent === "text" })),
       );
-      const base = {
-        level: headingLevelOf(paragraph) as HeadingLevel,
+      const heading = makeHeading({
+        level: headingLevelOf(paragraph.style, paragraph.outlineLevel)!,
         text: normaliseHeadingText(paragraph.text),
         number: paragraph.number,
         order,
         location: headingLocationOf(paragraph),
         bookmark,
-      };
-      return { heading: { ...base, key: headingKeyFor(base) }, paragraph };
+      });
+      return { heading, paragraph };
     });
   }
 
@@ -286,6 +291,8 @@ export class FakeGateway implements IDocumentGateway {
     const position = ordered.indexOf(paragraph);
     const own = headings.find((h) => h.paragraph.id === paragraph.id);
     const preceding = headings.filter((h) => ordered.indexOf(h.paragraph) < position).at(-1);
+    // As in Word, heading orders are counted in the main text only (data-model.md).
+    const inMain = paragraph.story === "main";
 
     const locationFacts: LocationFacts = {
       story: paragraph.story,
@@ -293,8 +300,9 @@ export class FakeGateway implements IDocumentGateway {
       styleBuiltIn: paragraph.style,
       outlineLevel: paragraph.outlineLevel,
       protected: this.state.protected,
-      headingOrder: own?.heading.order ?? null,
-      precedingHeadingOrder: preceding?.heading.order ?? null,
+      text: normaliseHeadingText(paragraph.text),
+      headingOrder: inMain ? (own?.heading.order ?? null) : null,
+      precedingHeadingOrder: inMain ? (preceding?.heading.order ?? null) : null,
     };
     const selectionFacts: SelectionFacts = {
       isEmpty:
@@ -311,14 +319,20 @@ export class FakeGateway implements IDocumentGateway {
     return classifyLocation(locationFacts, classifySelection(selectionFacts), policy);
   }
 
+  /** The paragraphs the selection touches, in story order. */
+  private selectedParagraphIds(): number[] {
+    const ordered = this.orderedParagraphs();
+    const start = ordered.findIndex((p) => p.id === this.state.selection.paragraphId);
+    return ordered.slice(start, start + Math.max(1, this.state.selection.paragraphs)).map((p) => p.id);
+  }
+
   private resolveTarget(request: InsertReferenceRequest): ListedHeading | null {
     const headings = this.listHeadings();
     const key = request.target;
     if (key.kind === "provisional") {
-      const found = headings[key.order];
-      return found && headingFingerprint(found.heading) === key.fingerprint ? found : null;
+      return atProvisionalKey(headings.map((h) => h.heading), key) ? headings[key.order]! : null;
     }
-    const bookmark = this.state.bookmarks.find((b) => b.name.toLowerCase() === key.name.toLowerCase());
+    const bookmark = this.state.bookmarks.find((b) => sameBookmarkName(b.name, key.name));
     if (!bookmark) return null;
     return headings.find((h) => h.paragraph.id === bookmark.paragraphId) ?? null;
   }
@@ -356,13 +370,6 @@ export class FakeGateway implements IDocumentGateway {
     if (!found) throw new Error(`No paragraph with text "${text}".`);
     return found;
   }
-}
-
-function headingLevelOf(paragraph: FakeParagraph): number | null {
-  const styled = /^Heading([1-9])$/.exec(paragraph.style);
-  if (styled) return Number(styled[1]);
-  const level = paragraph.outlineLevel;
-  return level !== null && level >= 1 && level <= 9 ? level : null;
 }
 
 function headingLocationOf(paragraph: FakeParagraph): HeadingLocation {

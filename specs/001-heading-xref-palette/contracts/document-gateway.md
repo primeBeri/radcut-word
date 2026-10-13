@@ -44,7 +44,7 @@ interface InsertReferenceRequest {
   parts: FormatPart[];            // already validated by the core
   newBookmarkName: string;        // used only if no usable bookmark exists
   policy: LocationPolicy;         // { allowInHeadings } from user settings
-  confirmExtendedSelection: boolean; // true only after the user confirmed the warning (FR-008a)
+  confirmed: "selection" | "field" | null; // the warning the user confirmed (FR-008a, FR-008b); covers only that one
 }
 
 type InsertReferenceResult =
@@ -74,6 +74,8 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
    with the matching `location`, in story order (main text with table cells in place, text
    boxes, footnotes, endnotes, headers, footers); a header or footer shared by several sections
    is returned once.
+1b. A heading that opens a footnote is returned and can be referenced even when its text is
+   longer than Word's 255-character search limit or contains `^`.
 2. Bold or large-font paragraphs without a heading style or outline level are not returned;
    headings shown as tracked deletions are not returned; tracked-insertion headings are.
 3. A heading with a usable bookmark reports it in `bookmark`; a heading whose only bookmarks
@@ -106,27 +108,45 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
 7c. A heading in a table cell, text box, footnote, endnote, header or footer gets its bookmark
    like any other, and a reference to it resolves (the Ctrl+click jump is checked in the Word
    run only).
+7d. A second reference to the same heading, in any story, reuses the bookmark the first one
+   created (`bookmarkCreated = false`, same name); the bookmark count rises by exactly one.
 8. The inserted content, read back, consists of the literal parts and one field per non-literal
    part, each with `\h`, pointing at the returned bookmark, with the switches in research R5.
 9. After insertion, each field's displayed result equals the core's preview for that format
    (page excepted, where the result is a positive integer).
+9a. `precedingHeadingOrder` and `inHeadingOrder` index the `readHeadings` snapshot: in the main
+    text (table cells in place) they count headings as the list does, skipping tracked-deleted
+    ones; in a footnote or endnote both are `null` and the preview shows above/below as unknown.
+    With the cursor in a heading in a note, `inHeadingFingerprint` identifies that heading.
+9b. With the cursor in a footnote, an endnote or a table cell, the inserted fields have the R5
+    composition and show what the preview said (above/below where the preview knows it).
 10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
     selected text without confirmation.
 10a. With a selection spanning two paragraphs, or containing a picture, shape or content
-    control (`selection: "extended"`), `insertReference` with `confirmExtendedSelection: false`
-    returns `needsConfirmation` with `confirm: "selection"` and the document is unchanged; with
-    `true`, the reference replaces the selection.
+    control (`selection: "extended"`), `insertReference` with `confirmed: null` returns
+    `needsConfirmation` with `confirm: "selection"` and the document is unchanged; with
+    `confirmed: "selection"`, the reference replaces the selection and the target's bookmark
+    stays on the heading.
 10b. With a selection containing a table, `checkInsertionPoint` and `insertReference` decline
     with `tableSelected`, confirmed or not, and the document is unchanged.
 10c. With the cursor inside an existing REF field (`selection: "field"`), `insertReference`
     returns `needsConfirmation` with `confirm: "field"` and the document is unchanged; with
-    `confirmExtendedSelection: true`, the field is removed and the reference takes its place in
-    the same paragraph.
+    `confirmed: "field"`, the field is removed and the reference takes its place in the same
+    paragraph.
+10d. A selection that covers or runs into the target heading is declined with `selfReference`,
+    confirmed or not, and the document is unchanged (replacing it would delete the target).
+10e. `confirmed: "selection"` with the cursor inside a field returns `needsConfirmation` with
+    `confirm: "field"`; once the field is confirmed, the field containing the cursor (not the
+    paragraph's first) is the one replaced.
 11. If `expectedFingerprint` no longer matches the live heading, the result is
     `staleTarget` and the document is unchanged.
 12. A failure before the write leaves no new bookmark and no partial reference, and reports
     `hostError` with `partialWrite: false`.
+12a. A failure inside the write batch reports `hostError` with `partialWrite` true exactly when
+    the document changed (read back afterwards), so the palette never asks for an Undo that
+    would undo the user's own edit.
 13. `readReferences` returns one record per REF/PAGEREF field with its bookmark and switches.
+13a. References in footnotes and endnotes are returned with that `location`.
 14. In the Word run only (not checked against the fake): after a field update (F9), every
     inserted reference still shows the correct value; after moving the target heading and
     updating, it shows the new number; one Undo restores the document exactly (reference, any

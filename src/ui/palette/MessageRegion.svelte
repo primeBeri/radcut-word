@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { messageText, type MessageId } from "../../core/messages";
+  import { isWarning, messageText, type MessageId } from "../../core/messages";
 
   /** `visuallyHidden`: still spoken, but shown elsewhere (the warning popover under the selected row). */
   let { message, visuallyHidden = false }: { message: MessageId | null; visuallyHidden?: boolean } = $props();
@@ -8,7 +8,7 @@
 <!-- Always rendered, so screen readers announce changes to it (one polite live region). -->
 <div
   class="message"
-  class:warning={message === "selectionWarning" || message === "fieldWarning"}
+  class:warning={isWarning(message)}
   class:visually-hidden={visuallyHidden}
   role="status"
   aria-live="polite"
@@ -17,8 +17,10 @@
 </div>
 
 <style>
+  /* Empty but still rendered (not display: none), so the live region stays in the accessibility tree. */
   .message:empty {
-    display: none;
+    padding: 0;
+    background: none;
   }
 
   .message {

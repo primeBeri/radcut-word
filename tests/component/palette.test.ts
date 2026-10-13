@@ -44,6 +44,7 @@ const POINT: InsertionPoint = {
   location: "main",
   selection: "none",
   inHeadingOrder: null,
+  inHeadingFingerprint: null,
   precedingHeadingOrder: 2,
 };
 
@@ -168,7 +169,7 @@ describe("Palette keyboard", () => {
     const { key, insert } = setup();
     await key("ArrowDown");
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[1], false);
+    expect(insert).toHaveBeenCalledWith(HEADINGS[1], null);
   });
 
   it("cancels on Esc", async () => {
@@ -208,7 +209,7 @@ describe("Palette selection warning (FR-008a)", () => {
     expect(insert).not.toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent(messageText("selectionWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[0], true);
+    expect(insert).toHaveBeenCalledWith(HEADINGS[0], "selection");
   });
 
   it("Esc dismisses only the warning", async () => {
@@ -231,13 +232,13 @@ describe("Palette selection warning (FR-008a)", () => {
 
   it("shows the warning when the gateway asks for confirmation at Enter", async () => {
     const insert = vi.fn<PaletteProps["insert"]>()
-      .mockResolvedValueOnce({ kind: "needsConfirmation", message: "selectionWarning" })
+      .mockResolvedValueOnce({ kind: "needsConfirmation", confirm: "selection", message: "selectionWarning" })
       .mockResolvedValueOnce({ kind: "closed" });
     const { key } = setup({ insert });
     await key("Enter");
     expect(screen.getByRole("status")).toHaveTextContent(messageText("selectionWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenLastCalledWith(HEADINGS[0], true);
+    expect(insert).toHaveBeenLastCalledWith(HEADINGS[0], "selection");
   });
 
   it("shows the warning visibly under the selected row, hidden from screen readers (the live region speaks it)", async () => {
@@ -262,12 +263,12 @@ describe("Palette field warning (FR-008b)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(messageText("fieldWarning"));
     expect(screen.getByTestId("warning-popover")).toHaveTextContent(messageText("fieldWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[0], true);
+    expect(insert).toHaveBeenCalledWith(HEADINGS[0], "field");
   });
 
   it("shows the field warning when the gateway asks for it at Enter", async () => {
     const insert = vi.fn<PaletteProps["insert"]>()
-      .mockResolvedValueOnce({ kind: "needsConfirmation", message: "fieldWarning" })
+      .mockResolvedValueOnce({ kind: "needsConfirmation", confirm: "field", message: "fieldWarning" })
       .mockResolvedValueOnce({ kind: "closed" });
     const { key } = setup({ insert });
     await key("Enter");
@@ -309,5 +310,13 @@ describe("Palette messages and format strip", () => {
     expect(cog).toHaveAttribute("aria-keyshortcuts", "Control+Comma");
     await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
     expect(openSettings).toHaveBeenCalledOnce();
+  });
+
+  it("shows no cog and lets Ctrl+, through while there is no settings view to open", async () => {
+    const { input } = setup();
+    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
+    const event = new KeyboardEvent("keydown", { key: ",", ctrlKey: true, cancelable: true });
+    input.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

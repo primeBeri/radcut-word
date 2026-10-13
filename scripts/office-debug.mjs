@@ -14,10 +14,17 @@ if (command !== "start" && command !== "stop") {
 }
 
 const dir = join(process.env.LOCALAPPDATA ?? tmpdir(), "radcut-dev");
+// The copy's own path must be ASCII too (a user name can carry an accent), or Word ignores it again.
+if (!/^[ -~]*$/.test(dir)) {
+  console.error(`office-debug: ${dir} contains non-ASCII characters, which Word ignores. Set LOCALAPPDATA to an ASCII path.`);
+  process.exit(1);
+}
 mkdirSync(dir, { recursive: true });
 const manifest = join(dir, "manifest.xml");
 copyFileSync(new URL("../manifest.xml", import.meta.url), manifest);
 
 const cli = createRequire(import.meta.url).resolve("office-addin-debugging/cli.js");
 const result = spawnSync(process.execPath, [cli, command, manifest, ...rest], { stdio: "inherit" });
+if (result.error) console.error("office-debug: could not run office-addin-debugging:", result.error);
+if (result.signal) console.error(`office-debug: office-addin-debugging was stopped by ${result.signal}`);
 process.exit(result.status ?? 1);

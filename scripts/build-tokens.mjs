@@ -18,6 +18,13 @@ for (const [name, value] of Object.entries(webLightTheme)) {
   }
 }
 
+// Say so when the themes disagree on which tokens exist: a dark-only token is left out, and a
+// light-only one keeps its light value in dark mode.
+const darkOnly = Object.keys(webDarkTheme).filter((name) => !(name in webLightTheme));
+const lightOnly = Object.keys(webLightTheme).filter((name) => !(name in webDarkTheme));
+if (darkOnly.length > 0) console.warn(`build-tokens: dark-only tokens left out: ${darkOnly.join(", ")}`);
+if (lightOnly.length > 0) console.warn(`build-tokens: light-only tokens use their light value in dark mode: ${lightOnly.join(", ")}`);
+
 const block = (selector, entries) =>
   `${selector} {\n${entries.map(([n, v]) => `  --${n}: ${v};`).join("\n")}\n}\n`;
 

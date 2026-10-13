@@ -4,8 +4,6 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // An empty suite is fine while the scaffold has no tests yet.
-    passWithNoTests: true,
     projects: [
       {
         test: {

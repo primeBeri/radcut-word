@@ -48,7 +48,7 @@ const ALL_FORMATS: [string, Part[]][] = [
 let lastBookmark: string | null = null;
 
 /**
- * Write `parts` before the selection anchor, in order, then clear any selected content.
+ * Write `parts` before the selection anchor, in order. Clearing any selected content is the caller's job.
  * Everything is queued; the caller syncs once.
  */
 function queueParts(anchor: Word.Range, bookmark: string, parts: Part[], extraSwitch: string): Word.Field[] {

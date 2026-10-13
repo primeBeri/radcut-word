@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { classifyLocation } from "../../src/core/location/rules";
+import { classifyLocation, confirmationFor, headingLevelOf, isHeadingParagraph } from "../../src/core/location/rules";
+import { headingFingerprint } from "../../src/core/headings/key";
 import { classifySelection } from "../../src/core/location/selection";
 import type { LocationFacts, SelectionFacts } from "../../src/core/location/types";
 
@@ -9,6 +10,7 @@ const body: LocationFacts = {
   styleBuiltIn: "Normal",
   outlineLevel: 10,
   protected: false,
+  text: "Body text.",
   headingOrder: null,
   precedingHeadingOrder: 3,
 };
@@ -28,6 +30,7 @@ describe("classifyLocation with allowInHeadings off", () => {
       location,
       selection: "none",
       inHeadingOrder: null,
+      inHeadingFingerprint: null,
       precedingHeadingOrder: 3,
     });
   });
@@ -72,13 +75,29 @@ describe("classifyLocation with allowInHeadings off", () => {
 describe("classifyLocation with allowInHeadings on", () => {
   it("allows a heading paragraph and reports it as inHeadingOrder", () => {
     expect(
-      classifyLocation({ ...body, styleBuiltIn: "Heading2", outlineLevel: 2, headingOrder: 7 }, "none", on),
+      classifyLocation(
+        { ...body, styleBuiltIn: "Heading2", outlineLevel: 2, text: "Fire strategy", headingOrder: 7 },
+        "none",
+        on,
+      ),
     ).toEqual({
       kind: "insertionPoint",
       location: "main",
       selection: "none",
       inHeadingOrder: 7,
+      inHeadingFingerprint: headingFingerprint({ level: 2, location: "main", text: "Fire strategy" }),
       precedingHeadingOrder: 3,
+    });
+  });
+
+  it("fingerprints the heading containing the cursor where its order is unknown, e.g. in a note", () => {
+    const facts = { ...body, story: "footnote", styleBuiltIn: "Heading1", outlineLevel: 1, text: "Note heading" } as const;
+    expect(classifyLocation({ ...facts, headingOrder: null, precedingHeadingOrder: null }, "none", on)).toMatchObject({
+      inHeadingOrder: null,
+      inHeadingFingerprint: headingFingerprint({ level: 1, location: "footnote", text: "Note heading" }),
+    });
+    expect(classifyLocation({ ...body, inTable: true, styleBuiltIn: "Heading3", text: "Cell heading" }, "none", on)).toMatchObject({
+      inHeadingFingerprint: headingFingerprint({ level: 3, location: "tableCell", text: "Cell heading" }),
     });
   });
 
@@ -154,5 +173,36 @@ describe("classifyLocation with a table selection", () => {
 
   it("passes a field selection through for confirmation", () => {
     expect(classifyLocation(body, "field", off)).toMatchObject({ kind: "insertionPoint", selection: "field" });
+  });
+});
+
+describe("headingLevelOf", () => {
+  it.each([
+    ["Heading3", null, 3],
+    ["Heading1", 10, 1],
+    ["Normal", 2, 2],
+    ["Normal", 9, 9],
+    ["Normal", 10, null],
+    ["Normal", null, null],
+    ["Title", 10, null],
+    [null, 4, 4],
+  ] as const)("style %s, outline level %s gives %s", (style, outline, level) => {
+    expect(headingLevelOf(style, outline)).toBe(level);
+  });
+
+  it("is what isHeadingParagraph tests for", () => {
+    expect(isHeadingParagraph("Heading2", null)).toBe(true);
+    expect(isHeadingParagraph("Normal", 10)).toBe(false);
+  });
+});
+
+describe("confirmationFor", () => {
+  it.each([
+    ["none", null],
+    ["inline", null],
+    ["extended", "selection"],
+    ["field", "field"],
+  ] as const)("%s needs %s", (selection, confirmation) => {
+    expect(confirmationFor(selection)).toBe(confirmation);
   });
 });

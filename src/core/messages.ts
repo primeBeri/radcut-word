@@ -1,4 +1,4 @@
-import type { DeclinedReason } from "./location/types";
+import type { Confirmation, DeclinedReason } from "./location/types";
 
 /** Every message the palette can show, in its one polite live region (contracts/palette-ui.md). */
 export type MessageId =
@@ -36,6 +36,17 @@ const TEXTS: Record<MessageId, string> = {
     "The selection covers more than one paragraph or a picture. Press Enter again to replace it, or Esc to keep it.",
   fieldWarning: "The cursor is inside a field. Press Enter again to replace the whole field, or Esc to keep it.",
 };
+
+/** A warning that a second Enter confirms (FR-008a, FR-008b). */
+export type ConfirmationWarning = Extract<MessageId, "selectionWarning" | "fieldWarning">;
+
+export function warningFor(confirmation: Confirmation): ConfirmationWarning {
+  return confirmation === "field" ? "fieldWarning" : "selectionWarning";
+}
+
+export function isWarning(id: MessageId | null): id is ConfirmationWarning {
+  return id === "selectionWarning" || id === "fieldWarning";
+}
 
 export function messageText(id: MessageId): string {
   return TEXTS[id];

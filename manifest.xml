@@ -2,7 +2,7 @@
 <!--
   RAD·CUT add-in only manifest (research R1): shared runtime, ribbon group, keyboard shortcuts.
   WordApi 1.5 and SharedRuntime 1.1 are required. KeyboardShortcuts 1.1, WordApi 1.6 and
-  WordApiDesktop 1.4 are checked at runtime with isSetSupported, not declared here.
+  WordApiDesktop 1.2 and 1.4 are checked at runtime with isSetSupported, not declared here.
 -->
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

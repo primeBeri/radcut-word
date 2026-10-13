@@ -9,13 +9,13 @@ function heading(order: number, text: string, bookmark: string | null = null, nu
   return { ...base, key: headingKeyFor(base) };
 }
 
-function snapshot(takenAt: number, ...headings: Heading[]): HeadingSnapshot {
-  return { documentId: "doc", headings, takenAt };
+function snapshot(...headings: Heading[]): HeadingSnapshot {
+  return { documentId: "doc", headings };
 }
 
 describe("HeadingIndex", () => {
   it("builds from a snapshot and finds headings by bookmark key, case-insensitively", async () => {
-    const index = new HeadingIndex(async () => snapshot(1, heading(0, "Scope", "_Ref1"), heading(1, "Fire")));
+    const index = new HeadingIndex(async () => snapshot(heading(0, "Scope", "_Ref1"), heading(1, "Fire")));
     await index.get();
     expect(index.byKey({ kind: "bookmark", name: "_REF1" })?.text).toBe("Scope");
     expect(index.byKey({ kind: "bookmark", name: "_Ref2" })).toBeNull();
@@ -23,14 +23,14 @@ describe("HeadingIndex", () => {
 
   it("finds headings by provisional key within the snapshot", async () => {
     const fire = heading(1, "Fire");
-    const index = new HeadingIndex(async () => snapshot(1, heading(0, "Scope"), fire));
+    const index = new HeadingIndex(async () => snapshot(heading(0, "Scope"), fire));
     await index.get();
     expect(index.byKey(fire.key)).toEqual(fire);
   });
 
   it("invalidates a provisional key against a newer snapshot whose fingerprint differs", async () => {
     let text = "Fire strategy";
-    const index = new HeadingIndex(async () => snapshot(Date.now(), heading(0, text)));
+    const index = new HeadingIndex(async () => snapshot(heading(0, text)));
     const first = (await index.get()).headings[0]!;
     text = "Fire strategies";
     await index.refresh();
@@ -41,7 +41,7 @@ describe("HeadingIndex", () => {
   });
 
   it("uses the host's number as is (it is already the full number) and null for unnumbered", async () => {
-    const index = new HeadingIndex(async () => snapshot(1, heading(0, "Fire strategy", null, "4.3"), heading(1, "Note")));
+    const index = new HeadingIndex(async () => snapshot(heading(0, "Fire strategy", null, "4.3"), heading(1, "Note")));
     const { headings } = await index.get();
     expect(headings.map((h) => h.number)).toEqual(["4.3", null]);
   });
@@ -50,7 +50,7 @@ describe("HeadingIndex", () => {
     let calls = 0;
     const index = new HeadingIndex(async () => {
       calls++;
-      return snapshot(calls, heading(0, "Scope", "_Ref1"), heading(1, `Changing ${calls}`));
+      return snapshot(heading(0, "Scope", "_Ref1"), heading(1, `Changing ${calls}`));
     });
     expect(index.cached()).toBeNull();
     const first = await index.get();
@@ -64,6 +64,35 @@ describe("HeadingIndex", () => {
     expect(index.cached()).toBe(fresh);
     expect(fresh.headings[0]!.key).toEqual(first.headings[0]!.key);
     expect(fresh.headings[1]!.text).toBe("Changing 2");
+  });
+
+  it("shares one document read between refreshes that overlap", async () => {
+    let calls = 0;
+    let release!: () => void;
+    const index = new HeadingIndex(async () => {
+      calls++;
+      await new Promise<void>((resolve) => (release = resolve));
+      return snapshot(heading(0, "Scope"));
+    });
+    const a = index.refresh();
+    const b = index.refresh();
+    release();
+    expect(await a).toBe(await b);
+    expect(calls).toBe(1);
+  });
+
+  it("reads again after a failed read, keeping the last good snapshot meanwhile", async () => {
+    let fail = false;
+    const index = new HeadingIndex(async () => {
+      if (fail) throw new Error("Word is busy.");
+      return snapshot(heading(0, "Scope"));
+    });
+    const good = await index.get();
+    fail = true;
+    await expect(index.refresh()).rejects.toThrow("Word is busy.");
+    expect(index.cached()).toBe(good);
+    fail = false;
+    await expect(index.refresh()).resolves.toMatchObject({ headings: [{ text: "Scope" }] });
   });
 });
 

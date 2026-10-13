@@ -67,10 +67,17 @@ describe("rankHeadings", () => {
     expect(rankHeadings("zzzq", spec300)).toEqual([]);
     expect(matchCandidate("abc", "cba")).toBeNull();
   });
+});
 
-  it("carries the heading key in the match result", () => {
-    const [first] = rankHeadings("fstrat", spec300);
-    expect(first?.match.key).toEqual(first?.heading.key);
+describe("characters whose lower case is longer", () => {
+  it("highlights the right characters after a dotted capital I", () => {
+    const [ranked] = rankHeadings("hub", [heading(0, "Ankara İstanbul hub")]);
+    expect(ranked?.match.textRanges).toEqual([[16, 19]]);
+  });
+
+  it("matches a dotted capital I with a plain i", () => {
+    const [ranked] = rankHeadings("ist", [heading(0, "Ankara İstanbul hub")]);
+    expect(ranked?.match.textRanges).toEqual([[7, 10]]);
   });
 });
 

@@ -1,4 +1,7 @@
+import { headingFingerprint } from "../headings/key";
+import type { HeadingLevel } from "../headings/types";
 import type {
+  Confirmation,
   Declined,
   DeclinedReason,
   InsertionLocation,
@@ -6,12 +9,25 @@ import type {
   LocationFacts,
   LocationPolicy,
   SelectionClass,
+  SelectionExtent,
 } from "./types";
+
+/** The level of a Heading 1–9 style, else of an outline level 1–9; null for anything else (FR-003). */
+export function headingLevelOf(styleBuiltIn: string | null, outlineLevel: number | null): HeadingLevel | null {
+  const styled = styleBuiltIn === null ? null : /^Heading([1-9])$/.exec(styleBuiltIn);
+  if (styled) return Number(styled[1]) as HeadingLevel;
+  return outlineLevel !== null && outlineLevel >= 1 && outlineLevel <= 9 ? (outlineLevel as HeadingLevel) : null;
+}
 
 /** True for a Heading 1–9 style or an outline level 1–9 (FR-003). */
 export function isHeadingParagraph(styleBuiltIn: string | null, outlineLevel: number | null): boolean {
-  if (styleBuiltIn !== null && /^Heading[1-9]$/.test(styleBuiltIn)) return true;
-  return outlineLevel !== null && outlineLevel >= 1 && outlineLevel <= 9;
+  return headingLevelOf(styleBuiltIn, outlineLevel) !== null;
+}
+
+/** What the user must confirm before the selection is replaced, if anything (FR-008a, FR-008b). */
+export function confirmationFor(selection: SelectionExtent): Confirmation | null {
+  if (selection === "field") return "field";
+  return selection === "extended" ? "selection" : null;
 }
 
 const declined = (reason: DeclinedReason): Declined => ({ kind: "declined", reason });
@@ -40,18 +56,20 @@ export function classifyLocation(
       return declined(facts.story);
   }
 
-  const heading = isHeadingParagraph(facts.styleBuiltIn, facts.outlineLevel);
+  const level = headingLevelOf(facts.styleBuiltIn, facts.outlineLevel);
   const title = facts.styleBuiltIn === "Title" || facts.styleBuiltIn === "Subtitle";
-  if (heading && !policy.allowInHeadings) return declined("headingParagraph");
+  if (level !== null && !policy.allowInHeadings) return declined("headingParagraph");
   if (title && !policy.allowInHeadings) return declined("titleParagraph");
   // The place is fine; what is selected is not (FR-008a).
   if (selection === "table") return declined("tableSelected");
 
+  const headingLocation = location === "tableCellInMain" ? "tableCell" : location;
   return {
     kind: "insertionPoint",
     location,
     selection,
-    inHeadingOrder: heading ? facts.headingOrder : null,
+    inHeadingOrder: level !== null ? facts.headingOrder : null,
+    inHeadingFingerprint: level !== null ? headingFingerprint({ level, location: headingLocation, text: facts.text }) : null,
     precedingHeadingOrder: facts.precedingHeadingOrder,
   };
 }

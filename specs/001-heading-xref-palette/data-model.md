@@ -75,8 +75,9 @@ one used (FR-008). Nothing is kept or tracked between the two readings.
 |---|---|---|
 | `location` | `"main" \| "footnote" \| "endnote" \| "tableCellInMain"` | Only allowed locations reach this type. |
 | `selection` | `"none" \| "inline" \| "extended" \| "field"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a picture, shape or content control; replaced only after confirmation (FR-008a). `field`: the cursor or selection is inside an existing field; the whole field is replaced only after confirmation (FR-008b). A selection containing a table is declined (`tableSelected`). |
-| `inHeadingOrder` | `number \| null` | Order of the heading paragraph containing the cursor (only possible when `allowInHeadings` is on); that heading is not offered as a target (FR-001b). |
-| `precedingHeadingOrder` | `number \| null` | Heading order just before the point; used for the above/below preview. In Word it is the count of heading paragraphs before the cursor in the main text, so it is approximate when tracked deletions precede the cursor and null in notes (Word decides the real value). |
+| `inHeadingOrder` | `number \| null` | Snapshot order of the heading paragraph containing the cursor (only possible when `allowInHeadings` is on); that heading is not offered as a target (FR-001b). Main text only; null elsewhere. |
+| `inHeadingFingerprint` | `string \| null` | Fingerprint of the heading containing the cursor in any story, so the palette leaves it out where `inHeadingOrder` is null (a heading in a note). |
+| `precedingHeadingOrder` | `number \| null` | Snapshot order of the last heading before the cursor's paragraph; used for the above/below preview. Both gateways count it in the main text only, skipping tracked-deleted headings as the heading list does, so it indexes the `readHeadings` snapshot; null with no heading before the cursor and always null in notes, where the preview shows above/below as unknown (Word decides the real value). |
 
 **Location check** (FR-001a, FR-001b) produces either an `InsertionPoint` or a `Declined` reason:
 `"header" | "footer" | "comment" | "textBox" | "headingParagraph" | "titleParagraph" |

@@ -30,7 +30,7 @@ describe("OpenPalette", () => {
     expect(messageText("noHeadings")).toMatch(/Heading 1–9/);
   });
 
-  it("opens with headings in order, the default format, the first row selected and the preceding heading", async () => {
+  it("opens with headings in order, the default format and the preceding heading", async () => {
     const { gateway, index } = setup();
     const state = await openPalette({ gateway, index }, defaults);
     if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
@@ -38,7 +38,6 @@ describe("OpenPalette", () => {
     expect(orders).toEqual([...orders].sort((a, b) => a - b));
     expect(state.headings[0]?.text).toBe("Introduction");
     expect(state.format.id).toBe("sectionNumberText");
-    expect(state.selectedIndex).toBe(0);
     const fire = state.headings.find((h) => h.text === "Fire strategy")!;
     expect(state.point.precedingHeadingOrder).toBe(fire.order);
   });

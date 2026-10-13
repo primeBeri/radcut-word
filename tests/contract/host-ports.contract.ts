@@ -15,7 +15,10 @@ export interface HostShellContractHarness {
   closePaneByUser(): Promise<void>;
 }
 
-/** Shared ISettingsStore contract (contracts/host-ports.md). */
+/**
+ * Shared ISettingsStore contract (contracts/host-ports.md). A placeholder with no cases until
+ * T061 (US2) adds them; it checks nothing yet.
+ */
 export function defineSettingsStoreContract(
   name: string,
   makeStore: () => Promise<ISettingsStore>,
@@ -23,6 +26,7 @@ export function defineSettingsStoreContract(
 ): void {
   api.describe(`ISettingsStore contract: ${name}`, () => {
     void makeStore;
+    api.skip("placeholder: no cases until T061 (US2)", () => undefined);
   });
 }
 

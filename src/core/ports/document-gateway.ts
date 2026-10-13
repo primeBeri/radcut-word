@@ -1,6 +1,6 @@
 import type { FormatPart } from "../formats/types";
 import type { HeadingKey, HeadingSnapshot } from "../headings/types";
-import type { Declined, InsertionPoint, LocationPolicy } from "../location/types";
+import type { Confirmation, Declined, InsertionPoint, LocationPolicy } from "../location/types";
 
 /**
  * The core's only view of a Word document (contracts/document-gateway.md). Implemented by
@@ -44,11 +44,17 @@ export interface InsertReferenceRequest {
   /** Used only if no usable bookmark exists. */
   readonly newBookmarkName: string;
   readonly policy: LocationPolicy;
-  /** True only after the user confirmed the selection or field warning (FR-008a, FR-008b). */
-  readonly confirmExtendedSelection: boolean;
+  /**
+   * The warning the user confirmed, if any (FR-008a, FR-008b). It covers only what it named: a
+   * confirmed selection warning does not let a field the cursor has since moved into be replaced.
+   */
+  readonly confirmed: Confirmation | null;
 }
 
-/** Opaque handle the gateway that made it uses to put the caret after the reference. */
+/**
+ * Opaque handle for an inserted reference. `returnFocus` takes it as a hint that the caret goes
+ * after the reference; OfficeJsGateway relies on Word's selection already being there.
+ */
 export interface InsertedReference {
   readonly id: string;
 }
@@ -61,7 +67,7 @@ export type InsertReferenceResult =
       readonly bookmarkCreated: boolean;
     }
   | { readonly ok: false; readonly reason: "staleTarget" }
-  | { readonly ok: false; readonly reason: "needsConfirmation"; readonly confirm: "selection" | "field" }
+  | { readonly ok: false; readonly reason: "needsConfirmation"; readonly confirm: Confirmation }
   | {
       readonly ok: false;
       readonly reason: "hostError";

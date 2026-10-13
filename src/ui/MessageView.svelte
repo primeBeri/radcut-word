@@ -10,7 +10,8 @@
   onMount(() => button.focus());
 </script>
 
-<!-- Shown instead of the palette when the cursor is somewhere a reference cannot go. -->
+<!-- Shown instead of the palette when it cannot open: the cursor is somewhere a reference cannot go,
+     the document has no headings, or Word failed. -->
 <div class="message-view radcut-pane">
   <MessageRegion {message} />
   <button

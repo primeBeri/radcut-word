@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterHeadings } from "../../src/core/headings/filter";
-import { headingKeyFor } from "../../src/core/headings/key";
+import { headingFingerprint, headingKeyFor } from "../../src/core/headings/key";
 import type { Heading, HeadingLocation } from "../../src/core/headings/types";
 
 function heading(order: number, location: HeadingLocation): Heading {
@@ -39,5 +39,10 @@ describe("filterHeadings", () => {
     expect(filterHeadings(all, { showHeadingsOutsideMainText: false, inHeadingOrder: 0 }).map((h) => h.order)).toEqual([
       2,
     ]);
+  });
+
+  it("leaves out the heading containing the cursor by its fingerprint where its order is unknown (a note)", () => {
+    const options = { showHeadingsOutsideMainText: true, inHeadingOrder: null, inHeadingFingerprint: headingFingerprint(all[4]!) };
+    expect(filterHeadings(all, options).map((h) => h.order)).toEqual([0, 1, 2, 3, 5, 6, 7]);
   });
 });
