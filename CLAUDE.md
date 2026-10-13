@@ -8,6 +8,8 @@ Pre-code. `RAD·CUT - PRD.md` is the source of truth for scope, requirements (FR
 
 Phase 0 (three feasibility spikes on Windows desktop) comes before any MVP build: shortcut → task pane with focus in the search box; REF field to a hidden bookmark survives F9 and the hyperlink jumps; bookmark insertion under tracked changes and SharePoint co-authoring.
 
+Testing strategy: `docs/proposals/0001-automated-testing.md` (proposed) defines seven test layers and a Windows desktop harness that runs the in-Word checks without a human. Phase 0 spikes are to be written as automated tests per that proposal.
+
 ## Spec-driven workflow (spec-kit)
 
 Features are built with GitHub spec-kit (Claude integration, PowerShell scripts). Core flow: `/speckit-constitution` → `/speckit-specify` → `/speckit-clarify` (optional) → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` (optional) → `/speckit-implement`. The constitution lives in `.specify/memory/constitution.md`; feature artefacts (spec, plan, tasks) go under `specs/<feature>/`. Specs must not copy internal content from the gitignored PRD or `planning/` beyond what is fit for the public repo.
