@@ -8,7 +8,7 @@ Pre-code. `RAD·CUT - PRD.md` is the source of truth for scope, requirements (FR
 
 Phase 0 (three feasibility spikes on Windows desktop) comes before any MVP build: shortcut → task pane with focus in the search box; REF field to a hidden bookmark survives F9 and the hyperlink jumps; bookmark insertion under tracked changes and SharePoint co-authoring.
 
-Testing strategy: `docs/proposals/0001-automated-testing.md` (proposed) defines seven test layers and a Windows desktop harness that runs the in-Word checks without a human. Phase 0 spikes are to be written as automated tests per that proposal.
+Testing strategy: `docs/proposals/0001-automated-testing.md` (proposed) adds a Windows desktop harness (`tests/desktop`, C#) that runs the in-Word contract suite and the quickstart scenarios without a human, leaving a short manual list per release.
 
 ## Spec-driven workflow (spec-kit)
 
