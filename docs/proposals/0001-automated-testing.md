@@ -3,9 +3,9 @@
 | | |
 | --- | --- |
 | **Status** | Proposed, ready for handover to Claude Code on the Windows desktop |
-| **Date** | 2026-10-13 (revised the same day against branch `001-heading-xref-palette`) |
-| **Baseline** | Branch `001-heading-xref-palette` at `b26491a`: US1 complete, US2–US5 and Polish open |
-| **Affects** | The in-Word contract run (T051), every "Run quickstart scenarios in Word" task (T071, T078, T088, T095, T103), the performance runner (T096), Constitution 1.1.0 → 1.2.0 |
+| **Date** | 2026-10-13 (revised the same day against branch `001-heading-xref-palette`; revised 2026-10-15 for Phases 10–11, contract-run speed and milestone order) |
+| **Baseline** | Branch `001-heading-xref-palette` at `78f1aab` (merged into `main`): US1 and Phases 9–11 complete, US2–US5 and Polish open |
+| **Affects** | The in-Word contract run (T051, T138, T142) and its speed, every "Run quickstart scenarios in Word" task (T071, T078, T088, T095, T103), the performance runner (T096), Constitution 1.1.0 → 1.2.0 |
 | **Runs on** | Windows 11 with Word for Microsoft 365 desktop. Everything that does not need Word already runs under `npm test` |
 
 ## TL;DR
@@ -139,7 +139,7 @@ Make two small dev-only changes in `src/dev/contract-pane.ts`, and nothing else:
 
 The existing release-build check already keeps `src/dev/**` out of `dist/`. Add a Vitest case asserting that the release bundle does not contain `__radcutContractResults`.
 
-### 4.4 Layer 3 + 4 + 5: the six hand-checked contract cases
+### 4.4 Layer 3 + 4 + 5: the hand-checked contract cases
 
 | Hand check today (T051) | Harness replacement |
 | --- | --- |
@@ -149,6 +149,8 @@ The existing release-build check already keeps `src/dev/**` out of `dist/`. Add 
 | Picture: one Ctrl+Z restores | The same pattern with the inline picture paragraph |
 | Host shell: shortcut, ribbon and × | FlaUI: shortcut, ribbon "Cross-reference" button (by automation ID or name), and the pane's close button. Playwright or UIA: pane visible or hidden, focus where expected |
 | Cases 2 and 2a (two fixtures) | Already split. The harness simply runs each on its own fixture |
+| Plain-text content control parts of cases 5d and 10f (T138): the snapshot restore drops the control and Office.js cannot put it back | COM: restore the control (`ContentControls.Add(wdContentControlText, range)`) after the restore, or open a fresh scratch copy for these cases. Then the scripted cases run as written |
+| Text box heading part of case 5b (T142): Word refuses `Range.select()` in the re-created text box after the restore | COM: `Shapes(1).TextFrame.TextRange.Paragraphs(1).Range.Select()`, or a fresh scratch copy for this case |
 
 ### 4.5 Layer 4: document verification
 
@@ -185,7 +187,7 @@ The existing release-build check already keeps `src/dev/**` out of `dist/`. Add 
 | 9 templates | L1 already. L5 smoke for one template | – |
 | 10 ribbon, change shortcut, Ctrl+@ | L5 (ribbon by UIA, recorder UI, refusal message). UK layout loaded with `LoadKeyboardLayout("00000809")` for "no stray character" | One physical UK-keyboard check |
 | 11 recents | L5 + L3 | – |
-| 12 caret in heading, Title, header, comment, text box; protected | L4 caret placement in each story, L5 shortcut, L3 message | – |
+| 12 caret in heading, Title, comment, plain-text content control (declined); header, footer, text box (allowed since Phase 11); protected | L4 caret placement in each story, L5 shortcut, L3 message or L4 inserted field | – |
 | 13 caption, quote, table cell, footnote | The same | – |
 | 14 tracked accept and reject | L4 | – |
 | 15 dark theme, reduced motion | L3 (`emulateMedia`, Office theme set in the registry before launch), with a screenshot kept | A visual look (or L6) |
@@ -202,6 +204,23 @@ The existing release-build check already keeps `src/dev/**` out of `dist/`. Add 
 | 26 vs Word's own dialog | L4 (`InsertCrossReference`) | – |
 | 27 caret inside an existing field | L4, L5 | – |
 | SC-001 median under 3 s, by a practised human | Harness times machine latency only | The human timing, if still wanted |
+
+### 4.8 Contract-run speed
+
+One run of the `OfficeJsGateway` suite on `spec-300.docx` takes 20–25 minutes for about 90 cases, roughly 15 s per case, although most cases do one read and at most one insertion. The harness would make every run pay that, so the run is made fast before it is automated. Likely causes, from the code (`src/adapters/office/dev-registration.ts`), to be confirmed by measurement first:
+
+1. **Every case restores the whole document**, whether or not the previous case changed it: `body.insertOoxml(snapshot, "Replace")` over about 600 paragraphs, a table of contents with about 300 entries and their `_Toc` bookmarks, multilevel list numbering, and every header and footer. Word then renumbers and repaginates.
+2. **The contract fixture is the performance fixture.** Chapters 5–76 of `spec-300` exist for the 300-heading budget; no contract case needs them (two of them carry the footnote and endnote). Every `readHeadings` (about 450 ms at 300 headings), every `paragraphByText` (all paragraphs of every story, per `select`), and every `documentState` (all bookmarks with two range comparisons each, every field's result, including the table of contents' `PAGEREF`s, twice per mutating case) scales with it.
+3. **Repeated whole-document reads in the harness**: the fixture-marker check reads every body paragraph per case, and `paragraphByText` reloads every story per call.
+
+Plan:
+
+- **Measure first** (Constitution VI). `MiniTest` records each case's duration; the harness records time spent restoring, selecting and reading state. The pane shows the slowest cases and the total.
+- **A small contract fixture.** `make-fixtures.ps1` builds `spec-contract.docx` (the named paragraphs of `spec-300`, two filler chapters for the notes, a table of contents over those only), and the fake gets the same document. `spec-300` and `guide-500` stay for performance (T096, M4).
+- **Restore only when needed.** The harness marks the document dirty when a case writes (insert, `setParagraphText`, a simulated failure) and skips the restore otherwise; the marker check reuses what the restore already read.
+- **Cheaper lookups.** Find a paragraph with `body.search` in the story that holds it, and cache story paragraph lists until the next write.
+
+Target: the full gateway suite on its fixture in under 5 minutes, and recorded in `tests/desktop/README.md` with the before and after timings. No case is weakened or skipped to get there; a change that alters a result is a defect.
 
 ## 5. Claude computer use (layer 6)
 
@@ -224,14 +243,14 @@ Work test-first throughout. Build the harness as spec-kit feature **`002-desktop
 | ID | Milestone | Done when |
 | --- | --- | --- |
 | **M0** | **Feasibility (go/no-go)** | From `dotnet test --filter Category=M0`, the harness: (a) starts the dev server and sideloads (normal and devpane builds); (b) launches Word on a scratch copy of `spec-300.docx` with the add-in available; (c) attaches **COM** to that same Word instance; (d) attaches **Playwright** to the pane over CDP and reads one known element; (e) presses **Ctrl+Shift+Y** through FlaUI and sees the search box focused; (f) shuts everything down cleanly. Record the routes that worked in `tests/desktop/README.md` (see §8). **If (d) cannot be made to work by any route in §8, stop and report.** Layers 4 and 5 still work without it, but the plan changes. |
-| M1 | Contract run automated | §4.3 pane changes. Every registered Office suite runs on a fresh fixture copy, one xUnit result per case. The six §4.4 hand checks are automated. T051's "Still to check by hand" list is empty. |
-| M2 | Document verification | `DocumentInspector` and `DocumentSnapshot` exist. Scenarios 3, 4, 6, 14, 19, 20 and 26 pass. The `DoClick` question is answered. |
+| M1 | Contract run fast and automated | §4.8 first: timings recorded, the small contract fixture, restore only when dirty; the gateway suite under 5 minutes. Then the §4.3 pane changes. Every registered Office suite runs on a fresh fixture copy, one xUnit result per case. The §4.4 hand checks are automated. T051's "Still to check by hand" list, and the hand-check parts of T138 and T142, are empty. |
+| M2 | Document verification | `DocumentInspector` and `DocumentSnapshot` exist. Scenarios 3, 4, 6, 14, 19, 20 and 26 pass. The `DoClick` question is answered. US2's scenario 7 (preview = result) depends on this. |
 | M3 | US1 regression complete | Scenarios 1, 2, 5, 12, 13, 21, 22, 23, 25 and 27 pass, which together with M2 covers everything T055 checked by hand. The harness writes `test-results/acceptance-summary.md` in the checklist's table format. |
 | M4 | Performance | When T096's perf runner exists, the harness reads it. Until then, it times shortcut → search box focused and keystroke → list updated from outside. Budgets: ready < 500 ms on `spec-300`, filter < 50 ms, no long task > 100 ms on `guide-500`. |
 | M5 | Workflow and governance | `/speckit-constitution` amendment 1.1.0 → **1.2.0** (§9). `CLAUDE.md` commands updated. The open "Run quickstart scenarios in Word" tasks (T071, T078, T088, T095, T103) are reworded with `/speckit-refine-update` and `/speckit-refine-propagate` so each becomes "write the harness scenario first, then run it", with only §6 items left manual. `docs/acceptance-checklist.md` reorganised into "automated (paste the summary)" and "human (§6)". |
 | M6 | Exploratory charters (optional) | Two charters in `tests/exploratory/`. |
 
-Order: M0 → M1 → (M2, M3) → resume US2 using the harness → M4 with T096 → M5. M5's constitution amendment waits until M3 is green.
+Order (revised 2026-10-15): M0 → M1 → M2 → merge `002` into `001-heading-xref-palette`, with M5's constitution amendment and task rewording → US2 using the harness → M3 (US1 regression, needed before a release, T103) → M4 with T096. The amendment moves forward from "after M3" because US2's tasks rely on the harness as soon as they are reworded, and `/speckit-analyze` checks tasks against the constitution. M5's task rewording is a direct edit of `001`'s `plan.md` and `tasks.md` with a dated note, not `/speckit-refine-update`: `001`'s spec does not change. US2's Vitest-only tasks (T056–T065, T068–T070) need no harness and may go ahead if M0 stalls.
 
 ## 8. Routes to verify in M0
 
@@ -244,7 +263,7 @@ Order: M0 → M1 → (M2, M3) → resume US2 using the harness → M4 with T096 
 
 ## 9. Constitution impact (1.1.0 → 1.2.0, MINOR)
 
-Make the amendment after M3, with `/speckit-constitution`:
+Make the amendment when `002` merges into `001` after M2, with `/speckit-constitution`:
 
 - **Technology constraints, Testing:** "the Office.js contract run happens inside Word (Script Lab or a dev task pane)" becomes "…inside Word, from the dev pane, started and read by the desktop harness (`tests/desktop`)". Add the harness (C#, xUnit, Playwright for .NET, FlaUI, Word COM) as development-only tooling.
 - **Principle II:** name the test layers. A quickstart scenario that can be automated is written as a harness test before the implementation that satisfies it.
