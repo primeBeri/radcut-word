@@ -64,6 +64,7 @@ fallback, so no question blocks planning.
 |---|---|---|---|---|
 | Before (T051/T142 runs) | `spec-300` | none | 20–25 min (owner's estimate) | 46 passed, the rest manual or other fixtures |
 | T008, 2026-10-15 | `spec-300` | restore only when dirty | 17 min 16.6 s | 46 passed, 13 failed: the same cases (manual checks, other fixtures); 0 skipped |
+| T012, 2026-10-15 | `spec-contract` | and the small fixture | 1 min 3.5 s | 47 passed, 12 failed: the same, except 5b's text box heading now passes (no restore precedes it) |
 
 Findings from T008's per-case timings:
 
@@ -78,6 +79,16 @@ Findings from T008's per-case timings:
   51 s of gateway time for the seven formats in the header and in the footer, against 28 s in
   the text box and 5–8 s in notes and table cells). Worth a look in feature 001 (product
   latency, not only the harness).
+- T012 on `spec-contract`: a full restore takes 0.5–0.9 s, a guard check 3–6 ms; the slowest
+  case (9) takes 7.1 s. The counts noted after each restore stayed at 70 paragraphs, 1 list,
+  373 styles and 1 picture through the run, so lists, styles and pictures do not accumulate.
+  Restores still grow a little (0.53 s at case 1b to 0.90 s at case 13), which fits Word's
+  Undo history growing; at one minute a run, not worth chasing. The diagnostic note is removed.
+- The header and footer write cost on `spec-300` (51 s of gateway time in case 9c) falls to
+  0.6–0.7 s on `spec-contract`, so it scales with document size: feature 001 should time an
+  insertion from a header in a large document (its T096/T098 performance work).
+- 5b's text box heading passes when no restore precedes it, confirming that Word refuses the
+  selection only in a text box re-created by `insertOoxml`.
 - The multi-restore cases dominate: case 9 (1 min 9.6 s of restores), 10a (47 s), 13a (45 s),
   7c and 7d (40 s each).
 

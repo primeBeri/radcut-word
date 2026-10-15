@@ -203,3 +203,18 @@ script after the restore, so that part is a hand check:
 - [ ] **5b, text box heading.** Once the settings view exists (T069), turn on "allow references
       in headings", click in "Heading in a text box", press Ctrl+Shift+Y: the palette opens and
       inserts. With the setting off (as shipped) it declines as a heading.
+
+## Contract-run speed (feature 002, T008 and T012), 2026-10-15
+
+`IDocumentGateway: OfficeJsGateway` from the dev pane, on fresh scratch copies:
+
+| Fixture | Change | Total | Outcome |
+|---|---|---|---|
+| `spec-300.docx` | before 002 | 20–25 min | 46 passed, 13 by design |
+| `spec-300.docx` | restore only after a case that wrote | 17 min 16.6 s | 46 passed, the same 13 |
+| `spec-contract.docx` | and the small contract fixture | 1 min 3.5 s | 47 passed, 12 by design |
+
+The extra pass is case 5b's text box heading: no write precedes it, so no restore runs before it
+and Word accepts the selection. It still depends on that order (after a restore Word refuses),
+so the item above stays open until the desktop harness covers it (002 T028). Details: 
+`specs/002-desktop-test-harness/research.md`, "D2 measurements".
