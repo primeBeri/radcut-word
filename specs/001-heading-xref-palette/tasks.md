@@ -7,6 +7,8 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 **Input**: Design documents from `/specs/001-heading-xref-palette/`
 
+**Rescoped**: 2026-10-15 — Constitution 1.2.0 (test layers; layers 3–5 run unattended by the desktop harness from feature 002, `npm run test:desktop`). No spec change. In-Word checks of the remaining stories become harness tests written first: the Word halves of T066, T067, T085 and T093 run through the contract category; T071, T078, T088 and T095 become harness scenario tests written with each story's tests and made green by its implementation; T096, T101, T102 and T103 use the harness, leaving only the layer 7 checks (co-authoring, a physical UK keyboard, a visual theme pass, a screen-reader pass) to a person. Test tasks carry layer tags.
+
 **Propagated**: 2026-10-14 — Updated from spec.md refinement (Phase 10 hand checks): headers, footers and text boxes allowed as insertion points (FR-001a), gated by an in-Word spike; FR-016a may extend to them. Tasks modified: T057, T060, T064; added: T139–T142 (Phase 11).
 
 **Propagated**: 2026-10-13 — Updated from spec.md refinement (Phase 9 hand checks in Word): plain-text content controls declined inside and confirmed when selected whole (FR-001a, FR-008a); no above/below formats in footnotes and endnotes (FR-016a). Tasks modified: T057, T060, T064; added: T135–T138 (Phase 10).
@@ -21,10 +23,13 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 **Organization**: Tasks are grouped by user story so each story can be built, tested and demonstrated on its own.
 
-## Format: `[ID] [P?] [Story] Description`
+## Format: `[ID] [P?] [Story] [Layer] Description`
 
 - **[P]**: Can run in parallel (different files, no dependency on an unfinished task)
 - **[Story]**: The user story the task belongs to (US1–US5)
+- **[Layer]** (test tasks, from 2026-10-15): `[L1]` unit/component, `[L2]` contract vs FakeGateway,
+  `[L3]` contract or pane state in Word, `[L4]` document via Word COM, `[L5]` keyboard and focus,
+  `[L7]` human (Constitution 1.2.0, Principle II). Test at the lowest layer that can observe it.
 - Paths are relative to the repository root (single project, see plan.md "Project Structure")
 
 ## Ground rules for every task
@@ -33,6 +38,10 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 - Headings are identified by bookmark name, never by position or text (Constitution I).
 - Use the exact names, constraints and messages from data-model.md and contracts/ when a task quotes them.
 - After each task: `npm test` and `npm run lint` are green except for tests deliberately left red for the next task.
+- A task that touches Word runs the desktop harness (Word closed, hands off the keyboard): the contract
+  suites with `npm run test:desktop -- --filter-trait "Category=Contract"`, document checks and
+  scenarios with `Category=Document` and `Category=Scenario` (tests/desktop/README.md). Nothing
+  automatable is left as a hand check.
 
 ---
 
@@ -154,25 +163,25 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T056 [P] [US2] Unit tests for the built-in catalogue: ids and order `text`, `number`, `numberText`, `sectionNumberText`, `page`, `aboveBelow`, `textAboveBelow`; parts for each match research R5 (e.g. `textAboveBelow` = text, " ", aboveBelow); built-ins have `builtIn: true`, in `tests/unit/format-catalogue.test.ts`
-- [ ] T057 [P] [US2] Unit tests for the format cycle and preview: Tab = next, Shift+Tab = previous, wrapping at both ends; built-ins then templates in creation order; page previews as "page ?" with warning `pageUnknown`; above/below computed from `precedingHeadingOrder` versus target `order`; palette reopens on the default, not the last used; with the cursor in a footnote, endnote, header, footer or text box (T139) the cycle leaves out formats with an `aboveBelow` part and a default that is one of them opens on the next offered format (FR-016a), in `tests/unit/format-cycle.test.ts`
-- [ ] T058 [P] [US2] Unit tests for settings: defaults (`schemaVersion: 1`, `defaultFormatId: "sectionNumberText"`, no templates, `allowReferencesInHeadings: false`, `showHeadingsOutsideMainText: true`); load validates and migrates; "unknown versions reset to defaults with a message"; `defaultFormatId` "falls back to `sectionNumberText` if the template was deleted"; `SaveSettings` use case persists through `ISettingsStore`, in `tests/unit/settings.test.ts`
-- [ ] T059 [P] [US2] Contract cases: inserting each built-in format produces exactly the R5 field composition and its result equals the preview (page: positive integer); add to `tests/contract/document-gateway.contract.ts`
-- [ ] T060 [P] [US2] Component tests: Tab/Shift+Tab change the format strip and announce it politely; focus stays in the search box; Ctrl+, and the cog (with `aria-keyshortcuts="Control+Comma"`) emit open-settings; settings view focuses its first control on open; every settings control has a programmatic label, the default-format radio list is a labelled `radiogroup`, and validation errors are linked to their field with `aria-describedby` and announced; default-format radio list shows a sample preview per format; the Headings section has the "Allow references in headings" (off) and "Show headings outside the main text" (on) checkboxes, each with its description from contracts/palette-ui.md linked by `aria-describedby`; Esc/Close returns to the palette with the query restored when opened from it, otherwise to the document; unsaved changes prompt an in-pane confirmation; in a footnote, endnote, header, footer or text box the format strip never shows an above/below format and says briefly why (FR-016a), in `tests/component/format-strip.test.ts` and `tests/component/settings.test.ts`
-- [ ] T061 [P] [US2] Settings-store contract cases: `UserSettings` round-trips exactly; `loadSettings()` returns `null` when nothing is stored; corrupt or unknown-version raw data is returned unvalidated (validation is core logic); add to `tests/contract/host-ports.contract.ts`. Node-only case (mark it so the Word run skips it): saving settings makes no call on the paired `FakeGateway`
-- [ ] T062 [P] [US2] Extend the app-flow integration test for settings: the ribbon `OpenSettings` handler opens the settings view with focus on its first control; the palette cog and Ctrl+, open it from the palette; saving default format "number" persists through `FakeSettingsStore` and the next palette open starts on "number"; turning on "Allow references in headings" lets the palette open in a heading (without listing that heading); turning off "Show headings outside the main text" hides the badged headings; Close returns to the palette with its query restored when opened from it, otherwise hides the pane and returns focus to the document, in `tests/component/app-flow.test.ts`
+- [ ] T056 [P] [US2] [L1] Unit tests for the built-in catalogue: ids and order `text`, `number`, `numberText`, `sectionNumberText`, `page`, `aboveBelow`, `textAboveBelow`; parts for each match research R5 (e.g. `textAboveBelow` = text, " ", aboveBelow); built-ins have `builtIn: true`, in `tests/unit/format-catalogue.test.ts`
+- [ ] T057 [P] [US2] [L1] Unit tests for the format cycle and preview: Tab = next, Shift+Tab = previous, wrapping at both ends; built-ins then templates in creation order; page previews as "page ?" with warning `pageUnknown`; above/below computed from `precedingHeadingOrder` versus target `order`; palette reopens on the default, not the last used; with the cursor in a footnote, endnote, header, footer or text box (T139) the cycle leaves out formats with an `aboveBelow` part and a default that is one of them opens on the next offered format (FR-016a), in `tests/unit/format-cycle.test.ts`
+- [ ] T058 [P] [US2] [L1] Unit tests for settings: defaults (`schemaVersion: 1`, `defaultFormatId: "sectionNumberText"`, no templates, `allowReferencesInHeadings: false`, `showHeadingsOutsideMainText: true`); load validates and migrates; "unknown versions reset to defaults with a message"; `defaultFormatId` "falls back to `sectionNumberText` if the template was deleted"; `SaveSettings` use case persists through `ISettingsStore`, in `tests/unit/settings.test.ts`
+- [ ] T059 [P] [US2] [L2][L3] Contract cases: inserting each built-in format produces exactly the R5 field composition and its result equals the preview (page: positive integer); add to `tests/contract/document-gateway.contract.ts`
+- [ ] T060 [P] [US2] [L1] Component tests: Tab/Shift+Tab change the format strip and announce it politely; focus stays in the search box; Ctrl+, and the cog (with `aria-keyshortcuts="Control+Comma"`) emit open-settings; settings view focuses its first control on open; every settings control has a programmatic label, the default-format radio list is a labelled `radiogroup`, and validation errors are linked to their field with `aria-describedby` and announced; default-format radio list shows a sample preview per format; the Headings section has the "Allow references in headings" (off) and "Show headings outside the main text" (on) checkboxes, each with its description from contracts/palette-ui.md linked by `aria-describedby`; Esc/Close returns to the palette with the query restored when opened from it, otherwise to the document; unsaved changes prompt an in-pane confirmation; in a footnote, endnote, header, footer or text box the format strip never shows an above/below format and says briefly why (FR-016a), in `tests/component/format-strip.test.ts` and `tests/component/settings.test.ts`
+- [ ] T061 [P] [US2] [L2][L3] Settings-store contract cases: `UserSettings` round-trips exactly; `loadSettings()` returns `null` when nothing is stored; corrupt or unknown-version raw data is returned unvalidated (validation is core logic); add to `tests/contract/host-ports.contract.ts`. Node-only case (mark it so the Word run skips it): saving settings makes no call on the paired `FakeGateway`
+- [ ] T062 [P] [US2] [L1] Extend the app-flow integration test for settings: the ribbon `OpenSettings` handler opens the settings view with focus on its first control; the palette cog and Ctrl+, open it from the palette; saving default format "number" persists through `FakeSettingsStore` and the next palette open starts on "number"; turning on "Allow references in headings" lets the palette open in a heading (without listing that heading); turning off "Show headings outside the main text" hides the badged headings; Close returns to the palette with its query restored when opened from it, otherwise hides the pane and returns focus to the document, in `tests/component/app-flow.test.ts`
 
 ### Implementation for User Story 2
 
 - [ ] T063 [P] [US2] Implement the remaining six built-ins until T056 passes, in `src/core/formats/built-ins.ts`
 - [ ] T064 [US2] Implement the format cycle (including FR-016a: no above/below formats while the cursor is in a footnote, endnote, header, footer or text box) and full preview until T057 passes, in `src/core/formats/cycle.ts` and `src/core/formats/preview.ts`
 - [ ] T065 [US2] Implement settings defaults (incl. the two heading settings), validation, migration and the `SaveSettings` use case until T058 passes, and feed `LocationPolicy` and the list filter from the loaded settings, in `src/core/settings/user-settings.ts` and `src/core/use-cases/save-settings.ts`
-- [ ] T066 [P] [US2] Implement `OfficeSettingsStore` until T061 passes in Node (fake) and in Word (registered in `src/adapters/office/dev-registration.ts`), on `OfficeRuntime.storage` (one versioned JSON key `radcut.settings`; raw data returned to the core for validation; nothing written to the document), in `src/adapters/office/office-settings-store.ts`
-- [ ] T067 [US2] Make both gateways pass the T059 cases (Node and Word), in `tests/fakes/fake-gateway.ts` and `src/adapters/office/office-js-gateway.ts`
+- [ ] T066 [P] [US2] Implement `OfficeSettingsStore` until T061 passes in Node (fake) and in Word (registered in `src/adapters/office/dev-registration.ts`; the Word run through `npm run test:desktop -- --filter-trait "Category=Contract"`), on `OfficeRuntime.storage` (one versioned JSON key `radcut.settings`; raw data returned to the core for validation; nothing written to the document), in `src/adapters/office/office-settings-store.ts`
+- [ ] T067 [US2] Make both gateways pass the T059 cases (Node, and Word through the harness's contract category), in `tests/fakes/fake-gateway.ts` and `src/adapters/office/office-js-gateway.ts`
 - [ ] T068 [US2] Add Tab/Shift+Tab cycling, the cog button and Ctrl+, to the palette until the palette parts of T060 pass, in `src/ui/palette/Palette.svelte` and `src/ui/palette/FormatStrip.svelte`
 - [ ] T069 [US2] Implement the settings view shell with the default-format and Headings sections until the settings parts of T060 pass, in `src/ui/settings/Settings.svelte`, `src/ui/settings/FormatPicker.svelte` and `src/ui/settings/HeadingOptions.svelte`
 - [ ] T070 [US2] Wire `OpenSettings` (ribbon button via `IHostShell.onOpenSettings`), palette → settings → palette navigation and settings persistence (incl. passing the heading settings to `OpenPalette` and `InsertReference`) in the composition root until T062 passes, in `src/app/create-app.ts`, `src/app/main.ts` and `src/adapters/office/office-host-shell.ts`
-- [ ] T071 [US2] Run quickstart scenarios 7, 8, 16, 24 and 25 (settings part) in Word and record results in `docs/acceptance-checklist.md`
+- [ ] T071 [US2] [L3][L4][L5] Harness scenarios first: write quickstart scenarios 7, 8, 16, 24 and 25 (settings part) as tests in `tests/desktop/RadCut.DesktopTests/Scenarios/Us2Scenarios.cs` (`Category=Scenario`, names `ScenarioNN_…`) alongside T056–T062, see them fail, then make them pass with T063–T070 (scenario 8's Word restart through `PaneSession`); paste `test-results/acceptance-summary.md` into `docs/acceptance-checklist.md` (needs 002's scenario summary writer, 002 T039)
 
 **Checkpoint**: US1 and US2 both work; formats are selectable and the default persists.
 
@@ -186,16 +195,16 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T072 [P] [US3] Unit tests for the template parser per contracts/format-templates.md: grammar incl. `{{`/`}}` literals and case-insensitive names; each error message verbatim ("Add at least one of {number}, {text}, {page} or {abovebelow}.", "Unknown placeholder {xyz}. Use {number}, {text}, {page} or {abovebelow}.", "Unmatched { or }. Write {{ or }} for a literal brace.", "Templates can be up to 200 characters.", "A format with this name already exists."); label 1–40 characters unique case-insensitively; repeated placeholders become separate parts; all example rows of the contract table, in `tests/unit/template-parser.test.ts`
-- [ ] T073 [P] [US3] Unit tests for template management in settings: add, edit, delete; "At most 20" templates; deleting the default template falls back to `sectionNumberText`; editing or deleting never touches existing references (no gateway calls), in `tests/unit/templates.test.ts`
-- [ ] T074 [P] [US3] Component tests for the template editor: live preview against a sample heading (in a polite live region); inline errors next to fields, linked with `aria-describedby` and setting `aria-invalid`; template text and label inputs have programmatic labels; save moves focus to the first error; templates appear after built-ins in the palette cycle, in `tests/component/template-editor.test.ts`
+- [ ] T072 [P] [US3] [L1] Unit tests for the template parser per contracts/format-templates.md: grammar incl. `{{`/`}}` literals and case-insensitive names; each error message verbatim ("Add at least one of {number}, {text}, {page} or {abovebelow}.", "Unknown placeholder {xyz}. Use {number}, {text}, {page} or {abovebelow}.", "Unmatched { or }. Write {{ or }} for a literal brace.", "Templates can be up to 200 characters.", "A format with this name already exists."); label 1–40 characters unique case-insensitively; repeated placeholders become separate parts; all example rows of the contract table, in `tests/unit/template-parser.test.ts`
+- [ ] T073 [P] [US3] [L1] Unit tests for template management in settings: add, edit, delete; "At most 20" templates; deleting the default template falls back to `sectionNumberText`; editing or deleting never touches existing references (no gateway calls), in `tests/unit/templates.test.ts`
+- [ ] T074 [P] [US3] [L1] Component tests for the template editor: live preview against a sample heading (in a polite live region); inline errors next to fields, linked with `aria-describedby` and setting `aria-invalid`; template text and label inputs have programmatic labels; save moves focus to the first error; templates appear after built-ins in the palette cycle, in `tests/component/template-editor.test.ts`
 
 ### Implementation for User Story 3
 
 - [ ] T075 [US3] Implement the template parser until T072 passes, in `src/core/formats/template-parser.ts`
 - [ ] T076 [US3] Implement template management in settings and include templates in the cycle until T073 passes, in `src/core/settings/templates.ts` and `src/core/formats/cycle.ts`
 - [ ] T077 [US3] Implement the templates section of the settings view until T074 passes, in `src/ui/settings/TemplateEditor.svelte` and `src/ui/settings/Settings.svelte`
-- [ ] T078 [US3] Run quickstart scenario 9 in Word and record results in `docs/acceptance-checklist.md`
+- [ ] T078 [US3] [L3][L5] Harness scenario first: write quickstart scenario 9 as a test in `tests/desktop/RadCut.DesktopTests/Scenarios/Us3Scenarios.cs` alongside T072–T074, see it fail, make it pass with T075–T077; paste the summary into `docs/acceptance-checklist.md`
 
 **Checkpoint**: templates work end to end without affecting US1/US2 behaviour.
 
@@ -209,19 +218,19 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T079 [P] [US4] Unit tests for shortcut rules: at least one modifier; Shift not the only modifier; exactly one key from A–Z, 0–9, `-`, `_`, `+`; Ctrl+@ always refused; normalised display form (e.g. "Ctrl+Shift+Alt+K"), in `tests/unit/shortcut-rules.test.ts`
-- [ ] T080 [P] [US4] Unit tests for the `ChangeShortcut` use case against `FakeHostShell`: refuses invalid combinations with a reason; refuses when `isInUse` is true; calls `replace` only after both checks pass; `replace(null)` resets to default; `current()` returning `null` yields "no shortcut assigned"; `canCustomise()` false yields read-only state with explanation, in `tests/unit/change-shortcut.test.ts`
-- [ ] T081 [P] [US4] Component tests for shortcut capture: "Record new shortcut" captures the next key combination and shows it; refusal messages shown inline; reset to default; read-only state with explanation; ribbon-opened palette behaves the same as shortcut-opened (same handler), in `tests/component/shortcut-capture.test.ts`
-- [ ] T082 [P] [US4] Host-shell shortcut contract cases: `shortcut.current()` returns the assigned combination or `null`; `canCustomise()` is `false` when signed out or when KeyboardShortcuts 1.1 is unsupported; `isInUse()` is `true` for a combination already taken; `replace(combo)` then `current()` returns it; `replace(null)` restores the manifest default; add to `tests/contract/host-ports.contract.ts`
+- [ ] T079 [P] [US4] [L1] Unit tests for shortcut rules: at least one modifier; Shift not the only modifier; exactly one key from A–Z, 0–9, `-`, `_`, `+`; Ctrl+@ always refused; normalised display form (e.g. "Ctrl+Shift+Alt+K"), in `tests/unit/shortcut-rules.test.ts`
+- [ ] T080 [P] [US4] [L1] Unit tests for the `ChangeShortcut` use case against `FakeHostShell`: refuses invalid combinations with a reason; refuses when `isInUse` is true; calls `replace` only after both checks pass; `replace(null)` resets to default; `current()` returning `null` yields "no shortcut assigned"; `canCustomise()` false yields read-only state with explanation, in `tests/unit/change-shortcut.test.ts`
+- [ ] T081 [P] [US4] [L1] Component tests for shortcut capture: "Record new shortcut" captures the next key combination and shows it; refusal messages shown inline; reset to default; read-only state with explanation; ribbon-opened palette behaves the same as shortcut-opened (same handler), in `tests/component/shortcut-capture.test.ts`
+- [ ] T082 [P] [US4] [L2][L3] Host-shell shortcut contract cases: `shortcut.current()` returns the assigned combination or `null`; `canCustomise()` is `false` when signed out or when KeyboardShortcuts 1.1 is unsupported; `isInUse()` is `true` for a combination already taken; `replace(combo)` then `current()` returns it; `replace(null)` restores the manifest default; add to `tests/contract/host-ports.contract.ts`
 
 ### Implementation for User Story 4
 
 - [ ] T083 [P] [US4] Implement shortcut rules until T079 passes, in `src/core/settings/shortcut-rules.ts`
 - [ ] T084 [US4] Implement the `ChangeShortcut` use case until T080 passes, in `src/core/use-cases/change-shortcut.ts`
-- [ ] T085 [US4] Implement the shortcut methods of `OfficeHostShell` until T082 passes in Node (fake) and in Word: `getShortcuts`, `areShortcutsInUse`, `replaceShortcuts`, and `canCustomise` = signed in AND `isSetSupported("KeyboardShortcuts", "1.1")`, in `src/adapters/office/office-host-shell.ts`
+- [ ] T085 [US4] Implement the shortcut methods of `OfficeHostShell` until T082 passes in Node (fake) and in Word (harness contract category; the shortcut and ribbon cases use the desktop bridge): `getShortcuts`, `areShortcutsInUse`, `replaceShortcuts`, and `canCustomise` = signed in AND `isSetSupported("KeyboardShortcuts", "1.1")`, in `src/adapters/office/office-host-shell.ts`
 - [ ] T086 [US4] Implement the shortcut section of the settings view until T081 passes, in `src/ui/settings/ShortcutCapture.svelte` and `src/ui/settings/Settings.svelte`
 - [ ] T087 [US4] Confirm the ribbon "Cross-reference" button routes to the same `OpenPalette` handler as the shortcut (manifest action id and associate call), in `manifest.xml` and `src/adapters/office/bootstrap.ts`
-- [ ] T088 [US4] Run quickstart scenario 10 in Word (incl. UK layout) and record results in `docs/acceptance-checklist.md`
+- [ ] T088 [US4] [L3][L5] Harness scenario first: write quickstart scenario 10 as a test in `tests/desktop/RadCut.DesktopTests/Scenarios/Us4Scenarios.cs` (ribbon button by UI Automation, recording a new shortcut, the Ctrl+@ refusal, and the UK layout loaded for the test with `LoadKeyboardLayout("00000809")` to check no stray character is typed) alongside T079–T082, see it fail, make it pass with T083–T087; paste the summary into `docs/acceptance-checklist.md`. [L7] A physical UK keyboard check stays on the human list
 
 **Checkpoint**: users can open the palette by button or a shortcut of their choice.
 
@@ -235,16 +244,16 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T089 [P] [US5] Unit tests for `RecentHeadings`: "Most recent first, unique (case-insensitive), at most 5"; entries whose bookmark no longer exists or no longer sits on a heading are dropped on open; "At most 50 documents are kept; the least recently used is dropped"; unsaved documents (`documentId` null) kept in memory only and never sent to the store; recents never affect ranking once a query is typed, in `tests/unit/recents.test.ts`
-- [ ] T090 [P] [US5] Component tests: empty query shows `role="group"` "Recent" then "All headings"; typing removes the groups; keyboard navigation crosses groups, in `tests/component/recents.test.ts`
-- [ ] T091 [P] [US5] Settings-store recents contract cases: `saveRecents(documentId, bookmarks)` then `loadRecents(documentId)` returns the same list; different `documentId`s are independent; unknown `documentId` returns `[]`; add to `tests/contract/host-ports.contract.ts`
+- [ ] T089 [P] [US5] [L1] Unit tests for `RecentHeadings`: "Most recent first, unique (case-insensitive), at most 5"; entries whose bookmark no longer exists or no longer sits on a heading are dropped on open; "At most 50 documents are kept; the least recently used is dropped"; unsaved documents (`documentId` null) kept in memory only and never sent to the store; recents never affect ranking once a query is typed, in `tests/unit/recents.test.ts`
+- [ ] T090 [P] [US5] [L1] Component tests: empty query shows `role="group"` "Recent" then "All headings"; typing removes the groups; keyboard navigation crosses groups, in `tests/component/recents.test.ts`
+- [ ] T091 [P] [US5] [L2][L3] Settings-store recents contract cases: `saveRecents(documentId, bookmarks)` then `loadRecents(documentId)` returns the same list; different `documentId`s are independent; unknown `documentId` returns `[]`; add to `tests/contract/host-ports.contract.ts`
 
 ### Implementation for User Story 5
 
 - [ ] T092 [US5] Implement `RecentHeadings` and update `OpenPalette` and `InsertReference` to read and record recents until T089 passes, in `src/core/recents/recent-headings.ts`, `src/core/use-cases/open-palette.ts`, `src/core/use-cases/insert-reference.ts`
-- [ ] T093 [US5] Add recents storage keyed by document URL to `OfficeSettingsStore` (key `radcut.recents`) until T091 passes in Node (fake) and in Word, in `src/adapters/office/office-settings-store.ts`
+- [ ] T093 [US5] Add recents storage keyed by document URL to `OfficeSettingsStore` (key `radcut.recents`) until T091 passes in Node (fake) and in Word (harness contract category), in `src/adapters/office/office-settings-store.ts`
 - [ ] T094 [US5] Render the Recent and All headings groups until T090 passes, in `src/ui/palette/Palette.svelte`
-- [ ] T095 [US5] Run quickstart scenario 11 in Word and record results in `docs/acceptance-checklist.md`
+- [ ] T095 [US5] [L3][L5] Harness scenario first: write quickstart scenario 11 as a test in `tests/desktop/RadCut.DesktopTests/Scenarios/Us5Scenarios.cs` alongside T089–T091, see it fail, make it pass with T092–T094; paste the summary into `docs/acceptance-checklist.md`
 
 **Checkpoint**: all five stories work independently.
 
@@ -252,14 +261,14 @@ description: "Task list for the Heading Cross-Reference Palette (MVP)"
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T096 Add a performance runner to the dev pane that times shortcut-to-palette-ready and per-keystroke filter latency, and flags main-thread tasks over 100 ms (`PerformanceObserver` long tasks), on `spec-300.docx` (targets: ready < 500 ms, filter < 50 ms) and `guide-500.docx` (no task > 100 ms), in `src/dev/perf-pane.ts`
+- [ ] T096 Add a performance runner to the dev pane that times shortcut-to-palette-ready and per-keystroke filter latency, and flags main-thread tasks over 100 ms (`PerformanceObserver` long tasks), on `spec-300.docx` (targets: ready < 500 ms, filter < 50 ms) and `guide-500.docx` (no task > 100 ms), in `src/dev/perf-pane.ts`; the desktop harness starts it and reads its results (002 US5, T043), as it does the contract pane
 - [ ] T097 [P] Add a Vitest benchmark for `FuzzyMatcher` (500 headings × 20-character queries, target under 5 ms per query) run by `npm run bench`, outside `npm test`, in `tests/bench/fuzzy-matcher.bench.ts`
 - [ ] T098 Optimise until T096 meets every budget (background index refresh, batched loads, list rendering), recording measurements in `docs/performance.md`
 - [X] T099 [P] **Dropped by T017** (`prefers-reduced-motion` follows Windows; research R11). ~~If T014 showed `prefers-reduced-motion` is not reliable in Word's WebView, add an "Animations" on/off setting (off by default) to `UserSettings` and the settings view, with tests first, in `src/core/settings/user-settings.ts`, `src/ui/settings/Settings.svelte`, `tests/unit/settings.test.ts`~~
 - [ ] T100 [P] Write user-facing known behaviours: one Undo per insertion (FR-013; no exceptions are allowed, so this states the guarantee), selection objects not detected for the warning (equations, embedded objects), story fallbacks from T017 if any, tracked-change reject leaving a hidden bookmark, co-authoring outcome, signed-out shortcut limitation, in `docs/known-behaviours.md`
-- [ ] T101 [P] Write the per-release manual acceptance checklist from quickstart.md scenarios 1–27, in `docs/acceptance-checklist.md`
-- [ ] T102 Verify the release build excludes `src/dev/**` and `src/adapters/office/spikes/**` and the bundle stays under 150 KB gzip (`npm run build`), and that no network requests occur after load (quickstart 18), recording results in `docs/acceptance-checklist.md`
-- [ ] T103 Run the full quickstart (scenarios 1–27, incl. 14, 15, 17, 18, 22, 24) on Windows desktop and record pass/fail in `docs/acceptance-checklist.md`; time 10 practised shortcut-to-inserted-reference runs and record the median against SC-001 (under 3 s)
+- [ ] T101 [P] Write the per-release acceptance checklist from quickstart.md scenarios 1–27 in two parts: "automated" (paste the harness's `summary.md` and `acceptance-summary.md`; every scenario a harness test covers) and "human" (layer 7 only: scenario 17 co-authoring, scenario 10 on a physical UK keyboard, a visual pass over the light, dark and black themes and the story badges from the harness's saved screenshots, a Narrator pass over the palette and settings), in `docs/acceptance-checklist.md`
+- [ ] T102 Verify the release build excludes `src/dev/**` and `src/adapters/office/spikes/**` and the bundle stays under 150 KB gzip (`npm run build`), and that no network requests occur after load (quickstart 18, a harness scenario: Playwright records every request from the pane after load and asserts none leaves localhost), recording results in `docs/acceptance-checklist.md`
+- [ ] T103 Release run on Windows desktop: `npm run test:desktop` green (contract, document and scenario categories, timing), the human list of T101 done, both recorded in `docs/acceptance-checklist.md`; time 10 practised shortcut-to-inserted-reference runs by hand and record the median against SC-001 (under 3 s)
 - [ ] T104 [P] Write the README: what RAD·CUT does, install by sideloading, keyboard reference, formats and template syntax, privacy statement, in `README.md`
 
 ---

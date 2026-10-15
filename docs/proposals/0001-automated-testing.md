@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | Proposed, ready for handover to Claude Code on the Windows desktop |
+| **Status** | Accepted; M0–M2 implemented in feature `002-desktop-test-harness`, merged into `001-heading-xref-palette` on 2026-10-15 (Constitution 1.2.0) |
 | **Date** | 2026-10-13 (revised the same day against branch `001-heading-xref-palette`; revised 2026-10-15 for Phases 10–11, contract-run speed and milestone order) |
 | **Baseline** | Branch `001-heading-xref-palette` at `78f1aab` (merged into `main`): US1 and Phases 9–11 complete, US2–US5 and Polish open |
 | **Affects** | The in-Word contract run (T051, T138, T142) and its speed, every "Run quickstart scenarios in Word" task (T071, T078, T088, T095, T103), the performance runner (T096), Constitution 1.1.0 → 1.2.0 |

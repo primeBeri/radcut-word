@@ -2,6 +2,8 @@
 
 **Branch**: `001-heading-xref-palette` | **Date**: 2026-10-10 | **Spec**: [spec.md](spec.md)
 
+**Rescoped**: 2026-10-15 — Constitution 1.2.0 (test layers; layers 3–5 run unattended by the desktop harness from feature 002, `npm run test:desktop`). No spec change. In-Word checks of the remaining stories become harness tests written first: the Word halves of T066, T067, T085 and T093 run through the contract category; T071, T078, T088 and T095 become harness scenario tests written with each story's tests and made green by its implementation; T096, T101, T102 and T103 use the harness, leaving only the layer 7 checks (co-authoring, a physical UK keyboard, a visual theme pass, a screen-reader pass) to a person. Test tasks carry layer tags.
+
 **Propagated**: 2026-10-14 — Updated from spec.md refinement (Phase 10 hand checks): headers, footers and text boxes allowed as insertion points (FR-001a), confirmed first by spike 4; FR-016a may extend to them. Research R8, data model, gateway and palette contracts updated to match.
 
 **Propagated**: 2026-10-13 — Updated from spec.md refinement (Phase 9 hand checks in Word): a cursor or selection inside a plain-text content control is declined, a whole content control selected is an extended selection however Word reports it (FR-001a, FR-008a); formats with an above/below part are not offered in footnotes and endnotes (FR-016a). Research R8, data model, gateway and palette contracts updated to match.
@@ -47,8 +49,10 @@ office-addin-debugging, fuzzysort (test benchmark only)
 roaming store for the custom shortcut; nothing in documents
 
 **Testing**: Vitest unit (core vs fakes), Vitest component (Svelte views, jsdom), shared contract
-suite (FakeGateway in Node; OfficeJsGateway inside Word via a dev-only pane), manual acceptance
-checklist ([quickstart.md](quickstart.md))
+suite (FakeGateway in Node; OfficeJsGateway inside Word via a dev-only pane, started and read by
+the desktop harness), desktop harness scenarios for the quickstart (`tests/desktop`, feature 002,
+`npm run test:desktop`), and a manual checklist for the layer 7 checks only
+([quickstart.md](quickstart.md); test layers per Constitution 1.2.0, Principle II)
 
 **Target Platform**: Word for Microsoft 365 on Windows desktop, build 2408+ (2508+ for the full
 API surface); sideloaded
@@ -239,9 +243,10 @@ tests/
 ├── contract/                    # document-gateway and host-ports contract suites + fake runners
 ├── bench/                       # Vitest benchmarks (npm run bench, not npm test)
 ├── fakes/                       # FakeGateway, FakeHostShell, FakeSettingsStore
-└── fixtures/                    # .docx fixture documents for the Word contract run
+├── fixtures/                    # .docx fixture documents for the Word contract run
+└── desktop/                     # desktop harness (C#, feature 002): contract run, documents, scenarios
 docs/
-└── acceptance-checklist.md      # manual per-release checklist (from quickstart)
+└── acceptance-checklist.md      # per-release record: harness summaries and the layer 7 checks
 ```
 
 **Structure Decision**: single front-end project. Dependency direction is
