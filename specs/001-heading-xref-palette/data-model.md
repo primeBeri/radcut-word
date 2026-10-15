@@ -73,15 +73,18 @@ one used (FR-008). Nothing is kept or tracked between the two readings.
 
 | Field | Type | Rules |
 |---|---|---|
-| `location` | `"main" \| "footnote" \| "endnote" \| "tableCellInMain"` | Only allowed locations reach this type. |
-| `selection` | `"none" \| "inline" \| "extended" \| "field"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a picture, shape or content control; replaced only after confirmation (FR-008a). `field`: the cursor or selection is inside an existing field; the whole field is replaced only after confirmation (FR-008b). A selection containing a table is declined (`tableSelected`). |
+| `location` | `"main" \| "footnote" \| "endnote" \| "tableCellInMain" \| "header" \| "footer" \| "textBox"` | Only allowed locations reach this type. `header`, `footer` and `textBox` from 2026-10-14 (FR-001a); a table cell in one of them reports that story. |
+| `selection` | `"none" \| "inline" \| "extended" \| "field"` | `inline`: within one paragraph, replaced without warning. `extended`: spans more than one paragraph or contains a picture, shape or content control (a whole content control counts however Word reports it: in the range, or as the range's container); replaced only after confirmation (FR-008a). `field`: the cursor or selection is inside an existing field; the whole field is replaced only after confirmation (FR-008b). A selection containing a table is declined (`tableSelected`). |
 | `inHeadingOrder` | `number \| null` | Snapshot order of the heading paragraph containing the cursor (only possible when `allowInHeadings` is on); that heading is not offered as a target (FR-001b). Main text only; null elsewhere. |
 | `inHeadingFingerprint` | `string \| null` | Fingerprint of the heading containing the cursor in any story, so the palette leaves it out where `inHeadingOrder` is null (a heading in a note). |
-| `precedingHeadingOrder` | `number \| null` | Snapshot order of the last heading before the cursor's paragraph; used for the above/below preview. Both gateways count it in the main text only, skipping tracked-deleted headings as the heading list does, so it indexes the `readHeadings` snapshot; null with no heading before the cursor and always null in notes, where the preview shows above/below as unknown (Word decides the real value). |
+| `precedingHeadingOrder` | `number \| null` | Snapshot order of the last heading before the cursor's paragraph; used for the above/below preview. Both gateways count it in the main text only, skipping tracked-deleted headings as the heading list does, so it indexes the `readHeadings` snapshot; null with no heading before the cursor and always null in notes, headers, footers and text boxes, where the preview shows above/below as unknown (Word decides the real value). |
 
 **Location check** (FR-001a, FR-001b) produces either an `InsertionPoint` or a `Declined` reason:
-`"header" | "footer" | "comment" | "textBox" | "headingParagraph" | "titleParagraph" |
-"selfReference" | "protected" | "tableSelected" | "unknown"`. `selfReference` arises only at Enter, when the target
+`~~"header" | "footer" |~~ "comment" | ~~"textBox" |~~ "headingParagraph" | "titleParagraph" |
+"selfReference" | "protected" | "tableSelected" | "plainTextControl" | "unknown"`. (`header`,
+`footer` and `textBox` removed 2026-10-14: those places are allowed, FR-001a.) `plainTextControl`:
+the cursor or selection is inside a plain-text content control, where Word allows no fields
+(FR-001a); selecting the whole control is `extended` instead. `selfReference` arises only at Enter, when the target
 is the heading containing the cursor.
 
 **LocationPolicy** = `{ allowInHeadings: boolean }`, taken from `UserSettings`. With it on,
@@ -97,6 +100,10 @@ and call them, so the fake and Word cannot disagree on the rules.
 | `label` | `string` | Shown in the palette. |
 | `parts` | `FormatPart[]` | Non-empty; at least one non-literal part. |
 | `builtIn` | `boolean` | Built-ins cannot be edited or deleted. |
+
+Formats with an `aboveBelow` part are left out of the cycle while the cursor is in a footnote or
+endnote (FR-016a): Word shows the heading text there instead of "above"/"below". The same
+applies in headers, footers and text boxes (spike 4, 2026-10-14).
 
 **FormatPart** = `{ kind: "literal", text }` | `{ kind: "number" }` | `{ kind: "text" }` |
 `{ kind: "page" }` | `{ kind: "aboveBelow" }`. Adjacent literals are merged; empty literals are

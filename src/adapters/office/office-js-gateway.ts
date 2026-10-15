@@ -60,6 +60,8 @@ const PARAGRAPH_FIELDS = `${STYLE_FIELDS},items/text`;
  * field wholly inside the selection ("Inside…") is simply replaced with it, so it does not count.
  */
 const INSIDE_FIELD = new Set<string>(["Equal", "Contains", "ContainsStart", "ContainsEnd", "OverlapsBefore", "OverlapsAfter"]);
+/** A content control's whole range relative to the selection when the selection takes all of it. */
+const WITHIN_SELECTION = new Set<string>(["Equal", "Inside", "InsideStart", "InsideEnd"]);
 
 /**
  * Protection that stops a reference going in. "AllowOnlyRevisions" still allows edits (tracked),
@@ -164,6 +166,11 @@ interface SelectionReading {
   readonly field: Word.Field | null;
   /** Inline pictures and shapes in the selection. */
   readonly objects: number;
+  /**
+   * The content control whose text is exactly the selection: the write selects the whole control
+   * first, so nothing is written inside it.
+   */
+  readonly textOfControl: Word.ContentControl | null;
 }
 
 export class OfficeJsGateway implements IDocumentGateway {
@@ -205,7 +212,7 @@ export class OfficeJsGateway implements IDocumentGateway {
     try {
       return await Word.run(async (context) => {
         // Reads: as many syncs as needed. Nothing is written until every check has passed.
-        const { point, selection, paragraph, field, objects } = await this.readInsertionPoint(context, request.policy, {
+        const { point, selection, paragraph, field, objects, textOfControl } = await this.readInsertionPoint(context, request.policy, {
           positions: false,
         });
         if (point.kind === "declined") return { ok: false, reason: "declined", declined: point };
@@ -246,6 +253,13 @@ export class OfficeJsGateway implements IDocumentGateway {
         if (replacing) {
           // Selecting a field selects all of it, so "Before" lands outside it.
           replacing.select();
+          anchor = context.document.getSelection();
+        }
+        // All of a control's text: select the whole control, as its handle does, and replace that
+        // selection, which works (hand check, 2026-10-13); writing before the control's own range
+        // fails, and nothing may go inside a plain-text control.
+        if (replacing === null && point.selection === "extended" && textOfControl) {
+          textOfControl.getRange("Whole").select();
           anchor = context.document.getSelection();
         }
         // Word refuses insertField next to a selected picture or shape (in-Word contract run), so such a
@@ -441,6 +455,7 @@ export class OfficeJsGateway implements IDocumentGateway {
     const pictures = selection.inlinePictures.load("items");
     const controls = selection.contentControls.load("items");
     const shapes = supports("WordApiDesktop", "1.2") ? selection.shapes.load("items") : null;
+    const container = selection.parentContentControlOrNullObject.load("type");
     await context.sync();
 
     const first = paragraphs.items[0] ?? null;
@@ -454,10 +469,22 @@ export class OfficeJsGateway implements IDocumentGateway {
         ? context.document.body.getRange("Start").expandTo(first.getRange("Whole")).paragraphs.load(STYLE_FIELDS)
         : null;
     const tracked = before && supports("WordApi", "1.6") ? context.document.body.getTrackedChanges().load("items/type") : null;
+    // A control selected whole (its handle) is reported neither in the selection's controls nor as
+    // its container (hand check, 2026-10-13), so look at the controls in the selection's paragraph.
+    const nearControls = first && !selection.isEmpty ? first.getRange("Whole").contentControls.load("items/type") : null;
     await context.sync();
 
     const relations = (fields?.items ?? []).map((f) => f.result.compareLocationWith(selection));
-    if (relations.length > 0) await context.sync();
+    const controlRelations = (nearControls?.items ?? []).map((control) => ({
+      control,
+      whole: control.getRange("Whole").compareLocationWith(selection),
+      content: control.getRange("Content").compareLocationWith(selection),
+    }));
+    if (relations.length + controlRelations.length > 0) await context.sync();
+    // Selecting all of a control's text counts as selecting the control: anything written inside a
+    // plain-text control fails.
+    const textOfControl = controlRelations.find((r) => r.content.value === "Equal")?.control ?? null;
+    const wholeControl = textOfControl ?? controlRelations.find((r) => WITHIN_SELECTION.has(r.whole.value))?.control ?? null;
     const inside = relations.findIndex((relation) => INSIDE_FIELD.has(relation.value));
     const field = inside >= 0 ? (fields?.items[inside] ?? null) : null;
 
@@ -474,17 +501,22 @@ export class OfficeJsGateway implements IDocumentGateway {
       text: first ? normaliseHeadingText(first.text) : "",
       ...positions,
     };
-    const extent = classifySelection({
+    const classified = classifySelection({
       isEmpty: selection.isEmpty,
       paragraphCount: paragraphs.items.length,
       tableCount: tables.items.length,
       pictureCount: pictures.items.length,
       shapeCount: shapes?.items.length ?? 0,
       contentControlCount: controls.items.length,
+      containingControl: wholeControl
+        ? { kind: controlKind(wholeControl.type), whole: true }
+        : container.isNullObject
+          ? null
+          : { kind: controlKind(container.type), whole: false },
       insideField: field !== null,
     });
     const objects = pictures.items.length + (shapes?.items.length ?? 0);
-    return { point: classifyLocation(facts, extent, policy), selection, paragraph: first, field, objects };
+    return { point: classifyLocation(facts, classified, policy), selection, paragraph: first, field, objects, textOfControl };
   }
 
   /**
@@ -645,6 +677,11 @@ function isHeaderOrFooter(location: StoryBody["location"]): boolean {
  */
 function linkedCopySignature(location: StoryBody["location"], texts: () => readonly string[]): string | null {
   return isHeaderOrFooter(location) ? `${location}:${JSON.stringify(texts())}` : null;
+}
+
+function controlKind(type: string): "plainText" | "richText" | "other" {
+  if (type === "PlainText") return "plainText";
+  return type === "RichText" ? "richText" : "other";
 }
 
 /**

@@ -11,7 +11,7 @@ row; the manual acceptance checklist repeats the focus rows in real Word.
 | Printable keys | Edit query; results re-ranked; first row selected | FR-005, FR-007 |
 | ↑ / ↓ | Move selection, no wrap; selected row scrolled into view | FR-006 |
 | Page Up / Page Down | Move selection by one visible page | (convenience) |
-| Tab / Shift+Tab | Next / previous format, wrapping; preview updates | FR-015 |
+| Tab / Shift+Tab | Next / previous format, wrapping; preview updates. With the cursor in a footnote, endnote, header, footer or text box, formats with an above/below part are left out (opening on the next offered format if the default is one) and the format strip says why | FR-015, FR-016a |
 | Enter | Insert selected heading in the shown format; with an extended selection, or the cursor inside a field, the first Enter shows the warning and changes nothing, the second inserts | FR-006, FR-008a, FR-008b |
 | Esc | Close, no change, caret restored; while the selection warning is shown, dismiss the warning only | FR-006, FR-008a |
 | Ctrl+, | Open settings (same as clicking the cog) | FR-021a |

@@ -2,6 +2,7 @@
 import { installFocusProbe, spike1 } from "./spike1-focus";
 import { spike2 } from "./spike2-ref";
 import { spike3 } from "./spike3-tracked";
+import { spike4 } from "./spike4-other-stories";
 import { requirementSupport, type Log, type Spike } from "./spike-kit";
 
 const logElement = document.querySelector<HTMLDivElement>("#log");
@@ -19,6 +20,7 @@ const groups: [string, readonly Spike[]][] = [
   ["Spike 1: shortcut and focus (R3, R4, R8, R11)", spike1],
   ["Spike 2: REF survives F9 (R5, R6, R7)", spike2],
   ["Spike 3: tracked changes (R9)", spike3],
+  ["Spike 4: writing in headers, footers and text boxes (R8)", spike4],
 ];
 
 for (const [title, spikes] of groups) {

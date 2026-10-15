@@ -32,8 +32,19 @@ const FIXTURE_MARKER: Record<ContractFixture, string> = {
   "plain-headings": "Outline-level heading",
 };
 
-/** The main text as the first case found it, per document (the pane may outlive a document). */
-let snapshot: { url: string; ooxml: string } | null = null;
+/**
+ * The main text, and each section's primary header and footer, as the first case found them, per
+ * document (the pane may outlive a document). Headers and footers are restored too since
+ * references may be written there (case 9c).
+ */
+let snapshot: { url: string; ooxml: string; headersAndFooters: string[] } | null = null;
+
+/** Each section's primary header and footer, in section order: header, footer, header, … */
+async function headersAndFooters(context: Word.RequestContext): Promise<Word.Body[]> {
+  const sections = context.document.sections.load("items");
+  await context.sync();
+  return sections.items.flatMap((section) => [section.getHeader("Primary"), section.getFooter("Primary")]);
+}
 
 async function storyParagraphs(context: Word.RequestContext): Promise<Word.Paragraph[]> {
   const body = context.document.body;
@@ -68,14 +79,36 @@ async function paragraphByText(context: Word.RequestContext, fixtureText: string
   return found;
 }
 
+/**
+ * The content control holding `text`, looked up in the whole body. The restore before each case
+ * (`insertOoxml` over the body) keeps a rich-text control but drops a plain-text one, leaving its
+ * text, and Word refuses to put one back from script (GeneralException at
+ * `Range.insertContentControl("PlainText")`; in-Word contract runs, 2026-10-14). Those cases are
+ * checked by hand.
+ */
+async function controlByText(context: Word.RequestContext, text: string): Promise<Word.ContentControl> {
+  const controls = context.document.body.contentControls.load("items/text");
+  await context.sync();
+  const found = controls.items.find((c) => c.text.trim() === text);
+  if (found) return found;
+  if (snapshot?.ooxml.includes("<w:text/>")) {
+    throw new Error(
+      "Manual check: the restore before each case drops the plain-text content control; " +
+        "check the plain-text content-control cases by hand (docs/acceptance-checklist.md, case 10a).",
+    );
+  }
+  throw new Error(`No content control holding "${text}" (${controls.items.length} in the body).`);
+}
+
 async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHarness> {
   await Word.run(async (context) => {
     const body = context.document.body;
     const url = Office.context.document.url;
     if (snapshot === null || snapshot.url !== url) {
       const ooxml = body.getOoxml();
+      const others = (await headersAndFooters(context)).map((story) => story.getOoxml());
       await context.sync();
-      snapshot = { url, ooxml: ooxml.value };
+      snapshot = { url, ooxml: ooxml.value, headersAndFooters: others.map((o) => o.value) };
     } else {
       // With change tracking on, the restore itself would be tracked and leave a deleted copy of
       // every paragraph (contract run on tracked.docx), so switch tracking off around it.
@@ -84,6 +117,11 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
       const mode = document.changeTrackingMode;
       document.changeTrackingMode = Word.ChangeTrackingMode.off;
       body.insertOoxml(snapshot.ooxml, "Replace");
+      const saved = snapshot.headersAndFooters;
+      (await headersAndFooters(context)).forEach((story, i) => {
+        const ooxml = saved[i];
+        if (ooxml !== undefined) story.insertOoxml(ooxml, "Replace");
+      });
       document.changeTrackingMode = mode;
       await context.sync();
     }
@@ -187,7 +225,13 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
         await context.sync();
         range = result.search(result.text.slice(0, 2), { matchCase: true }).getFirst().getRange("End");
       } else if (selection.contentControls) {
-        throw new Error("The fixture has no content control; check this case by hand.");
+        range = (await controlByText(context, text)).getRange("Whole");
+      } else if (selection.inContentControl) {
+        const content = (await controlByText(context, text)).getRange("Content").load("text");
+        await context.sync();
+        // Two characters in, or the first `length` characters: inside the control, not at its edge.
+        const found = content.search(content.text.slice(0, selection.length ?? 2), { matchCase: true }).getFirst();
+        range = selection.length ? found : found.getRange("End");
       } else if ((selection.paragraphs ?? 1) > 1) {
         range = paragraph.getRange("Whole").expandTo(paragraph.getNext().getRange("Whole"));
       } else if (selection.caretOffset) {
@@ -203,12 +247,34 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
   return {
     gateway,
     async select(text: string, selection: SelectionRequest = {}) {
-      // Selecting inside a text box sometimes fails with GeneralException at Range.select and
-      // works when tried again (in-Word contract runs, 2026-10-12); this is the harness, not the add-in.
       try {
         await selectOnce(text, selection);
-      } catch {
-        await selectOnce(text, selection);
+      } catch (error) {
+        // Word refuses a caret in the text box's first paragraph after the restore, at its start
+        // and two characters in (in-Word contract runs, 2026-10-15). A plain caret request falls
+        // back to those, then to selecting the first two characters: still inside the paragraph.
+        if (Object.keys(selection).length === 0) {
+          for (const fallback of [{ caretOffset: 2 }, { length: 2 }]) {
+            try {
+              await selectOnce(text, fallback);
+              return;
+            } catch {
+              // Try the next, or fall through to the original error.
+            }
+          }
+        }
+        // After the restore (insertOoxml over the body) Word may refuse to put the cursor inside the
+        // re-created text box: GeneralException at Range.select, also when tried again (in-Word
+        // contract runs, 2026-10-12 and 2026-10-15). The harness cannot place it, so the case is
+        // checked by hand.
+        if (text === "Text box body." || text === "Heading in a text box") {
+          throw new Error(
+            `Manual check: Word will not select "${text}" in the text box from script after the document is restored; ` +
+              "put the cursor there by hand, press the shortcut, and check the palette behaves as this case expects.",
+            { cause: error },
+          );
+        }
+        throw error;
       }
     },
     async setProtected(on: boolean) {

@@ -69,7 +69,7 @@ In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run "Contract suite
 | 9 | Add template `see §{number} {text}, {abovebelow}`; try `{num}` | First appears in the cycle; second rejected with message | US3 |
 | 10 | Ribbon "Cross-reference"; change shortcut; try Ctrl+@; switch to UK layout | Same palette; new shortcut works, old one does not; Ctrl+@ refused; no stray character typed | US4 |
 | 11 | Insert to two headings; reopen palette with empty query | Both listed first under "Recent", most recent at top | US5 |
-| 12 | Cursor in a heading, Title, header, comment, text box; protected document | Clear message (for heading and Title, it names the "Allow references in headings" setting); no change | FR-001a, edge cases |
+| 12 | Cursor in a heading, Title, comment; protected document. Then cursor in a header, footer and text box (allowed from 2026-10-14) | Clear message (for heading and Title, it names the "Allow references in headings" setting); no change. In a header, footer or text box the reference is inserted, one Undo, caret returns | FR-001a, edge cases |
 | 13 | Cursor in a caption, quote, table cell, footnote | Insert works | FR-001a |
 | 14 | `tracked.docx`: insert; accept all; reject on a copy | Tracked insertion; reference valid after accept; nothing broken after reject | Edge cases |
 | 15 | Windows dark mode + Office black theme; Windows "Animation effects" off | Palette dark; no motion | FR-025, FR-026 |

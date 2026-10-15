@@ -54,6 +54,8 @@ $wdHeaderFooterPrimary = 1
 $wdOutlineLevel2       = 2
 $wdOutlineLevelBodyText = 10
 $wdWord9TableBehavior  = 1
+$wdContentControlRichText = 0
+$wdContentControlText  = 1
 $msoTextOrientationHorizontal = 1
 
 #region Logging
@@ -416,6 +418,21 @@ function New-Spec300 {
     Enter-Step 'spec-300 : inline picture'
     $p = Add-Para $doc 'Paragraph with an inline picture.' $S.Normal
     $null = Invoke-Com $doc.InlineShapes 'AddPicture' @($script:PicturePath, $false, $true, (Get-ParaEnd $doc $p))
+
+    Enter-Step 'spec-300 : content controls'
+    # Each control holds its paragraph's whole text: Word allows no fields in the plain-text one.
+    # Inline, like a control a user inserts in running text: over the paragraph's whole text, or
+    # alone in an empty paragraph, Word makes a block-level control. So add it with a spare
+    # character after it, then delete that character. (The contract harness's restore drops the
+    # plain-text control either way, so its cases are checked by hand; see dev-registration.ts.)
+    foreach ($control in @(@('Plain text control body.', $wdContentControlText), @('Rich text control body.', $wdContentControlRichText))) {
+        $p = Add-Para $doc ($control[0] + '#') $S.Normal
+        $start = $p.Range.Start
+        $end = $start + $control[0].Length
+        $null = Invoke-Com $doc.ContentControls 'Add' @($control[1], (Get-DocRange $doc $start $end))
+        $spare = $doc.Paragraphs.Last.Range
+        $null = Invoke-Com (Get-DocRange $doc ($spare.End - 2) ($spare.End - 1)) 'Delete'
+    }
 
     Enter-Step 'spec-300 : cross-references'
     # Two Insert > Cross-reference references to "Scope" (gives Scope a _Ref bookmark).

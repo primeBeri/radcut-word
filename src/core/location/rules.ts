@@ -50,6 +50,9 @@ export function classifyLocation(
       break;
     case "footnote":
     case "endnote":
+    case "header":
+    case "footer":
+    case "textBox":
       location = facts.story;
       break;
     default:
@@ -62,6 +65,7 @@ export function classifyLocation(
   if (title && !policy.allowInHeadings) return declined("titleParagraph");
   // The place is fine; what is selected is not (FR-008a).
   if (selection === "table") return declined("tableSelected");
+  if (selection === "plainTextControl") return declined("plainTextControl");
 
   const headingLocation = location === "tableCellInMain" ? "tableCell" : location;
   return {

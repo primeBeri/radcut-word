@@ -2,6 +2,10 @@
 
 **Branch**: `001-heading-xref-palette` | **Date**: 2026-10-10 | **Spec**: [spec.md](spec.md)
 
+**Propagated**: 2026-10-14 — Updated from spec.md refinement (Phase 10 hand checks): headers, footers and text boxes allowed as insertion points (FR-001a), confirmed first by spike 4; FR-016a may extend to them. Research R8, data model, gateway and palette contracts updated to match.
+
+**Propagated**: 2026-10-13 — Updated from spec.md refinement (Phase 9 hand checks in Word): a cursor or selection inside a plain-text content control is declined, a whole content control selected is an extended selection however Word reports it (FR-001a, FR-008a); formats with an above/below part are not offered in footnotes and endnotes (FR-016a). Research R8, data model, gateway and palette contracts updated to match.
+
 **Propagated**: 2026-10-11 — Updated from spec.md refinement (default shortcut Ctrl+Shift+Y, FR-001) and the spike outcomes: see "Spike outcomes" under the delivery sequence; research R3–R9 and R11 carry the details.
 
 **Propagated**: 2026-10-10 — Updated from spec.md refinement (usable-bookmark rule excluding Word-managed bookmarks; bookmark extent; surrounding-text formatting, FR-012a; insertion point taken at Enter and re-checked; tracked-change headings). Research R5, R6, R8, R9, data model, gateway contract and quickstart updated to match.
@@ -136,6 +140,29 @@ exception.
 **Spike outcomes (2026-10-11, Word 16.0.20430.20092; details in research.md):** neither stop
 condition was hit.
 
+**Hand-check outcomes (2026-10-13, Phase 9):** Word allows no fields inside a plain-text content
+control (the write fails after its literal text), and a whole selected plain-text control is not
+always counted in `range.contentControls`. The gateway therefore also reads the control the
+selection sits in (`parentContentControlOrNullObject`: its type, and whether the selection is
+the whole control) and the core decides: inside a plain-text control is declined
+(`plainTextControl`), the whole control is extended (FR-001a, FR-008a). In a footnote or endnote
+Word shows the heading text for `\p`, so the format cycle leaves out formats with an above/below
+part there (FR-016a); that belongs to US2's cycle.
+
+**Refinement 2026-10-14 (Phase 10 hand checks):** headers, footers and text boxes become allowed
+insertion points, as in Word's own cross-reference dialog (FR-001a); comments stay declined.
+Before the core rule changes, **spike 4** (dev pane, `src/adapters/office/spikes/`) checks in
+each of the three, and in a header linked to the previous section: the R5 write as one Undo
+step, F9, Ctrl+click from the reference, the caret's return with `range.select()` after the
+pane hides, and what a `\p` field shows. Its outcome goes into research R8; if `\p` shows the
+heading text there, as in notes, FR-016a's exclusion covers these places too. **Outcome
+(2026-10-14):** all three places and the linked header pass (one Undo, F9, Ctrl+click, caret
+return); `\p` shows the heading text in each, as in notes and in Word's own dialog, so FR-016a
+covers them. Outside the main
+text `precedingHeadingOrder` and `inHeadingOrder` stay `null`, as in notes. If the spike finds
+no one-step write or no caret return in a header or footer, that place stays declined and the
+spec is amended (FR-013 is a release gate).
+
 - Palette surface: task pane; no dialog fallback (R3). Every `Office.actions.associate` handler
   calls `event?.completed()`, or the ribbon ignores clicks after the first.
 - Default shortcut: **Ctrl+Shift+Y** (R4); Ctrl+Alt+K is taken in Word.
@@ -146,7 +173,9 @@ condition was hit.
 - Headings: `listString` is the full number; all six other stories listed; heading text in a
   note loses its leading reference mark (`\u0002`) and the bookmark starts after it (R7). Full
   read is 456 ms at 301 headings, so the cached index is required.
-- Location: a text box reports `Shape` and a comment `Unknown`; both are declined (R8).
+- Location: a text box reports `Shape` and a comment `Unknown`; ~~both are declined~~ a comment
+  is declined; text boxes, headers and footers are allowed from 2026-10-14, subject to spike 4
+  (R8).
 - Theme from `officeTheme.isDarkTheme` only (the media query does not follow Office);
   `prefers-reduced-motion` follows Windows, so T099 is dropped (R11).
 - Tracked changes: deleted-heading detection works; a reject leaves the created bookmark (R9).

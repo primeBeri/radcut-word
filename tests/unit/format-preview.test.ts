@@ -77,7 +77,7 @@ describe("previewReference", () => {
     ).toEqual({ text: "above/below ?", warnings: ["positionUnknown"] });
   });
 
-  it.each(["footnote", "endnote"] as const)("cannot tell above/below with the cursor in a %s", (location) => {
+  it.each(["footnote", "endnote", "header", "footer", "textBox"] as const)("cannot tell above/below with the cursor in a %s", (location) => {
     expect(previewReference([{ kind: "aboveBelow" }], fireStrategy, { precedingHeadingOrder: null, location })).toEqual({
       text: "above/below ?",
       warnings: ["positionUnknown"],

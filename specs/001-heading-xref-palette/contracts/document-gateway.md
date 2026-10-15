@@ -83,13 +83,18 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
    `_Hlk…`, `_GoBack`) reports `null`.
 4. When several usable bookmarks exist, `bookmark` is the first by case-insensitive name order,
    every time.
-5. With `allowInHeadings: false`, `checkInsertionPoint` returns `Declined` for header, footer,
-   comment, text box, heading, Title and Subtitle paragraphs, and protected documents; it
-   returns an `InsertionPoint` for main text, footnotes, endnotes and table cells in the main
-   text. It never changes the document.
+5. With `allowInHeadings: false`, `checkInsertionPoint` returns `Declined` for comment,
+   heading, Title and Subtitle paragraphs, and protected documents; it returns an
+   `InsertionPoint` for main text, footnotes, endnotes, table cells in the main text, headers,
+   footers and text boxes (the last three from 2026-10-14, FR-001a; until then declined). It
+   never changes the document.
+5d. With the cursor, or a selection, inside a plain-text content control, `checkInsertionPoint`
+   and `insertReference` decline with `plainTextControl`, confirmed or not, and the document is
+   unchanged; inside a rich-text content control the reference is inserted as in a normal
+   paragraph (FR-001a).
 5b. With `allowInHeadings: true`, heading, Title and Subtitle paragraphs return an
    `InsertionPoint` (`inHeadingOrder` set for a heading, `null` for Title and Subtitle); header,
-   footer, comment, text box and protected cases are still declined.
+   comment and protected cases are still declined.
 5c. `insertReference` whose target is the heading containing the cursor returns `declined` with
    `selfReference`, and the document is unchanged.
 5a. If the selection moves between `checkInsertionPoint` and `insertReference`, the reference
@@ -120,13 +125,20 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
     With the cursor in a heading in a note, `inHeadingFingerprint` identifies that heading.
 9b. With the cursor in a footnote, an endnote or a table cell, the inserted fields have the R5
     composition and show what the preview said (above/below where the preview knows it).
+9c. With the cursor in a header, a footer or a text box (added 2026-10-14, FR-001a), the
+    inserted fields have the R5 composition, resolve to the target and show what the preview
+    said; `precedingHeadingOrder` and `inHeadingOrder` are `null`. A heading there is allowed
+    with `allowInHeadings: true` (5b), with `inHeadingFingerprint` set. The shared header of
+    linked sections, one Undo, the caret's return and the `\p` result are checked in Word only
+    (spike 4 and hand checks).
 10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
     selected text without confirmation.
 10a. With a selection spanning two paragraphs, or containing a picture, shape or content
     control (`selection: "extended"`), `insertReference` with `confirmed: null` returns
     `needsConfirmation` with `confirm: "selection"` and the document is unchanged; with
     `confirmed: "selection"`, the reference replaces the selection and the target's bookmark
-    stays on the heading.
+    stays on the heading. A whole plain-text content control selected counts as extended,
+    however Word reports it (case 10f: needsConfirmation, then replaced, one Undo).
 10b. With a selection containing a table, `checkInsertionPoint` and `insertReference` decline
     with `tableSelected`, confirmed or not, and the document is unchanged.
 10c. With the cursor inside an existing REF field (`selection: "field"`), `insertReference`

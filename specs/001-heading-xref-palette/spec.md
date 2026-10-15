@@ -18,6 +18,10 @@
 
 **Refined**: 2026-10-12 — From the in-Word contract run: at the very start of a paragraph a reference takes the paragraph's own formatting, as Word's own dialog does (FR-012a clarified; no behaviour change).
 
+**Refined**: 2026-10-13 — From the Phase 9 hand checks in Word: Word allows no fields inside a plain-text content control, so a cursor or selection inside one is declined (FR-001a) while selecting the whole control still asks for confirmation and replaces it (FR-008a); in a footnote or endnote Word shows the heading text for "above/below", so formats with an above/below part are not offered there (new FR-016a).
+
+**Refined**: 2026-10-14 — From the Phase 10 hand checks: references may also be inserted with the cursor in a header, a footer or a text box, as Word's own cross-reference dialog allows (FR-001a); comments and plain-text content controls stay declined. Outside the main text no heading order is known, so the preview does not guess above/below there; formats with an above/below part are also hidden in headers, footers and text boxes if Word shows the heading text there (FR-016a, to be confirmed in Word). Behaviour there (one Undo step, caret return, F9, Ctrl+click, linked headers and footers) is to be confirmed by an in-Word spike before the rule changes.
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -127,7 +131,9 @@ reopen the palette and confirm it starts on the new default.
    format advances to the next one and the preview updates to show the exact text that will be
    inserted; Shift+Tab moves to the previous format; cycling wraps at either end.
 2. **Given** the built-in formats, **Then** the cycle contains: text; number; number + text;
-   § number text; page; above/below; text + above/below.
+   § number text; page; above/below; text + above/below. With the cursor in a footnote, an
+   endnote, a header, a footer or a text box, the two formats with above/below are left out of
+   the cycle (FR-016a).
 3. **Given** a format is shown, **When** the user presses Enter, **Then** the inserted reference
    matches the preview and every part of it (number, text, page, above/below) updates when fields
    are updated.
@@ -257,8 +263,24 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   never refers to itself).
 - **Cursor in a quote, caption, list item or table cell** in the main text, a footnote or an
   endnote: insertion works as in a normal paragraph.
-- **Cursor in a header, footer, comment or text box**: the palette explains that insertion is
-  not supported there and makes no change; it never inserts somewhere else.
+- **Cursor in a header, footer, comment or text box**: ~~declined in all four~~ (changed
+  2026-10-14: Word's own cross-reference dialog allows headers, footers and text boxes). In a
+  header, footer or text box insertion works as in a normal paragraph of the main text, with the
+  same exclusions (headings, Title, Subtitle); a reference in a header or footer repeats on every
+  page that uses it, and in a header or footer linked to the previous section it goes into the
+  shared header or footer, as Word does. After inserting, the caret returns to where it was, in
+  the header or footer too. In a comment the palette explains that insertion is not supported
+  there and makes no change; it never inserts somewhere else.
+- **Cursor or selection inside a plain-text content control**: Word allows no fields there, so
+  the palette explains that references cannot go inside it and makes no change. Rich-text
+  content controls take references like a normal paragraph. Selecting the whole control is an
+  extended selection: warning, then a second Enter replaces it (FR-008a).
+- **Above/below in a footnote or endnote**: Word shows the heading text instead of "above" or
+  "below" for a reference there, so formats with an above/below part are not offered while the
+  cursor is in a note (FR-016a). The same holds in a header, footer or text box (spike 4,
+  2026-10-14; Word's own cross-reference dialog behaves the same): a header or footer repeats
+  across pages and a text box floats outside the paragraph flow, so neither has one position.
+  The preview does not guess above/below outside the main text.
 - **Read-only or protected document**: the palette explains that the document cannot be edited
   and makes no change.
 - **Tracked changes on**: insertion succeeds; the reference appears as a tracked insertion and
@@ -282,11 +304,17 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 
 - **FR-001**: Users MUST be able to open the palette with a keyboard shortcut (default
   Ctrl+Shift+Y) from anywhere in the document.
-- **FR-001a**: Insertion MUST be supported in the main text, footnotes and endnotes, in any
-  paragraph style (including quotes, captions, list items and table cells) except paragraphs that
-  are headings (heading style or outline level), Title or Subtitle. In those excluded paragraphs,
-  and in headers, footers, comments and text boxes, the palette MUST decline with a message and
-  make no change.
+- **FR-001a**: Insertion MUST be supported in the main text, footnotes, endnotes, headers,
+  footers and text boxes, in any paragraph style (including quotes, captions, list items and
+  table cells) except paragraphs that are headings (heading style or outline level), Title or
+  Subtitle. In those excluded paragraphs, in comments, and inside a plain-text content control
+  (Word allows no fields there; rich-text content controls are unaffected), the palette MUST
+  decline with a message and make no change. Selecting a whole content control is not "inside" it
+  (FR-008a). In a header or footer linked to the previous section the reference goes into the
+  shared header or footer, as Word does; the write stays one Undo step (FR-013) and the caret
+  returns to where it was. (Headers, footers and text boxes were declined until 2026-10-14;
+  allowed from the Phase 10 hand checks; spike 4 confirmed the write, one Undo, F9, Ctrl+click,
+  the caret's return and the linked header in Word.)
 - **FR-001b**: A per-user setting "Allow references in headings", off by default, MUST lift the
   exclusion of heading, Title and Subtitle paragraphs in FR-001a. The setting MUST carry a short
   explanation of why it is discouraged (headings feed the table of contents, the navigation pane
@@ -323,8 +351,9 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   document protection MUST be re-checked at that moment; if they now forbid insertion, the
   palette MUST show a message, stay open and leave the document unchanged.
 - **FR-008a**: A selection within a single paragraph MUST be replaced without warning. If the
-  selection spans more than one paragraph or contains a picture or other non-text object,
-  the first Enter MUST show an inline warning in the palette (not a browser or system dialog) and
+  selection spans more than one paragraph or contains a picture or other non-text object
+  (including a whole content control, however Word reports it), the first Enter MUST show an
+  inline warning in the palette (not a browser or system dialog) and
   change nothing; a second Enter MUST go ahead and Esc MUST cancel. ~~A selection containing a
   table is replaced after the same confirmation.~~ (changed 2026-10-11 after the US1 acceptance
   run: replacing a table is not an intended use and Word handled it badly.) A selection
@@ -375,6 +404,13 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   palette is open, with a live preview of the exact text to be inserted for the selected heading.
 - **FR-016**: The built-in formats MUST be: text; number; number + text; § number text; page;
   above/below; text + above/below.
+- **FR-016a**: While the cursor is in a footnote or endnote, formats with an above/below part
+  MUST NOT be offered: there Word shows the heading text instead of "above" or "below". The same
+  MUST apply in a header, footer or text box, where Word does the same (spike 4, 2026-10-14;
+  also so in Word's own cross-reference dialog). If the default format is one of them, the palette
+  MUST open on the first offered format after it in the cycle. The format area SHOULD say briefly
+  why they are missing. (Added 2026-10-13 from the Phase 9 hand checks in Word; extended
+  2026-10-14.)
 - **FR-017**: Users MUST be able to choose a default format; the palette MUST open on it in every
   document and session. The out-of-the-box default MUST be "§ number text".
 - **FR-018**: Users SHOULD be able to create, edit and delete format templates combining literal

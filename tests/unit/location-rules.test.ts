@@ -48,14 +48,46 @@ describe("classifyLocation with allowInHeadings off", () => {
     ["outline level 2", { styleBuiltIn: "Normal", outlineLevel: 2, headingOrder: 0 }, "headingParagraph"],
     ["Title", { styleBuiltIn: "Title" }, "titleParagraph"],
     ["Subtitle", { styleBuiltIn: "Subtitle" }, "titleParagraph"],
-    ["header", { story: "header" }, "header"],
-    ["footer", { story: "footer" }, "footer"],
     ["comment", { story: "comment" }, "comment"],
-    ["text box", { story: "textBox" }, "textBox"],
     ["unknown story", { story: "unknown" }, "unknown"],
     ["protected document", { protected: true }, "protected"],
   ] as const)("declines %s", (_name, facts, reason) => {
     expect(classifyLocation({ ...body, ...facts }, "none", off)).toEqual({ kind: "declined", reason });
+  });
+
+  describe("headers, footers and text boxes (FR-001a, allowed from 2026-10-14)", () => {
+    const outside = { headingOrder: null, precedingHeadingOrder: null } as const;
+    it.each([
+      ["header", { story: "header" }, "header"],
+      ["footer", { story: "footer" }, "footer"],
+      ["text box", { story: "textBox" }, "textBox"],
+      ["table cell in a header", { story: "header", inTable: true }, "header"],
+      ["table cell in a text box", { story: "textBox", inTable: true }, "textBox"],
+    ] as const)("allows %s, with no heading orders", (_name, facts, location) => {
+      expect(classifyLocation({ ...body, ...outside, ...facts }, "inline", off)).toEqual({
+        kind: "insertionPoint",
+        location,
+        selection: "inline",
+        inHeadingOrder: null,
+        inHeadingFingerprint: null,
+        precedingHeadingOrder: null,
+      });
+    });
+
+    it.each(["header", "footer", "textBox"] as const)("still declines a heading, Title or Subtitle in a %s", (story) => {
+      const facts = { ...body, ...outside, story };
+      expect(classifyLocation({ ...facts, styleBuiltIn: "Heading1", outlineLevel: 1 }, "none", off)).toEqual({
+        kind: "declined",
+        reason: "headingParagraph",
+      });
+      expect(classifyLocation({ ...facts, styleBuiltIn: "Title" }, "none", off)).toEqual({ kind: "declined", reason: "titleParagraph" });
+    });
+
+    it("declines a table selection or a plain-text control there as anywhere else", () => {
+      const facts = { ...body, ...outside, story: "footer" } as const;
+      expect(classifyLocation(facts, "table", off)).toEqual({ kind: "declined", reason: "tableSelected" });
+      expect(classifyLocation(facts, "plainTextControl", off)).toEqual({ kind: "declined", reason: "plainTextControl" });
+    });
   });
 
   it("declines a heading inside a footnote as a heading paragraph", () => {
@@ -99,6 +131,13 @@ describe("classifyLocation with allowInHeadings on", () => {
     expect(classifyLocation({ ...body, inTable: true, styleBuiltIn: "Heading3", text: "Cell heading" }, "none", on)).toMatchObject({
       inHeadingFingerprint: headingFingerprint({ level: 3, location: "tableCell", text: "Cell heading" }),
     });
+    const header = { ...body, story: "header", styleBuiltIn: "Heading1", outlineLevel: 1, text: "Header heading" } as const;
+    expect(classifyLocation({ ...header, headingOrder: null, precedingHeadingOrder: null }, "none", on)).toMatchObject({
+      kind: "insertionPoint",
+      location: "header",
+      inHeadingOrder: null,
+      inHeadingFingerprint: headingFingerprint({ level: 1, location: "header", text: "Header heading" }),
+    });
   });
 
   it.each(["Title", "Subtitle"])("allows %s with inHeadingOrder null", (style) => {
@@ -109,10 +148,7 @@ describe("classifyLocation with allowInHeadings on", () => {
   });
 
   it.each([
-    [{ story: "header" }, "header"],
-    [{ story: "footer" }, "footer"],
     [{ story: "comment" }, "comment"],
-    [{ story: "textBox" }, "textBox"],
     [{ protected: true }, "protected"],
   ] as const)("still declines %o", (facts, reason) => {
     expect(classifyLocation({ ...body, ...facts }, "none", on)).toEqual({ kind: "declined", reason });
@@ -127,6 +163,7 @@ describe("classifySelection", () => {
     pictureCount: 0,
     shapeCount: 0,
     contentControlCount: 0,
+    containingControl: null,
     insideField: false,
   };
   const words = { ...caret, isEmpty: false };
@@ -159,6 +196,32 @@ describe("classifySelection", () => {
   ] as const)("%s inside a field is a field selection (FR-008b)", (_name, facts) => {
     expect(classifySelection({ ...facts, insideField: true })).toBe("field");
   });
+
+  describe("content controls (FR-001a, FR-008a)", () => {
+    const plainInside = { kind: "plainText", whole: false } as const;
+    const plainWhole = { kind: "plainText", whole: true } as const;
+
+    it.each([
+      ["a caret", caret],
+      ["words", words],
+    ] as const)("%s inside a plain-text control is declined: Word allows no fields there", (_name, facts) => {
+      expect(classifySelection({ ...facts, containingControl: plainInside })).toBe("plainTextControl");
+    });
+
+    it("a whole plain-text control selected is extended, though Word reports it as the container, not in the range", () => {
+      expect(classifySelection({ ...words, containingControl: plainWhole })).toBe("extended");
+    });
+
+    it("a rich-text control takes references like a normal paragraph", () => {
+      expect(classifySelection({ ...caret, containingControl: { kind: "richText", whole: false } })).toBe("none");
+      expect(classifySelection({ ...words, containingControl: { kind: "richText", whole: false } })).toBe("inline");
+      expect(classifySelection({ ...words, containingControl: { kind: "richText", whole: true } })).toBe("extended");
+    });
+
+    it("a table still wins", () => {
+      expect(classifySelection({ ...words, tableCount: 1, containingControl: plainInside })).toBe("table");
+    });
+  });
 });
 
 describe("classifyLocation with a table selection", () => {
@@ -167,8 +230,13 @@ describe("classifyLocation with a table selection", () => {
   });
 
   it("reports the place first when the place itself is not allowed", () => {
-    expect(classifyLocation({ ...body, story: "header" }, "table", off)).toEqual({ kind: "declined", reason: "header" });
+    expect(classifyLocation({ ...body, story: "comment" }, "table", off)).toEqual({ kind: "declined", reason: "comment" });
     expect(classifyLocation({ ...body, protected: true }, "table", off)).toEqual({ kind: "declined", reason: "protected" });
+  });
+
+  it("declines plainTextControl in an allowed place, after the place itself", () => {
+    expect(classifyLocation(body, "plainTextControl", off)).toEqual({ kind: "declined", reason: "plainTextControl" });
+    expect(classifyLocation({ ...body, story: "comment" }, "plainTextControl", off)).toEqual({ kind: "declined", reason: "comment" });
   });
 
   it("passes a field selection through for confirmation", () => {

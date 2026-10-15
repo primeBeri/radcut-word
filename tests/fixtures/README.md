@@ -42,6 +42,8 @@ read "4.3", "4.4.1"). Main text, in this order:
 | Cell text in the main table. | Normal, in a table cell |
 | Heading in a table cell | Heading 3, 4.4.1, in a cell of the same table |
 | Paragraph with an inline picture. | Normal, with a small inline picture |
+| Plain text control body. | Normal; the whole text is a plain-text content control (Word allows no fields in it) |
+| Rich text control body. | Normal; the whole text is a rich-text content control |
 | References made by Word: see section and heading. | Normal, containing two references made with Insert → Cross-reference to "Scope": one "Heading number", one "Heading text" |
 | Chapter 5 … Chapter 76 | Filler: each a Heading 1 ("Chapter N") with a body paragraph, then three Heading 2 ("Topic N.1"–"Topic N.3") each with a body paragraph |
 | Title of the document | Title |

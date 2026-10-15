@@ -138,6 +138,11 @@ export class FakeGateway implements IDocumentGateway {
         draft.fields = draft.fields.filter((f) => f !== old);
         replaced = old.result;
       }
+      // A content control selected whole goes, text and all.
+      if (point.selection === "extended" && at.contentControl && draft.selection.contentControls > 0) {
+        replaced = at.text;
+        at.contentControl = null;
+      }
       const content: FakeInlineContent[] = [];
       for (const part of request.parts) {
         if (part.kind === "literal") {
@@ -313,7 +318,12 @@ export class FakeGateway implements IDocumentGateway {
       tableCount: selection.tables,
       pictureCount: selection.pictures,
       shapeCount: selection.shapes,
-      contentControlCount: selection.contentControls,
+      // Word reports a whole selected control as the one the selection sits in (hand check).
+      contentControlCount: paragraph.contentControl ? 0 : selection.contentControls,
+      containingControl:
+        paragraph.contentControl && (selection.inContentControl || selection.contentControls > 0)
+          ? { kind: paragraph.contentControl, whole: selection.contentControls > 0 }
+          : null,
       insideField: selection.inField,
     };
     return classifyLocation(locationFacts, classifySelection(selectionFacts), policy);

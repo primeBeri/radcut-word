@@ -280,10 +280,35 @@ KeyboardShortcuts 1.1 = 2408.
   `Endnote`, `Header`, `Footer`, `TableCell` (with `parentOfBodyType: "MainDoc"`), and **`Shape`
   for a text box**, not `Unknown`; a comment reports `Unknown` (style `Other`) and a footnote
   `Footnote`.
+  **Hand checks (2026-10-13)**: with a plain-text content control selected by its title tab,
+  the selection was replaced without the warning, so the control was not counted; with the
+  cursor inside one, Word wrote the literal text and then refused `insertField` (fields are not
+  allowed in plain-text controls). Reading `range.parentContentControlOrNullObject` (`type`,
+  and `compareLocationWith` its whole range) covers both: inside a plain-text control is
+  declined `plainTextControl`, the whole control is `extended`. Rich-text controls take fields.
   A triple-clicked paragraph including its mark counts as **1** paragraph (inline); heading plus
   body counts as 2; a whole table gives `tableCount: 1`; an inline picture counts as both
   `pictureCount: 1` and `shapeCount: 1`. Showing the pane leaves Word's selection unchanged.
   **Decision: as planned, with `Shape` added to the declined body types.**
+- **Refinement (2026-10-14)**: `Header`, `Footer` and `Shape` (text box) move to the allowed
+  body types, with the same paragraph exclusions as the main text (FR-001a); a table cell is
+  allowed when its chain leads to any allowed story. Only `Unknown` (comments) stays declined
+  by body type. `precedingHeadingOrder` and `inHeadingOrder` are `null` there, as in notes.
+  **Unverified, spike 4**: one Undo step for the R5 write in each; F9 and Ctrl+click from the
+  reference; `range.select()` returning the caret into a header or footer after the pane hides
+  (Word may need header view); a header linked to the previous section receiving the write in
+  the shared story; and what a `\p` field shows there (if the heading text, as in notes,
+  FR-016a's exclusion applies).
+- **Outcome (spike 4, 2026-10-14)**: with the cursor in a header (`Header`), a footer (`Footer`)
+  and a text box (`Shape`), the production path wrote `§ 4.3 Fire strategy` at the cursor (REF
+  `\w \h \* CHARFORMAT` and REF `\h \* CHARFORMAT`), reusing the bookmark from the first
+  insert; one Ctrl+Z removed each, F9 kept the results and Ctrl+click jumped. Hiding the pane and
+  `returnFocus` (`range.select()`) put the caret back in the header, footer or text box. In
+  section 2's header linked to section 1 the reference appeared in both. A `\p` field shows the
+  heading text, not "above"/"below", in all three, as in notes; Word's own cross-reference
+  dialog does the same (a header or footer spans pages; a text box floats outside the paragraph
+  flow). **Decision: allowed, as refined; FR-016a's exclusion covers headers, footers and text
+  boxes.**
 
 ## R9. Tracked changes and co-authoring — SPIKE 3
 

@@ -26,7 +26,10 @@ export interface SelectionRequest {
   tables?: number;
   pictures?: number;
   shapes?: number;
+  /** Select the paragraph's content control whole (as by clicking its title tab). */
   contentControls?: number;
+  /** Put the cursor (or, with `length`, a selection) inside the paragraph's content control. */
+  inContentControl?: boolean;
   /** Put the cursor inside a field of the paragraph: the first, or the one at `fieldIndex`. */
   inField?: boolean;
   /** 0-based, among the paragraph's fields. */
@@ -131,7 +134,10 @@ export function defineDocumentGatewayContract(
 
   async function insertOk(h: GatewayContractHarness, text: string, overrides: Parameters<typeof request>[2] = {}) {
     const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, text), overrides));
-    if (!result.ok) throw new Error(`Insert failed: ${result.reason}`);
+    if (!result.ok) {
+      const detail = result.reason === "hostError" ? `: ${result.detail ?? "no detail"}` : "";
+      throw new Error(`Insert of "${text}" failed: ${result.reason}${detail}`);
+    }
     return result;
   }
 
@@ -219,6 +225,10 @@ export function defineDocumentGatewayContract(
         ["Footnote text.", "footnote"],
         ["Endnote text.", "endnote"],
         ["Cell text in the main table.", "tableCellInMain"],
+        // Allowed from 2026-10-14 (FR-001a), as in Word's own cross-reference dialog.
+        ["Header text.", "header"],
+        ["Footer text.", "footer"],
+        ["Text box body.", "textBox"],
       ] as const;
       for (const [text, location] of allowed) {
         it(`allows "${text}" as ${location}`, async () => {
@@ -230,11 +240,9 @@ export function defineDocumentGatewayContract(
       }
 
       const declined = [
-        ["Header text.", "header"],
-        ["Footer text.", "footer"],
         ["A comment.", "comment"],
-        ["Text box body.", "textBox"],
         ["Fire strategy", "headingParagraph"],
+        ["Heading in the header", "headingParagraph"],
         ["Title of the document", "titleParagraph"],
         ["Subtitle of the document", "titleParagraph"],
       ] as const;
@@ -255,6 +263,30 @@ export function defineDocumentGatewayContract(
       });
     });
 
+    it("5d. inside a plain-text content control is declined plainTextControl, unchanged; a rich-text one takes the reference", async () => {
+      // Rich text first: in Word the plain-text control is a manual check (the restore drops it).
+      const rich = await setup("spec-300");
+      await rich.select("Rich text control body.", { inContentControl: true, caretOffset: 4 });
+      const result = await insertOk(rich, "Fire strategy");
+      const added = (await rich.fields()).filter((f) => f.bookmark === result.bookmark);
+      expect(added.map((f) => f.switches)).toEqual([fieldFor("number").switches, fieldFor("text").switches]);
+      for (const selection of [{ inContentControl: true }, { inContentControl: true, length: 5 }]) {
+        const h = await setup("spec-300");
+        await h.select("Plain text control body.", selection);
+        const before = await h.documentState();
+        expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason: "plainTextControl" });
+        const target = await headingByText(h.gateway, "Scope");
+        for (const confirmed of [null, "selection"] as const) {
+          expect(await h.gateway.insertReference(await request(h.gateway, target, { confirmed }))).toEqual({
+            ok: false,
+            reason: "declined",
+            declined: { kind: "declined", reason: "plainTextControl" },
+          });
+        }
+        expect(await h.documentState()).toEqual(before);
+      }
+    });
+
     describe("5b. checkInsertionPoint with allowInHeadings on", () => {
       it("allows a heading with inHeadingOrder set, and Title and Subtitle with null", async () => {
         const h = await setup("spec-300");
@@ -267,17 +299,21 @@ export function defineDocumentGatewayContract(
         expect(title.kind === "insertionPoint" && title.inHeadingOrder).toBeNull();
       });
 
-      it("still declines header, footer, comment, text box and protected", async () => {
-        const h = await setup("spec-300");
-        for (const [text, reason] of [
-          ["Header text.", "header"],
-          ["Footer text.", "footer"],
-          ["A comment.", "comment"],
-          ["Text box body.", "textBox"],
-        ] as const) {
+      it("allows a heading in a header, footer or text box with no order, but the heading's fingerprint", async () => {
+        for (const text of ["Heading in the header", "Heading in the footer", "Heading in a text box"]) {
+          const h = await setup("spec-300");
           await h.select(text);
-          expect(await h.gateway.checkInsertionPoint(ON)).toEqual({ kind: "declined", reason });
+          const point = await h.gateway.checkInsertionPoint(ON);
+          if (point.kind !== "insertionPoint") throw new Error(`${text}: declined ${point.reason}`);
+          expect(point.inHeadingOrder).toBeNull();
+          expect(point.inHeadingFingerprint).toBe(headingFingerprint(await headingByText(h.gateway, text)));
         }
+      });
+
+      it("still declines comment and protected", async () => {
+        const h = await setup("spec-300");
+        await h.select("A comment.");
+        expect(await h.gateway.checkInsertionPoint(ON)).toEqual({ kind: "declined", reason: "comment" });
         await h.select(BODY);
         await h.setProtected(true);
         expect(await h.gateway.checkInsertionPoint(ON)).toEqual({ kind: "declined", reason: "protected" });
@@ -426,6 +462,8 @@ export function defineDocumentGatewayContract(
 
     it("8. inserted content is the literals plus one hyperlinked field per part, with the R5 switches", async () => {
       const h = await setup("spec-300");
+      // Placed explicitly: in Word the cursor is otherwise wherever the previous case left it.
+      await h.select(BODY);
       const result = await insertOk(h, "Fire strategy");
       const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
       expect(added.map((f) => ({ type: f.type, bookmark: f.bookmark, switches: f.switches }))).toEqual([
@@ -438,6 +476,7 @@ export function defineDocumentGatewayContract(
     it("9. each field's result equals the core's preview for every built-in format", async () => {
       for (const format of BUILT_IN_FORMATS) {
         const h = await setup("spec-300");
+        await h.select(BODY);
         const point = await h.gateway.checkInsertionPoint(OFF);
         if (point.kind !== "insertionPoint") throw new Error("expected an insertion point");
         const target = await headingByText(h.gateway, "Scope");
@@ -468,6 +507,33 @@ export function defineDocumentGatewayContract(
             const preview = previewReference(parts, target, point);
             // In a note Word shows the heading text for \\p, not above/below (in-Word contract run,
             // 2026-10-12); the preview warns that it cannot tell.
+            if (preview.warnings.includes("positionUnknown")) expect(shown).toMatch(/^Fire strategy (above|below|Fire strategy)$/);
+            else expect(shown).toBe(preview.text);
+          }
+        });
+      }
+    });
+
+    describe("9c. writing with the cursor in a header, a footer or a text box", () => {
+      for (const place of ["Header text.", "Footer text.", "Text box body."]) {
+        it(`at "${place}": the R5 fields, resolving, with no heading orders`, async () => {
+          for (const id of ["sectionNumberText", "textAboveBelow"]) {
+            const parts = formatById(id)!.parts;
+            const h = await setup("spec-300");
+            await h.select(place);
+            const point = await h.gateway.checkInsertionPoint(OFF);
+            if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
+            expect({ preceding: point.precedingHeadingOrder, own: point.inHeadingOrder }).toEqual({ preceding: null, own: null });
+            const target = await headingByText(h.gateway, "Fire strategy");
+            const result = await insertOk(h, "Fire strategy", { parts });
+            const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+            const expected = parts.flatMap((p) => (p.kind === "literal" ? [] : [fieldFor(p.kind)]));
+            expect(added.map((f) => ({ type: f.type, switches: f.switches }))).toEqual(expected);
+            const shown = await h.insertionText(result.reference);
+            const preview = previewReference(parts, target, point);
+            // Outside the main text the preview cannot tell above/below; what Word shows for \p
+            // there is recorded by spike 4 (research R8).
+            expect(preview.warnings.includes("positionUnknown") || !parts.some((p) => p.kind === "aboveBelow")).toBe(true);
             if (preview.warnings.includes("positionUnknown")) expect(shown).toMatch(/^Fire strategy (above|below|Fire strategy)$/);
             else expect(shown).toBe(preview.text);
           }
@@ -531,7 +597,8 @@ export function defineDocumentGatewayContract(
     });
 
     it("10a. an extended selection needs confirmation; once confirmed it is replaced", async () => {
-      for (const extended of [{ paragraphs: 2, length: 5 }, { pictures: 1 }, { shapes: 1 }, { contentControls: 1 }]) {
+      // A content control selected whole is case 10f.
+      for (const extended of [{ paragraphs: 2, length: 5 }, { pictures: 1 }, { shapes: 1 }]) {
         const h = await setup("spec-300");
         await h.select("First of two paragraphs.", extended);
         const before = await h.documentState();
@@ -547,6 +614,22 @@ export function defineDocumentGatewayContract(
         // Replacing the selection never takes the target's bookmark with it.
         expect((await h.bookmarks()).find((b) => b.name === confirmed.bookmark)?.paragraphText).toBe("Scope");
       }
+    });
+
+    it("10f. a plain-text content control selected whole needs confirmation; once confirmed it is replaced", async () => {
+      const h = await setup("spec-300");
+      await h.select("Plain text control body.", { contentControls: 1 });
+      const before = await h.documentState();
+      const target = await headingByText(h.gateway, "Scope");
+      expect(await h.gateway.insertReference(await request(h.gateway, target))).toEqual({
+        ok: false,
+        reason: "needsConfirmation",
+        confirm: "selection",
+      });
+      expect(await h.documentState()).toEqual(before);
+      const confirmed = await insertOk(h, "Scope", { confirmed: "selection" });
+      expect(await h.replacedText(confirmed.reference)).toBe("Plain text control body.");
+      expect(await h.insertionText(confirmed.reference)).toBe("§ 1.1 Scope");
     });
 
     it("10d. a selection that covers the target heading is declined selfReference, confirmed or not, unchanged", async () => {

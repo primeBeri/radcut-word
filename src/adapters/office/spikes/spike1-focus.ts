@@ -186,6 +186,7 @@ export const spike1: readonly Spike[] = [
           tableCount: tables.items.length,
           pictureCount: pictures.items.length,
           contentControlCount: controls.items.length,
+          containingControl: null,
           shapeCount: shapes ? shapes.items.length : "WordApiDesktop 1.2 unsupported",
         });
       });

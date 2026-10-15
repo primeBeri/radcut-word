@@ -1,5 +1,9 @@
-/** Places where a reference may be inserted (FR-001a). */
-export type InsertionLocation = "main" | "footnote" | "endnote" | "tableCellInMain";
+/**
+ * Places where a reference may be inserted (FR-001a). Headers, footers and text boxes from
+ * 2026-10-14, as Word's own cross-reference dialog allows; a table cell in one of them reports
+ * that story.
+ */
+export type InsertionLocation = "main" | "footnote" | "endnote" | "tableCellInMain" | "header" | "footer" | "textBox";
 
 /**
  * `inline`: within one paragraph, replaced without warning.
@@ -12,8 +16,11 @@ export type SelectionExtent = "none" | "inline" | "extended" | "field";
 /** What the user confirms before a selection (FR-008a) or a field (FR-008b) is replaced. */
 export type Confirmation = "selection" | "field";
 
-/** What `classifySelection` decides: an extent, or a table selection, which is declined (FR-008a). */
-export type SelectionClass = SelectionExtent | "table";
+/**
+ * What `classifySelection` decides: an extent, or a selection that is declined: one containing a
+ * table (FR-008a), or one inside a plain-text content control, where Word allows no fields (FR-001a).
+ */
+export type SelectionClass = SelectionExtent | "table" | "plainTextControl";
 
 export interface InsertionPoint {
   readonly kind: "insertionPoint";
@@ -37,15 +44,13 @@ export interface InsertionPoint {
 }
 
 export type DeclinedReason =
-  | "header"
-  | "footer"
   | "comment"
-  | "textBox"
   | "headingParagraph"
   | "titleParagraph"
   | "selfReference"
   | "protected"
   | "tableSelected"
+  | "plainTextControl"
   | "unknown";
 
 export interface Declined {
@@ -101,6 +106,18 @@ export interface SelectionFacts {
   readonly pictureCount: number;
   readonly shapeCount: number;
   readonly contentControlCount: number;
+  /**
+   * The innermost content control the selection sits in, and whether the selection is that whole
+   * control. Word may report a whole selected control here rather than in `contentControlCount`
+   * (hand check, 2026-10-13).
+   */
+  readonly containingControl: ContainingControl | null;
   /** The cursor or selection lies inside an existing field's result or code. */
   readonly insideField: boolean;
+}
+
+/** Word allows no fields in a plain-text content control; a rich-text one takes them. */
+export interface ContainingControl {
+  readonly kind: "plainText" | "richText" | "other";
+  readonly whole: boolean;
 }

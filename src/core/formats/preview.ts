@@ -8,8 +8,8 @@ export type PreviewContext = Pick<InsertionPoint, "precedingHeadingOrder" | "loc
 /** Word decides above/below for targets here itself; the add-in cannot tell before inserting. */
 const POSITION_UNKNOWN: ReadonlySet<Heading["location"]> = new Set(["textBox", "header", "footer"]);
 
-/** Cursor places where the gateways do not count headings, so above/below is not known. */
-const CURSOR_POSITION_UNKNOWN: ReadonlySet<InsertionLocation> = new Set(["footnote", "endnote"]);
+/** Cursor places outside the main text, where the gateways do not count headings, so above/below is not known. */
+const CURSOR_POSITION_UNKNOWN: ReadonlySet<InsertionLocation> = new Set(["footnote", "endnote", "header", "footer", "textBox"]);
 
 /**
  * What a reference will display now (FR-015). Page cannot be known before insertion; above/below

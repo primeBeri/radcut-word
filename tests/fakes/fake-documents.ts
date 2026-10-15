@@ -21,7 +21,12 @@ export interface FakeParagraph {
   trackedDeletion: boolean;
   /** Character formatting of the paragraph's text, e.g. "regular", "bold", "italic". */
   charFormat: string;
+  /** A content control holding the paragraph's whole text, or null. */
+  contentControl: FakeContentControl | null;
 }
+
+/** Word's plain-text controls allow no fields; rich-text ones do. */
+export type FakeContentControl = "plainText" | "richText";
 
 /** Extent of a bookmark relative to its paragraph's text. */
 export type FakeBookmarkExtent = "text" | "paragraph" | "partial";
@@ -64,7 +69,14 @@ export interface FakeSelection {
   tables: number;
   pictures: number;
   shapes: number;
+  /**
+   * Content controls selected whole. On a paragraph with a control, Word reports that control as
+   * the one the selection sits in rather than counting it in the range (hand check, 2026-10-13),
+   * and the fake does the same.
+   */
   contentControls: number;
+  /** The cursor or selection is inside the paragraph's content control. */
+  inContentControl: boolean;
   /** The cursor is inside a field of the paragraph: the one at `fieldIndex` (0-based) among its fields. */
   inField: boolean;
   fieldIndex: number;
@@ -95,6 +107,7 @@ export interface ParagraphOptions {
   story?: FakeStory;
   inTable?: boolean;
   charFormat?: string;
+  contentControl?: FakeContentControl;
 }
 
 export interface SelectOptions {
@@ -104,6 +117,7 @@ export interface SelectOptions {
   pictures?: number;
   shapes?: number;
   contentControls?: number;
+  inContentControl?: boolean;
   inField?: boolean;
   fieldIndex?: number;
 }
@@ -136,6 +150,7 @@ export class FakeDocumentBuilder {
       number: options.number ?? null,
       trackedDeletion: options.trackedDeletion ?? false,
       charFormat: options.charFormat ?? "regular",
+      contentControl: null,
     });
     return this;
   }
@@ -151,6 +166,7 @@ export class FakeDocumentBuilder {
       number: null,
       trackedDeletion: false,
       charFormat: options.charFormat ?? "regular",
+      contentControl: options.contentControl ?? null,
     });
     return this;
   }
@@ -215,6 +231,7 @@ export function emptySelection(paragraphId: number): FakeSelection {
     pictures: 0,
     shapes: 0,
     contentControls: 0,
+    inContentControl: false,
     inField: false,
     fieldIndex: 0,
   };
@@ -265,6 +282,8 @@ function spec300(): FakeDocumentState {
     .para("Cell text in the main table.", { inTable: true })
     .heading(3, "Heading in a table cell", { number: "4.4.1", inTable: true })
     .para("Paragraph with an inline picture.")
+    .para("Plain text control body.", { contentControl: "plainText" })
+    .para("Rich text control body.", { contentControl: "richText" })
     .para("References made by Word: see section and heading.");
   addNumberedFiller(b, 72, 3, 5);
   b.para("Title of the document", { style: "Title" })
