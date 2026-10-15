@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Packaging;
 using RadCut.DesktopTests.Infrastructure;
 
 namespace RadCut.DesktopTests.Infrastructure.Tests;
@@ -144,5 +145,55 @@ public class EvidenceTests
     public void Folder_names_are_safe_file_names()
     {
         Assert.Equal("Contract.IDocumentGateway_ OfficeJsGateway.7c", EvidenceFolder.SafeName("Contract.IDocumentGateway: OfficeJsGateway.7c"));
+    }
+}
+
+[Trait("Category", "Harness")]
+public sealed class TaskpaneDocumentTests : IDisposable
+{
+    private readonly string root = Path.Combine(Path.GetTempPath(), "radcut-harness-tests-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
+    public void Reads_the_add_in_id_and_version_from_the_manifest()
+    {
+        var manifest = AddinManifest.Load();
+        Assert.Equal("15ecd785-9690-4df5-88be-ffb376d11ee9", manifest.Id);
+        Assert.Matches(@"^\d+\.\d+\.\d+\.\d+$", manifest.Version);
+    }
+
+    [Fact]
+    public void Adds_a_task_pane_that_opens_the_registered_add_in()
+    {
+        var scratch = ScratchFixture.Create("tracked", "t", root);
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, new AddinManifest("11111111-2222-3333-4444-555555555555", "1.2.3.4"));
+
+        using var package = Package.Open(scratch.Path, FileMode.Open, FileAccess.Read);
+        var toTaskpanes = Assert.Single(package.GetRelationshipsByType(TaskpaneDocument.TaskpanesRelationship));
+        var taskpanes = package.GetPart(PackUriHelper.ResolvePartUri(new Uri("/", UriKind.Relative), toTaskpanes.TargetUri));
+        var toExtension = Assert.Single(taskpanes.GetRelationshipsByType(TaskpaneDocument.WebExtensionRelationship));
+        using var taskpanesXml = new StreamReader(taskpanes.GetStream());
+        Assert.Contains($"r:id=\"{toExtension.Id}\"", taskpanesXml.ReadToEnd());
+
+        var extension = package.GetPart(PackUriHelper.ResolvePartUri(taskpanes.Uri, toExtension.TargetUri));
+        using var extensionXml = new StreamReader(extension.GetStream());
+        var xml = extensionXml.ReadToEnd();
+        Assert.Contains("id=\"11111111-2222-3333-4444-555555555555\"", xml);
+        Assert.Contains("version=\"1.2.3.4\"", xml);
+        Assert.Contains("store=\"developer\"", xml);
+        Assert.Contains("storeType=\"Registry\"", xml);
+    }
+
+    [Fact]
+    public void Refuses_to_add_a_second_task_pane()
+    {
+        var scratch = ScratchFixture.Create("tracked", "t", root);
+        var manifest = AddinManifest.Load();
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest);
+        Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest));
     }
 }
