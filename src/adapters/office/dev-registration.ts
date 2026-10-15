@@ -25,13 +25,17 @@ import { runningCase, timed } from "../../dev/mini-test";
 import { OfficeHostShell } from "./office-host-shell";
 import { OfficeJsGateway, storyBodies } from "./office-js-gateway";
 
-/** A heading each fixture has and the others do not, to tell which document is open. */
-const FIXTURE_MARKER: Record<ContractFixture, string> = {
-  "spec-contract": "Contract fixture.",
-  "spec-300": "Chapter 76",
-  "guide-500": "Part 100",
-  tracked: "Kept heading",
-  "plain-headings": "Outline-level heading",
+/**
+ * Paragraphs that tell which document is open: a case runs if any of its fixture's markers is
+ * there. spec-300 holds every paragraph of spec-contract, so it is accepted for spec-contract
+ * too; that lets the speed work be measured on both (research D2).
+ */
+const FIXTURE_MARKER: Record<ContractFixture, readonly string[]> = {
+  "spec-contract": ["Contract fixture.", "Chapter 76"],
+  "spec-300": ["Chapter 76"],
+  "guide-500": ["Part 100"],
+  tracked: ["Kept heading"],
+  "plain-headings": ["Outline-level heading"],
 };
 
 /**
@@ -133,7 +137,8 @@ async function prepareDocument(fixture: ContractFixture): Promise<void> {
     if (hasMarker === undefined) {
       const paragraphs = body.paragraphs.load("items/text");
       await context.sync();
-      hasMarker = paragraphs.items.some((p) => p.text.trim() === FIXTURE_MARKER[fixture]);
+      const markers = FIXTURE_MARKER[fixture];
+      hasMarker = paragraphs.items.some((p) => markers.includes(p.text.trim()));
       snapshot.fixtures.set(fixture, hasMarker);
     }
     if (!hasMarker) throw new Error(`This case needs ${fixture}.docx open in Word.`);
