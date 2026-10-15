@@ -68,7 +68,20 @@ public sealed class PaneSession : IAsyncDisposable
         // 2026-10-15), so open it as a user would. The pane's WebView2, and with it the debugging
         // endpoint, starts only then (unless another pane, such as Copilot's, started it first).
         Ribbon.Invoke(Word, Ribbon.CrossReference);
-        var version = await Word.WaitForCdpAsync(CdpWait);
+        string? version = null, addinError = null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.Elapsed < CdpWait && version is null && addinError is null)
+        {
+            version = await Word.WaitForCdpAsync(TimeSpan.FromSeconds(2));
+            if (version is null) addinError = Word.DismissAddinError();
+        }
+        if (addinError is not null)
+        {
+            var failure = $"Word could not start the add-in and showed: \"{addinError}\" (dismissed). If another Office app " +
+                "shares the add-in browser, check that the harness's Word has its own WebView2 data folder (tests/desktop/README.md).";
+            RouteReport.Add(Mode, route, false, failure);
+            return failure;
+        }
         if (version is null)
         {
             var failure = $"no debugging endpoint at {Word.CdpEndpoint} within {CdpWait.TotalSeconds:0} s";

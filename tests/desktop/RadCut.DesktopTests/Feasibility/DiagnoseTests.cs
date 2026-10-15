@@ -137,3 +137,60 @@ public sealed class DiagnoseShortcutTests
         File.WriteAllText(Path.Combine(folder.Path, "diagnose.md"), report.ToString());
     }
 }
+
+/// <summary>Not a check: does Esc, pressed with a real keystroke in the palette, reach the page?</summary>
+[Trait("Category", "Diagnose")]
+public sealed class DiagnoseEscapeTests : ScenarioTest
+{
+    [Fact]
+    public async Task Record_what_Esc_does_in_the_palette()
+    {
+        var (palette, document) = await OpenAsync("spec-contract", "diagnose-escape");
+        var page = Session!.Pane!.Page;
+        using var keys = new Keys(Session.Word!);
+        var report = new StringBuilder($"# Esc in the palette, {DateTime.Now:yyyy-MM-dd HH:mm}\n\n");
+        async Task Record(string step)
+        {
+            var state = await page.EvaluateAsync<string>(@"() => JSON.stringify({
+                keys: window.__keys ?? null, visibility: document.visibilityState, focus: document.hasFocus(),
+                active: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName,
+                palette: !!document.querySelector('input[aria-label=""Search headings""]'),
+                warning: !!document.querySelector('[data-testid=warning-popover]') })");
+            report.AppendLine($"- {step}: {state}; UIA focus {keys.FocusedDescription()}");
+        }
+
+        WordActions.PutCaretIn(document, "The fire strategy is described here.");
+        await palette.OpenAsync();
+        await page.EvaluateAsync("() => { window.__keys = []; document.addEventListener('keydown', e => window.__keys.push(e.key), true); }");
+        await Record("palette open");
+        Palette.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        await Record("1.5 s after Esc (FlaUI)");
+
+        await palette.OpenAsync();
+        await page.EvaluateAsync("() => { window.__keys = []; }");
+        Palette.Type("x");
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await Record("after typing x");
+        await page.Keyboard.PressAsync("Escape");
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        await Record("1.5 s after Esc (CDP, straight to the page)");
+
+        // With the confirmation warning showing (scenario 23's state).
+        dynamic first = WordActions.Find(document, "First of two paragraphs.").Paragraphs.First;
+        ((dynamic)document).Range((int)first.Range.Start, (int)first.Next().Range.Start + 5).Select();
+        await palette.OpenAsync();
+        await page.EvaluateAsync("() => { window.__keys = []; }");
+        Palette.Type("Scope");
+        await palette.WaitForSelectedRowAsync("Scope");
+        Palette.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ENTER);
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        await Record("1.5 s after Enter on a two-paragraph selection");
+        Palette.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        await Record("1.5 s after Esc with the warning showing");
+
+        var folder = new EvidenceFolder("diagnose-escape");
+        File.WriteAllText(Path.Combine(folder.Path, "diagnose.md"), report.ToString());
+    }
+}

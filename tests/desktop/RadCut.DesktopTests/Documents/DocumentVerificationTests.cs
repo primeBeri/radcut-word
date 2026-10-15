@@ -8,42 +8,14 @@ namespace RadCut.DesktopTests.Documents;
 /// itself, independently of the add-in.
 /// </summary>
 [Trait("Category", "Document")]
-public sealed class DocumentVerificationTests : HarnessTest
+public sealed class DocumentVerificationTests : ScenarioTest
 {
     private const string Body = "The fire strategy is described here.";
-    private PaneSession? session;
-
-    public DocumentVerificationTests()
-    {
-        OnFailure(folder => session?.SaveEvidenceAsync(folder) ?? Task.CompletedTask);
-    }
-
-    public override async ValueTask DisposeAsync()
-    {
-        await base.DisposeAsync();
-        if (session is not null) await session.DisposeAsync();
-    }
-
-    private async Task<(PaneSession Session, Palette Palette, object Document)> OpenAsync(string fixture, string name)
-    {
-        if (!Preflight.HasInteractiveDesktop()) Assert.Skip(Preflight.NoDesktopMessage);
-        session = await PaneSession.StartAsync(fixture, DevServerMode.Normal, name);
-        if (session.Pane is null) throw new InvalidOperationException($"No route reached the task pane: {session.PaneFailure}");
-        return (session, new Palette(session), session.Word!.Document);
-    }
-
-    private async Task CloseAsync()
-    {
-        if (session is not null) await session.DisposeAsync();
-        session = null;
-    }
-
-    private static string[] Results(IEnumerable<ReferenceField> fields) => fields.Select(f => f.Result).ToArray();
 
     [Fact]
     public async Task Scenario03_after_moving_the_heading_F9_shows_the_new_number_and_Ctrl_click_jumps_to_it()
     {
-        var (open, palette, document) = await OpenAsync("spec-contract", "Scenario03");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario03");
         var inserted = await palette.InsertAsync("Scope body.", "Fire strategy");
         Assert.Equal(["4.3", "Fire strategy"], Results(inserted.Fields));
 
@@ -51,13 +23,13 @@ public sealed class DocumentVerificationTests : HarnessTest
         Assert.Empty(WordActions.UpdateFields(document));
 
         Assert.Equal(["4.1", "Fire strategy"], Results(DocumentInspector.FieldsTo(document, inserted.Bookmark)));
-        Assert.Equal("Fire strategy", (string)WordActions.FollowReference(open.Word!, inserted.Bookmark));
+        Assert.Equal("Fire strategy", (string)WordActions.FollowReference(Session!.Word!, inserted.Bookmark));
     }
 
     [Fact]
     public async Task Scenario04_a_second_reference_to_the_same_heading_reuses_its_bookmark()
     {
-        var (_, palette, document) = await OpenAsync("spec-contract", "Scenario04");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario04");
         var bookmarksBefore = DocumentInspector.Bookmarks(document).Count;
 
         var first = await palette.InsertAsync(Body, "Fire strategy");
@@ -72,9 +44,9 @@ public sealed class DocumentVerificationTests : HarnessTest
     [Fact]
     public async Task Scenario06_references_work_in_Word_without_the_add_in()
     {
-        var (open, palette, document) = await OpenAsync("spec-contract", "Scenario06");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario06");
         var inserted = await palette.InsertAsync(Body, "Fire strategy");
-        string saved = open.Scratch!.SaveCopy(open.Word!, "saved");
+        string saved = Session!.Scratch!.SaveCopy(Session!.Word!, "saved");
         await CloseAsync(); // also unregisters the add-in
 
         await using var plain = await WordSession.StartAsync(saved, PaneRoute.B);
@@ -87,13 +59,13 @@ public sealed class DocumentVerificationTests : HarnessTest
     [Fact]
     public async Task Scenario14_a_tracked_insertion_survives_accept_all_and_reject_all_breaks_nothing()
     {
-        var (open, palette, document) = await OpenAsync("tracked", "Scenario14");
+        var (palette, document) = await OpenAsync("tracked", "Scenario14");
         var revisionsBefore = DocumentInspector.RevisionCount(document);
         var inserted = await palette.InsertAsync("Body under the kept heading.", "Kept heading");
         Assert.True(DocumentInspector.RevisionCount(document) > revisionsBefore, "The insertion is not tracked.");
         Assert.Equal(["1", "Kept heading"], Results(inserted.Fields));
-        string accept = open.Scratch!.SaveCopy(open.Word!, "accept");
-        string reject = open.Scratch!.SaveCopy(open.Word!, "reject");
+        string accept = Session!.Scratch!.SaveCopy(Session!.Word!, "accept");
+        string reject = Session!.Scratch!.SaveCopy(Session!.Word!, "reject");
         await CloseAsync();
 
         await using (var word = await WordSession.StartAsync(accept, PaneRoute.B))
@@ -121,7 +93,7 @@ public sealed class DocumentVerificationTests : HarnessTest
     [Fact]
     public async Task Scenario19_a_table_of_contents_bookmark_is_not_reused_and_the_reference_survives_a_TOC_update()
     {
-        var (_, palette, document) = await OpenAsync("spec-contract", "Scenario19");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario19");
         Assert.Contains(DocumentInspector.Bookmarks(document), b => b.Name.StartsWith("_Toc", StringComparison.Ordinal) && b.ParagraphText == "Fire strategy");
 
         var inserted = await palette.InsertAsync(Body, "Fire strategy");
@@ -136,7 +108,7 @@ public sealed class DocumentVerificationTests : HarnessTest
     [Fact]
     public async Task Scenario20_a_reference_takes_the_formatting_around_it_not_the_heading_s_and_keeps_it_after_F9()
     {
-        var (_, palette, document) = await OpenAsync("spec-contract", "Scenario20");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario20");
         // Mid-text: at the very start of a paragraph Word takes no surrounding formatting (FR-012a).
         var bold = await palette.InsertAsync("Bold body text.", "Heading with bold word", offset: 4);
         var italic = await palette.InsertAsync("Italic body text.", "Heading with bold word", offset: 4);
@@ -159,7 +131,7 @@ public sealed class DocumentVerificationTests : HarnessTest
     [Fact]
     public async Task Scenario26_references_match_Word_s_own_cross_reference_dialog()
     {
-        var (_, palette, document) = await OpenAsync("spec-contract", "Scenario26");
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario26");
         // spec-contract carries two references made with Word's own dialog to "Scope" (A): number and text.
         var word = DocumentInspector.ReferenceFields(document).Where(f => f.Bookmark.StartsWith("_Ref", StringComparison.Ordinal)).ToList();
         Assert.Equal(2, word.Count);

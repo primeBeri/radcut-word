@@ -130,6 +130,25 @@ public class SummaryTests
         Assert.Contains("- IDocumentGateway: OfficeJsGateway: 3 min 14.5 s in all; slowest: 9.4 s 7c; 120 ms 1", text);
     }
 
+    [Fact]
+    public void Formats_the_acceptance_table_from_scenario_tests_with_the_human_checks()
+    {
+        var text = RunSummary.FormatAcceptance(
+            [
+                new("RadCut.DesktopTests.Scenarios.Us1Scenarios.Scenario01_fuzzy", "Scenario", Outcome.Passed, null, null, TimeSpan.Zero),
+                new("…Scenario02_esc", "Scenario", Outcome.Failed, "The document changed: x | y", "e", TimeSpan.Zero),
+                new("…Scenario25_badges", "Scenario", Outcome.Passed, null, null, TimeSpan.Zero),
+            ],
+            scenarios: 26);
+
+        Assert.Contains("| 1 | Pass | Automated |", text);
+        Assert.Contains("| 2 | Fail | The document changed: x / y |", text);
+        Assert.Contains("| 3 | Not run | No harness test in this run |", text);
+        Assert.Contains("| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |", text);
+        Assert.Contains("| 25 | Pass | Automated. By hand: The badges' colours, by eye;", text);
+        Assert.DoesNotContain("| 27 |", text);
+    }
+
     [Theory]
     [InlineData(120, "120 ms")]
     [InlineData(9_400, "9.4 s")]

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using FlaUI.Core.AutomationElements;
 using Microsoft.Win32;
 
 namespace RadCut.DesktopTests.Infrastructure;
@@ -24,6 +25,9 @@ public enum PaneRoute
 public sealed class WordSession : IAsyncDisposable
 {
     public const int RouteAPort = 9229;
+
+    /// <summary>The WebView2 data folder of the Word the harness starts (route B): never Office's shared one.</summary>
+    public static string WebViewDataFolder => Path.Combine(HarnessPaths.DevRoot, "webview2");
 
     private readonly Process process;
     private dynamic? document;
@@ -62,6 +66,10 @@ public sealed class WordSession : IAsyncDisposable
         if (route == PaneRoute.B)
         {
             info.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={port}";
+            // Office's add-in WebView2 data folder is shared with Outlook. While Outlook has an add-in
+            // browser running there, a browser with other arguments cannot start on it and Word shows
+            // "The add-in could not be started" (2026-10-15), so this Word gets a folder of its own.
+            info.Environment["WEBVIEW2_USER_DATA_FOLDER"] = WebViewDataFolder;
         }
         var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start Word.");
         var session = new WordSession(process, documentPath, route, port);
@@ -127,6 +135,26 @@ public sealed class WordSession : IAsyncDisposable
     }
 
     public bool HasExited => process.HasExited;
+
+    /// <summary>
+    /// If Word shows Office's "ADD-IN ERROR" dialog, closes it (Cancel) and returns its text; else
+    /// null. A modal dialog would otherwise block the run until someone clicks it.
+    /// </summary>
+    public string? DismissAddinError()
+    {
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        var cf = automation.ConditionFactory;
+        foreach (var window in automation.GetDesktop().FindAllChildren(cf.ByProcessId(process.Id)))
+        {
+            var texts = window.FindAllDescendants(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Text))
+                .Select(t => { try { return t.Name ?? ""; } catch (COMException) { return ""; } })
+                .ToList();
+            if (!texts.Any(t => t.Contains("ADD-IN ERROR", StringComparison.OrdinalIgnoreCase))) continue;
+            window.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName("Cancel")))?.AsButton().Invoke();
+            return string.Join(" ", texts.Where(t => t.Length > 0));
+        }
+        return null;
+    }
 
     /// <summary>
     /// Closes the document without saving and quits Word, then waits for the process to end. Only

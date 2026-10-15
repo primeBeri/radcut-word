@@ -69,10 +69,30 @@ public static class WordActions
     public static void PutCaretIn(dynamic document, string text, int offset = 0)
     {
         dynamic range = Find(document, text);
+        int story = range.StoryType;
+        // After working in a header or footer Word stays in that view, and selecting body text or a
+        // text box then silently leaves the cursor where it was (scenario 12, 2026-10-15).
+        if (story is WdMainTextStory or WdTextFrameStory)
+        {
+            dynamic window = document.ActiveWindow;
+            if ((int)window.View.Type == WdPrintView) window.ActivePane.View.SeekView = WdSeekMainDocument;
+            else while ((int)window.Panes.Count > 1) window.Panes[(int)window.Panes.Count].Close(); // the header or footer pane of the other views
+        }
         int at = (int)range.Start + offset;
         range.SetRange(at, at);
         range.Select();
+        dynamic selection = document.Application.Selection;
+        if ((int)selection.StoryType != story || (int)selection.Start != at)
+        {
+            throw new InvalidOperationException(
+                $"Could not put the cursor in \"{text}\": it is in story {(int)selection.StoryType} at {(int)selection.Start}, not story {story} at {at}.");
+        }
     }
+
+    private const int WdMainTextStory = 1;
+    private const int WdTextFrameStory = 5;
+    private const int WdSeekMainDocument = 0;
+    private const int WdPrintView = 3;
 
     /// <summary>Select all, F9: updates every field in every story; the indexes of fields that failed, if any.</summary>
     public static List<int> UpdateFields(dynamic document)
@@ -138,10 +158,11 @@ public static class WordActions
         keys.FocusDocument();
         dynamic window = document.ActiveWindow;
         // Word.Window.GetPoint fails here ("Command failed", contract runs 2026-10-15), so put the
-        // cursor one character into the reference and click where Windows draws the caret (Word
-        // keeps a system caret for accessibility tools).
+        // cursor at the start of the reference and click just right of where Windows draws the caret
+        // (Word keeps a system caret for accessibility tools): on the first character, which is the
+        // whole result when it is one character ("0").
         window.ScrollIntoView(range, true);
-        document.Range((int)range.Start + 1, (int)range.Start + 1).Select();
+        document.Range((int)range.Start, (int)range.Start).Select();
         System.Drawing.Point? point = null;
         Wait.Until(() => (point = CaretOnScreen()) is not null, Wait.Pane, "Word's caret on screen");
         string from = ParagraphText(range.Paragraphs.First);
@@ -152,7 +173,8 @@ public static class WordActions
         // The click itself puts the cursor in the reference; the jump then moves it to the bookmark.
         try
         {
-            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Focus,
+            // A jump into a note or a header takes Word a moment longer.
+            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Pane,
                 "the cursor to leave the reference's paragraph after Ctrl+click");
         }
         catch (TimeoutException)

@@ -26,8 +26,19 @@ public sealed class Keys : IDisposable
         var handle = word.MainWindow;
         if (handle == IntPtr.Zero) throw new InvalidOperationException("Word has no main window.");
         var window = automation.FromHandle(handle).AsWindow();
-        window.SetForeground();
-        Wait.Until(() => GetForegroundWindow() == handle, Wait.Focus, "Word's window to come to the front");
+        // Windows may refuse a foreground change from a background process; ask again until it holds.
+        try
+        {
+            Wait.Until(() =>
+            {
+                if (GetForegroundWindow() != handle) window.SetForeground();
+                return GetForegroundWindow() == handle;
+            }, Wait.Pane, "Word's window to come to the front");
+        }
+        catch (TimeoutException e)
+        {
+            throw new TimeoutException($"{e.Message} In front instead: {ForegroundDescription()}. Close it and leave the machine alone during the run.", e);
+        }
         word.Document.ActiveWindow.SetFocus();
     }
 
@@ -86,6 +97,25 @@ public sealed class Keys : IDisposable
 
     public void Dispose() => automation.Dispose();
 
+    /// <summary>The process and title of the window in front, to say what is in the way.</summary>
+    public static string ForegroundDescription()
+    {
+        var foreground = GetForegroundWindow();
+        GetWindowThreadProcessId(foreground, out var id);
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById((int)id);
+            return $"{process.ProcessName} \"{process.MainWindowTitle}\"";
+        }
+        catch (ArgumentException)
+        {
+            return "(unknown)";
+        }
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 }
