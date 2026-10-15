@@ -242,7 +242,7 @@ export function fakeDocument(): FakeDocumentBuilder {
 }
 
 /** Fixture names shared with the Word contract run (tests/fixtures/*.docx). */
-export type FixtureName = "spec-300" | "guide-500" | "tracked" | "plain-headings";
+export type FixtureName = "spec-contract" | "spec-300" | "guide-500" | "tracked" | "plain-headings";
 
 /** Filler headings so the fake fixture has the same scale as the .docx. */
 function addNumberedFiller(builder: FakeDocumentBuilder, chapters: number, sections: number, from: number): void {
@@ -254,9 +254,14 @@ function addNumberedFiller(builder: FakeDocumentBuilder, chapters: number, secti
   }
 }
 
-function spec300(): FakeDocumentState {
+/**
+ * `spec-300` and its small copy `spec-contract` (tests/fixtures/README.md): the same named
+ * paragraphs, with 72 filler chapters for the 300-heading budget or two for the contract suite.
+ * `spec-contract` also carries its marker paragraph "Contract fixture." before the Title.
+ */
+function specDocument(name: "spec-300" | "spec-contract", fillerChapters: number): FakeDocumentState {
   const b = fakeDocument()
-    .documentId("https://example.invalid/spec-300.docx")
+    .documentId(`https://example.invalid/${name}.docx`)
     .heading(1, "Introduction", { number: "1" })
     .para("This specification sets out the requirements.")
     .para("Bold body text.", { charFormat: "bold" })
@@ -285,7 +290,8 @@ function spec300(): FakeDocumentState {
     .para("Plain text control body.", { contentControl: "plainText" })
     .para("Rich text control body.", { contentControl: "richText" })
     .para("References made by Word: see section and heading.");
-  addNumberedFiller(b, 72, 3, 5);
+  addNumberedFiller(b, fillerChapters, 3, 5);
+  if (name === "spec-contract") b.para("Contract fixture.");
   b.para("Title of the document", { style: "Title" })
     .para("Subtitle of the document", { style: "Subtitle" })
     .heading(1, "Heading in a text box", { story: "textBox" })
@@ -363,7 +369,8 @@ function plainHeadings(): FakeDocumentState {
 }
 
 export const fakeFixtures: Record<FixtureName, () => FakeDocumentState> = {
-  "spec-300": spec300,
+  "spec-contract": () => specDocument("spec-contract", 2),
+  "spec-300": () => specDocument("spec-300", 72),
   "guide-500": guide500,
   tracked,
   "plain-headings": plainHeadings,

@@ -203,3 +203,51 @@ script after the restore, so that part is a hand check:
 - [ ] **5b, text box heading.** Once the settings view exists (T069), turn on "allow references
       in headings", click in "Heading in a text box", press Ctrl+Shift+Y: the palette opens and
       inserts. With the setting off (as shipped) it declines as a heading.
+
+## Contract-run speed (feature 002, T008 and T012), 2026-10-15
+
+`IDocumentGateway: OfficeJsGateway` from the dev pane, on fresh scratch copies:
+
+| Fixture | Change | Total | Outcome |
+|---|---|---|---|
+| `spec-300.docx` | before 002 | 20–25 min | 46 passed, 13 by design |
+| `spec-300.docx` | restore only after a case that wrote | 17 min 16.6 s | 46 passed, the same 13 |
+| `spec-contract.docx` | and the small contract fixture | 1 min 3.5 s | 47 passed, 12 by design |
+
+The extra pass is case 5b's text box heading: no write precedes it, so no restore runs before it
+and Word accepts the selection. It still depends on that order (after a restore Word refuses),
+so the item above stays open until the desktop harness covers it (002 T028). Details: 
+`specs/002-desktop-test-harness/research.md`, "D2 measurements".
+
+## Automated contract run (feature 002, M1), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Contract"`, three runs, no person involved: 65
+passed, 1 failed, the same each time. The desktop harness opens scratch copies of `spec-contract`,
+`tracked` and `plain-headings`, runs the gateway and host-shell suites from the dev contract pane,
+and sets up through Word COM and UI Automation what Office.js cannot. Now automated, so off the
+hand-check lists of T051, T138 and T142: the caret in a comment; a protected document; the text box
+heading (5b); the plain-text control inside (5d); formatting after F9 (7a); Ctrl+click on each
+reference (7c, in every story); one Undo after a caret, a word, a picture and a content control
+(14); the number after moving a heading and F9 (14); the shortcut, the ribbon button and the
+pane's × (host shell).
+
+Deferred past V1 (002 T047, owner's decision 2026-10-15): case 10f, the plain-text control
+selected whole, and the plain-text part of the 10a hand check. Office.js stops listing the control
+after the harness's restore, so the case cannot be set up in Word; it still runs against the fake.
+See `docs/backlog.md`.
+
+## Automated document checks (feature 002, M2), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Document"`, three runs, 7 of 7 each time, about
+1.5 minutes. Each scenario inserts through the real palette (Ctrl+Shift+Y, typing, Enter) and
+reads the result through Word itself:
+
+| # | Result | Notes |
+|---|---|---|
+| 3 | Pass | "4.3" becomes "4.1" after moving the section and F9; Ctrl+click lands on the heading |
+| 4 | Pass | The second reference reuses the first one's `_RC…` bookmark; one bookmark added in all |
+| 6 | Pass | Saved, reopened with the add-in unregistered, F9: same results, no errors |
+| 14 | Pass | `tracked.docx`: the insertion is tracked; correct after Accept All; Reject All removes it with no errors. With Track Changes on, F9 itself is tracked (Word), so the check after accepting runs with tracking off |
+| 19 | Pass | A new `_RC…` bookmark (the `_Toc…` one not reused); still correct after the TOC update and F9 |
+| 20 | Pass | Bold and italic follow the surrounding text, not the heading, before and after F9 |
+| 26 | Pass | Against Word's own dialog: same field types and bookmark extent, switches differ only by design (`\w`, `\* CHARFORMAT`); B gets `_RC…`, A reuses Word's `_Ref…`; Word's bookmark and fields untouched |

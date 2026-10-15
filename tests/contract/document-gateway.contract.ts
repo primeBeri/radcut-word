@@ -14,7 +14,7 @@ import type {
 import type { ContractTestApi } from "./test-api";
 
 /** Fixture documents both runs know (tests/fixtures/README.md). */
-export type ContractFixture = "spec-300" | "guide-500" | "tracked" | "plain-headings";
+export type ContractFixture = "spec-contract" | "spec-300" | "guide-500" | "tracked" | "plain-headings";
 
 export interface SelectionRequest {
   /** Selected characters from the start of the paragraph; 0 = caret. */
@@ -79,6 +79,23 @@ export interface GatewayContractHarness {
   replacedText(reference: InsertedReference): Promise<string>;
   /** Comparable snapshot of the whole document for "unchanged" assertions. */
   documentState(): Promise<unknown>;
+  /**
+   * Word-only steps a person does with the keyboard and mouse, present when the desktop harness
+   * drives the run (tests/desktop); absent in Node and in a run started by hand.
+   */
+  readonly word?: WordDesktopOps;
+}
+
+/** What Word-only cases need from the desktop: F9, Ctrl+Z, moving text, Ctrl+click. */
+export interface WordDesktopOps {
+  /** Update every field in every story, as select all then F9. */
+  updateFields(): Promise<void>;
+  /** One Ctrl+Z. */
+  undo(): Promise<void>;
+  /** Move `paragraphs` paragraphs, from the one whose text is `text`, to just before the paragraph `before`. */
+  moveParagraphs(text: string, before: string, paragraphs: number): Promise<void>;
+  /** Follow the reference to `bookmark` as Ctrl+click does; the text of the paragraph the cursor lands in. */
+  followReference(bookmark: string): Promise<string>;
 }
 
 export type GatewayContractSetup = (fixture: ContractFixture) => Promise<GatewayContractHarness>;
@@ -131,6 +148,11 @@ export function defineDocumentGatewayContract(
 ): void {
   const { describe, it, expect } = api;
   const wordOnly = api.environment === "word" ? api.it : api.skip;
+  /**
+   * Not run in Word: the Word run cannot set the case up (after the harness's restore Office.js
+   * no longer lists a plain-text control). Deferred past V1 (docs/backlog.md); the fake keeps the rule.
+   */
+  const notInWord = api.environment === "word" ? api.skip : api.it;
 
   async function insertOk(h: GatewayContractHarness, text: string, overrides: Parameters<typeof request>[2] = {}) {
     const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, text), overrides));
@@ -143,7 +165,7 @@ export function defineDocumentGatewayContract(
 
   describe(`IDocumentGateway contract: ${name}`, () => {
     it("1. readHeadings returns only headings, in order, with level, text, number, location and order", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const { headings } = await h.gateway.readHeadings();
       expect(headings.map((x) => x.order)).toEqual(headings.map((_, i) => i));
       const fire = headings.find((x) => x.text === "Fire strategy");
@@ -161,7 +183,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("1a. headings outside the main text come with their location, in story order, each once", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const { headings } = await h.gateway.readHeadings();
       const locationOf = (text: string) => headings.filter((x) => x.text === text).map((x) => x.location);
       expect(locationOf("Heading in a table cell")).toEqual(["tableCell"]);
@@ -179,7 +201,7 @@ export function defineDocumentGatewayContract(
 
     it("1b. a heading that opens a footnote is listed and referenced even when long or containing ^", async () => {
       for (const text of [`Long footnote heading ${"x".repeat(280)}`, "Footnote heading with ^p and ^ in it"]) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.setParagraphText("Heading in a footnote", text);
         const heading = await headingByText(h.gateway, text);
         expect(heading.location).toBe("footnote");
@@ -204,7 +226,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("3. a usable bookmark is reported; whole-paragraph, partial and Word-managed ones are not", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const bookmarkOf = async (text: string) => (await headingByText(h.gateway, text)).bookmark;
       expect(await bookmarkOf("Scope")).toMatch(/^_Ref/);
       expect(await bookmarkOf("Definitions")).toBeNull();
@@ -214,7 +236,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("4. with several usable bookmarks, the first by case-insensitive name order, every time", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       expect((await headingByText(h.gateway, "Standards")).bookmark).toBe("Alpha");
       expect((await headingByText(h.gateway, "Standards")).bookmark).toBe("Alpha");
     });
@@ -232,7 +254,7 @@ export function defineDocumentGatewayContract(
       ] as const;
       for (const [text, location] of allowed) {
         it(`allows "${text}" as ${location}`, async () => {
-          const h = await setup("spec-300");
+          const h = await setup("spec-contract");
           await h.select(text);
           const point = await h.gateway.checkInsertionPoint(OFF);
           expect(point.kind === "insertionPoint" && point.location).toBe(location);
@@ -248,14 +270,14 @@ export function defineDocumentGatewayContract(
       ] as const;
       for (const [text, reason] of declined) {
         it(`declines "${text}" as ${reason}`, async () => {
-          const h = await setup("spec-300");
+          const h = await setup("spec-contract");
           await h.select(text);
           expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason });
         });
       }
 
       it("declines a protected document and never changes the document", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.setProtected(true);
         const before = await h.documentState();
         expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason: "protected" });
@@ -265,13 +287,13 @@ export function defineDocumentGatewayContract(
 
     it("5d. inside a plain-text content control is declined plainTextControl, unchanged; a rich-text one takes the reference", async () => {
       // Rich text first: in Word the plain-text control is a manual check (the restore drops it).
-      const rich = await setup("spec-300");
+      const rich = await setup("spec-contract");
       await rich.select("Rich text control body.", { inContentControl: true, caretOffset: 4 });
       const result = await insertOk(rich, "Fire strategy");
       const added = (await rich.fields()).filter((f) => f.bookmark === result.bookmark);
       expect(added.map((f) => f.switches)).toEqual([fieldFor("number").switches, fieldFor("text").switches]);
       for (const selection of [{ inContentControl: true }, { inContentControl: true, length: 5 }]) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select("Plain text control body.", selection);
         const before = await h.documentState();
         expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason: "plainTextControl" });
@@ -289,7 +311,7 @@ export function defineDocumentGatewayContract(
 
     describe("5b. checkInsertionPoint with allowInHeadings on", () => {
       it("allows a heading with inHeadingOrder set, and Title and Subtitle with null", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         const fire = await headingByText(h.gateway, "Fire strategy");
         await h.select("Fire strategy");
         const point = await h.gateway.checkInsertionPoint(ON);
@@ -301,7 +323,7 @@ export function defineDocumentGatewayContract(
 
       it("allows a heading in a header, footer or text box with no order, but the heading's fingerprint", async () => {
         for (const text of ["Heading in the header", "Heading in the footer", "Heading in a text box"]) {
-          const h = await setup("spec-300");
+          const h = await setup("spec-contract");
           await h.select(text);
           const point = await h.gateway.checkInsertionPoint(ON);
           if (point.kind !== "insertionPoint") throw new Error(`${text}: declined ${point.reason}`);
@@ -311,7 +333,7 @@ export function defineDocumentGatewayContract(
       });
 
       it("still declines comment and protected", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select("A comment.");
         expect(await h.gateway.checkInsertionPoint(ON)).toEqual({ kind: "declined", reason: "comment" });
         await h.select(BODY);
@@ -321,7 +343,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("5c. referring to the heading containing the cursor is declined as selfReference, unchanged", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       await h.select("Fire strategy");
       const before = await h.documentState();
       const result = await h.gateway.insertReference(
@@ -332,7 +354,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("5a. the reference goes to the selection at insert time; a now-disallowed one is declined", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       await h.gateway.checkInsertionPoint(OFF);
       await h.select("Scope body.");
       const moved = await insertOk(h, "Fire strategy");
@@ -356,7 +378,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("6. a usable bookmark is reused: none created, count unchanged", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const before = await h.bookmarks();
       const result = await insertOk(h, "Scope");
       expect(result.bookmarkCreated).toBe(false);
@@ -365,7 +387,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("7. with no usable bookmark, exactly one is created over the heading text; others untouched", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const before = await h.bookmarks();
       const req = await request(h.gateway, await headingByText(h.gateway, "Fire strategy"));
       const result = await h.gateway.insertReference(req);
@@ -382,7 +404,7 @@ export function defineDocumentGatewayContract(
         ["Bold body text.", { bold: true, italic: false }],
         ["Italic body text.", { bold: false, italic: true }],
       ] as const) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         // Mid-text: at the very start of a paragraph Word takes no surrounding formatting, as with
         // its own cross-reference dialog (FR-012a, in-Word contract run).
         await h.select(text, { caretOffset: 4 });
@@ -395,11 +417,24 @@ export function defineDocumentGatewayContract(
     });
 
     wordOnly("7a (after update). formatting is kept after F9", async () => {
-      manual("insert into bold and italic text, select all, press F9, and check each reference keeps that formatting");
+      for (const [text, format] of [
+        ["Bold body text.", { bold: true, italic: false }],
+        ["Italic body text.", { bold: false, italic: true }],
+      ] as const) {
+        const h = await setup("spec-contract");
+        const word =
+          h.word ?? manual("insert into bold and italic text, select all, press F9, and check each reference keeps that formatting");
+        await h.select(text, { caretOffset: 4 });
+        const result = await insertOk(h, "Heading with bold word");
+        await word.updateFields();
+        const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+        expect(added).toHaveLength(2);
+        for (const field of added) expect(field.format).toEqual(format);
+      }
     });
 
     it("7b. no insertion changes bookmarks or fields the add-in did not make", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const bookmarks = await h.bookmarks();
       const fields = await h.fields();
       await insertOk(h, "Scope");
@@ -422,7 +457,7 @@ export function defineDocumentGatewayContract(
         "Heading in the footer",
       ]) {
         // Fresh document each time: in Word the previous reference changes BODY's text.
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select(BODY);
         const result = await insertOk(h, text, { parts: TEXT });
         expect(await h.insertionText(result.reference)).toBe(text);
@@ -438,7 +473,7 @@ export function defineDocumentGatewayContract(
         "Heading in a footnote",
         "Heading in an endnote",
       ]) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         const before = (await h.bookmarks()).length;
         await h.select(BODY);
         const first = await insertOk(h, text, { parts: TEXT });
@@ -457,11 +492,24 @@ export function defineDocumentGatewayContract(
     });
 
     wordOnly("7c (jump). Ctrl+click on each reference jumps to its heading", async () => {
-      manual("Ctrl+click each reference from case 7c and check it jumps to its heading");
+      for (const text of [
+        "Fire strategy",
+        "Heading in a table cell",
+        "Heading in a text box",
+        "Heading in a footnote",
+        "Heading in an endnote",
+        "Heading in the header",
+      ]) {
+        const h = await setup("spec-contract");
+        const word = h.word ?? manual("Ctrl+click each reference from case 7c and check it jumps to its heading");
+        await h.select(BODY);
+        const result = await insertOk(h, text, { parts: TEXT });
+        expect({ text, landedIn: await word.followReference(result.bookmark) }).toEqual({ text, landedIn: text });
+      }
     });
 
     it("8. inserted content is the literals plus one hyperlinked field per part, with the R5 switches", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       // Placed explicitly: in Word the cursor is otherwise wherever the previous case left it.
       await h.select(BODY);
       const result = await insertOk(h, "Fire strategy");
@@ -475,7 +523,7 @@ export function defineDocumentGatewayContract(
 
     it("9. each field's result equals the core's preview for every built-in format", async () => {
       for (const format of BUILT_IN_FORMATS) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select(BODY);
         const point = await h.gateway.checkInsertionPoint(OFF);
         if (point.kind !== "insertionPoint") throw new Error("expected an insertion point");
@@ -493,7 +541,7 @@ export function defineDocumentGatewayContract(
         it(`at "${place}": the R5 fields, showing what the preview said`, async () => {
           for (const id of ["sectionNumberText", "textAboveBelow"]) {
             const parts = formatById(id)!.parts;
-            const h = await setup("spec-300");
+            const h = await setup("spec-contract");
             await h.select(place);
             const point = await h.gateway.checkInsertionPoint(OFF);
             if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
@@ -519,7 +567,7 @@ export function defineDocumentGatewayContract(
         it(`at "${place}": the R5 fields, resolving, with no heading orders`, async () => {
           for (const id of ["sectionNumberText", "textAboveBelow"]) {
             const parts = formatById(id)!.parts;
-            const h = await setup("spec-300");
+            const h = await setup("spec-contract");
             await h.select(place);
             const point = await h.gateway.checkInsertionPoint(OFF);
             if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
@@ -543,7 +591,7 @@ export function defineDocumentGatewayContract(
 
     describe("9a. heading orders index the readHeadings snapshot in the main text and are null outside it", () => {
       it("in a table cell of the main text: the preceding heading's order, and above/below as Word shows it", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         const { headings } = await h.gateway.readHeadings();
         await h.select("Cell text in the main table.");
         const point = await h.gateway.checkInsertionPoint(OFF);
@@ -551,7 +599,7 @@ export function defineDocumentGatewayContract(
         expect(point.precedingHeadingOrder).toBe(headings.find((x) => x.text === "Heading with bold word")!.order);
         for (const text of ["Heading in a table cell", "Scope"]) {
           const target = headings.find((x) => x.text === text)!;
-          const h2 = await setup("spec-300");
+          const h2 = await setup("spec-contract");
           await h2.select("Cell text in the main table.");
           const result = await insertOk(h2, text, { parts: ABOVE_BELOW });
           expect(await h2.insertionText(result.reference)).toBe(previewReference(ABOVE_BELOW, target, point).text);
@@ -559,7 +607,7 @@ export function defineDocumentGatewayContract(
       });
 
       it("in a note: no orders, and the preview does not guess above/below", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         for (const text of ["Footnote text.", "Endnote text."]) {
           await h.select(text);
           const point = await h.gateway.checkInsertionPoint(OFF);
@@ -571,7 +619,7 @@ export function defineDocumentGatewayContract(
       });
 
       it("in a heading in a note (headings allowed): no order, but the heading's fingerprint", async () => {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select("Heading in a footnote");
         const point = await h.gateway.checkInsertionPoint(ON);
         if (point.kind !== "insertionPoint") throw new Error(`Declined: ${point.reason}`);
@@ -590,7 +638,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("10. an inline selection is replaced without confirmation", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       await h.select(BODY, { length: 4 });
       const result = await insertOk(h, "Scope");
       expect(await h.replacedText(result.reference)).toBe("The ");
@@ -599,7 +647,7 @@ export function defineDocumentGatewayContract(
     it("10a. an extended selection needs confirmation; once confirmed it is replaced", async () => {
       // A content control selected whole is case 10f.
       for (const extended of [{ paragraphs: 2, length: 5 }, { pictures: 1 }, { shapes: 1 }]) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select("First of two paragraphs.", extended);
         const before = await h.documentState();
         const target = await headingByText(h.gateway, "Scope");
@@ -616,8 +664,8 @@ export function defineDocumentGatewayContract(
       }
     });
 
-    it("10f. a plain-text content control selected whole needs confirmation; once confirmed it is replaced", async () => {
-      const h = await setup("spec-300");
+    notInWord("10f. a plain-text content control selected whole needs confirmation; once confirmed it is replaced", async () => {
+      const h = await setup("spec-contract");
       await h.select("Plain text control body.", { contentControls: 1 });
       const before = await h.documentState();
       const target = await headingByText(h.gateway, "Scope");
@@ -633,7 +681,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("10d. a selection that covers the target heading is declined selfReference, confirmed or not, unchanged", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       // BODY is followed by the heading "Heading with bold word"; the selection runs into it.
       await h.select(BODY, { paragraphs: 2, length: 5 });
       const before = await h.documentState();
@@ -649,7 +697,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("10b. a selection containing a table is declined tableSelected, confirmed or not, unchanged", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       await h.select("First of two paragraphs.", { tables: 1, paragraphs: 2 });
       const before = await h.documentState();
       expect(await h.gateway.checkInsertionPoint(OFF)).toEqual({ kind: "declined", reason: "tableSelected" });
@@ -665,7 +713,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("10c. inside a field: needsConfirmation first; once confirmed the field is replaced in place", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const paragraph = "References made by Word: see section and heading.";
       await h.select(paragraph, { inField: true });
       const before = await h.documentState();
@@ -688,7 +736,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("10e. confirming the selection warning does not confirm replacing a field; the field the cursor is in is replaced", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const paragraph = "References made by Word: see section and heading.";
       // The second of the paragraph's two fields: the plain heading-text reference.
       await h.select(paragraph, { inField: true, fieldIndex: 1 });
@@ -713,7 +761,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("11. a stale fingerprint gives staleTarget and changes nothing", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const req = await request(h.gateway, await headingByText(h.gateway, "Fire strategy"));
       await h.setParagraphText("Fire strategy", "Fire safety strategy");
       const before = await h.documentState();
@@ -723,7 +771,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("12. a failure before the write leaves no new bookmark and no partial reference", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const before = await h.documentState();
       await h.failNextWrite();
       const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, "Fire strategy")));
@@ -733,7 +781,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("12a. a failure inside the write batch reports partialWrite exactly when the document changed", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const before = JSON.stringify(await h.documentState());
       await h.failNextWrite({ duringWrite: true });
       const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, "Fire strategy")));
@@ -742,7 +790,7 @@ export function defineDocumentGatewayContract(
     });
 
     it("13. readReferences returns one record per REF/PAGEREF field with bookmark and switches", async () => {
-      const h = await setup("spec-300");
+      const h = await setup("spec-contract");
       const before = await h.gateway.readReferences();
       expect(before.filter((r) => /^_Ref/.test(r.bookmark))).toHaveLength(2);
       const result = await insertOk(h, "Fire strategy");
@@ -759,7 +807,7 @@ export function defineDocumentGatewayContract(
         ["Footnote text.", "footnote"],
         ["Endnote text.", "endnote"],
       ] as const) {
-        const h = await setup("spec-300");
+        const h = await setup("spec-contract");
         await h.select(text);
         const result = await insertOk(h, "Fire strategy", { parts: TEXT });
         const ours = (await h.gateway.readReferences()).filter((r) => r.bookmark === result.bookmark);
@@ -767,8 +815,36 @@ export function defineDocumentGatewayContract(
       }
     });
 
-    wordOnly("14. after F9 and moving the heading the references update, and one Undo restores the document", async () => {
-      manual("follow docs/spike-runbook.md and the acceptance checklist (FR-013): F9, move the heading, F9, one Undo");
+    wordOnly("14. one Undo restores the document after an insertion, whatever it replaced", async () => {
+      // A caret, a word, a confirmed picture, and a confirmed content control selected whole (FR-013).
+      const replaced: [string, SelectionRequest, "selection" | null][] = [
+        [BODY, {}, null],
+        [BODY, { length: 4 }, null],
+        ["Paragraph with an inline picture.", { pictures: 1 }, "selection"],
+        ["Rich text control body.", { contentControls: 1 }, "selection"],
+      ];
+      for (const [text, selection, confirmed] of replaced) {
+        const h = await setup("spec-contract");
+        const word = h.word ?? manual("follow docs/spike-runbook.md and the acceptance checklist (FR-013): insert, then one Undo");
+        await h.select(text, selection);
+        const before = await h.documentState();
+        await insertOk(h, "Fire strategy", { confirmed });
+        await word.undo();
+        expect({ selection, after: await h.documentState() }).toEqual({ selection, after: before });
+      }
+    });
+
+    wordOnly("14 (update). after the heading moves, F9 shows its new number and the reference still resolves", async () => {
+      const h = await setup("spec-contract");
+      const word = h.word ?? manual("follow docs/spike-runbook.md: insert, move the heading, select all, F9");
+      await h.select("Scope body.");
+      const result = await insertOk(h, "Fire strategy");
+      const shown = async () => (await h.fields()).filter((f) => f.bookmark === result.bookmark).map((f) => f.result);
+      expect(await shown()).toEqual(["4.3", "Fire strategy"]);
+      // "Fire strategy" and its body paragraph move above "Means of escape" (4.1).
+      await word.moveParagraphs("Fire strategy", "Means of escape", 2);
+      await word.updateFields();
+      expect(await shown()).toEqual(["4.1", "Fire strategy"]);
     });
   });
 }

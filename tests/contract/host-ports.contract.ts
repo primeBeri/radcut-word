@@ -48,9 +48,12 @@ export function defineHostShellContract(
       const h = await makeShell();
       let calls = 0;
       h.shell.onOpenPalette(() => calls++);
+      // In Word the host runs the handler after the keystroke or click returns.
       await h.pressShortcut();
+      await waitFor(() => calls > 0);
       expect(calls).toBe(1);
       await h.clickCrossReferenceButton();
+      await waitFor(() => calls > 1);
       expect(calls).toBe(2);
     });
 

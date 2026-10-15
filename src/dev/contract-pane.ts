@@ -9,7 +9,8 @@ import { FakeHostShell } from "../../tests/fakes/fake-host-shell";
 import { FakeSettingsStore } from "../../tests/fakes/fake-settings-store";
 import { registerOfficeContracts } from "../adapters/office/dev-registration";
 import { registerContract, registeredContracts } from "./contract-registry";
-import { MiniTest } from "./mini-test";
+import { autorun } from "./contract-autorun";
+import { formatResultLine, formatSummary, MiniTest, type ContractRunResults } from "./mini-test";
 
 await registerOfficeContracts();
 
@@ -57,26 +58,67 @@ registeredContracts().forEach((registration, index) => {
   suite.append(option);
 });
 
-run.addEventListener("click", async () => {
-  const registration = registeredContracts()[Number(suite.value)];
-  if (!registration) return;
+/** Runs registration `index`, listing each result as it finishes, then the summary. */
+async function runSuite(index: number): Promise<ContractRunResults> {
+  const registration = registeredContracts()[index];
+  if (!registration || !suite || !run || !summary || !list) throw new Error(`No suite ${index}.`);
   list.replaceChildren();
   summary.textContent = "Running…";
   run.disabled = true;
-  const runner = new MiniTest();
-  registration.define(runner.api);
-  const results = await runner.run((result) => {
-    const item = document.createElement("li");
-    item.className = result.status;
-    item.textContent = `${result.status.toUpperCase()} ${result.name}`;
-    if (result.error) {
-      const detail = document.createElement("pre");
-      detail.textContent = result.error;
-      item.append(detail);
-    }
-    list.append(item);
-  });
-  const count = (status: string) => results.filter((r) => r.status === status).length;
-  summary.textContent = `${count("pass")} passed, ${count("fail")} failed, ${count("skip")} skipped`;
-  run.disabled = false;
+  try {
+    const runner = new MiniTest();
+    registration.define(runner.api);
+    const results = await runner.run(
+      (result) => {
+        const item = document.createElement("li");
+        item.className = result.status;
+        item.textContent = formatResultLine(result);
+        if (result.error) {
+          const detail = document.createElement("pre");
+          detail.textContent = result.error;
+          item.append(detail);
+        }
+        list.append(item);
+      },
+      { suite: registration.label, fixture: registration.fixture ?? null },
+    );
+    // Counts and total, then the slowest cases, one per line.
+    summary.replaceChildren(
+      ...formatSummary(results).flatMap((line, i) => (i === 0 ? [line] : [document.createElement("br"), line])),
+    );
+    return results;
+  } finally {
+    run.disabled = false;
+  }
+}
+
+run.addEventListener("click", () => {
+  void runSuite(Number(suite.value));
 });
+
+// The desktop harness opens `?suite=<label>&autorun=1` and reads the published results
+// (contracts/contract-pane-automation.md); a person can still pick and run a suite by hand.
+document.body.dataset.status = "idle";
+const choice = await autorun(
+  location.search,
+  registeredContracts().map((r) => r.label),
+  (index) => {
+    suite.value = String(index);
+    return runSuite(index);
+  },
+  {
+    setStatus: (status) => {
+      document.body.dataset.status = status;
+    },
+    publish: (json, value) => {
+      const script = document.createElement("script");
+      script.type = "application/json";
+      script.id = "contract-results";
+      script.textContent = json;
+      document.getElementById("contract-results")?.remove();
+      document.body.append(script);
+      (window as { __radcutContractResults?: unknown }).__radcutContractResults = value;
+    },
+  },
+);
+if (choice.kind === "preselect") suite.value = String(choice.index);
