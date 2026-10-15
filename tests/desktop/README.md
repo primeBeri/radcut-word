@@ -43,6 +43,17 @@ Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
 - No fixed sleeps: every wait is a condition with a time-out.
 - A flaky test is a defect: fix it, never skip or quarantine it.
 
+## The desktop bridge
+
+Contract cases that need something Office.js cannot do ask the harness for it through
+`__radcutDesktop`, a function Playwright exposes to the contract pane
+(`Infrastructure/DesktopBridge.cs`, `src/dev/desktop-bridge.ts`): select a paragraph in any story
+(comments and text boxes included), protect or unprotect, renew the plain-text control, press
+Ctrl+Shift+Y, click the ribbon button, close the pane with its ×, Ctrl+Z, F9 on every story, move
+paragraphs (cut and paste, so bookmarks move with them) and Ctrl+click a reference. Each run's
+requests and replies are in `test-results/contract-run-<fixture>/desktop-bridge.log`, beside the
+suite results (`*.json`), the pane console and a Playwright trace.
+
 ## Routes that worked
 
 Settled by the M0 checks on 2026-10-15 (Word for Microsoft 365 16.0.20430, WebView2 155):

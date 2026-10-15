@@ -218,3 +218,19 @@ The extra pass is case 5b's text box heading: no write precedes it, so no restor
 and Word accepts the selection. It still depends on that order (after a restore Word refuses),
 so the item above stays open until the desktop harness covers it (002 T028). Details: 
 `specs/002-desktop-test-harness/research.md`, "D2 measurements".
+
+## Automated contract run (feature 002, M1), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Contract"`, three runs, no person involved: 65
+passed, 1 failed, the same each time. The desktop harness opens scratch copies of `spec-contract`,
+`tracked` and `plain-headings`, runs the gateway and host-shell suites from the dev contract pane,
+and sets up through Word COM and UI Automation what Office.js cannot. Now automated, so off the
+hand-check lists of T051, T138 and T142: the caret in a comment; a protected document; the text box
+heading (5b); the plain-text control inside (5d); formatting after F9 (7a); Ctrl+click on each
+reference (7c, in every story); one Undo after a caret, a word, a picture and a content control
+(14); the number after moving a heading and F9 (14); the shortcut, the ribbon button and the
+pane's × (host shell).
+
+Still by hand until 002 T047: case 10f, the plain-text control selected whole (Office.js stops
+listing the control after the harness's restore, so the case cannot be set up there). The 10a hand
+check above covers it.

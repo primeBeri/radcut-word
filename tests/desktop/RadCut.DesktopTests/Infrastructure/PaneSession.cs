@@ -64,6 +64,10 @@ public sealed class PaneSession : IAsyncDisposable
         TaskpaneDocument.AddAutoOpenTaskpane(Scratch.Path, AddinManifest.Load());
         Word = await WordSession.StartAsync(Scratch.Path, route);
 
+        // The task pane part loads the add-in but does not open its pane (M0 diagnostic,
+        // 2026-10-15), so open it as a user would. The pane's WebView2, and with it the debugging
+        // endpoint, starts only then (unless another pane, such as Copilot's, started it first).
+        Ribbon.Invoke(Word, Ribbon.CrossReference);
         var version = await Word.WaitForCdpAsync(CdpWait);
         if (version is null)
         {
@@ -73,9 +77,6 @@ public sealed class PaneSession : IAsyncDisposable
         }
         try
         {
-            // The task pane part loads the add-in but does not open its pane (M0 diagnostic,
-            // 2026-10-15), so open it as a user would.
-            Ribbon.Invoke(Word, Ribbon.CrossReference);
             Pane = await TaskPane.ConnectAsync(Word.CdpEndpoint);
             RouteReport.Add(Mode, route, true, $"pane page {Pane.Page.Url} at {Word.CdpEndpoint}");
             return null;

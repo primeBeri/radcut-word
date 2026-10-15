@@ -79,6 +79,23 @@ export interface GatewayContractHarness {
   replacedText(reference: InsertedReference): Promise<string>;
   /** Comparable snapshot of the whole document for "unchanged" assertions. */
   documentState(): Promise<unknown>;
+  /**
+   * Word-only steps a person does with the keyboard and mouse, present when the desktop harness
+   * drives the run (tests/desktop); absent in Node and in a run started by hand.
+   */
+  readonly word?: WordDesktopOps;
+}
+
+/** What Word-only cases need from the desktop: F9, Ctrl+Z, moving text, Ctrl+click. */
+export interface WordDesktopOps {
+  /** Update every field in every story, as select all then F9. */
+  updateFields(): Promise<void>;
+  /** One Ctrl+Z. */
+  undo(): Promise<void>;
+  /** Move `paragraphs` paragraphs, from the one whose text is `text`, to just before the paragraph `before`. */
+  moveParagraphs(text: string, before: string, paragraphs: number): Promise<void>;
+  /** Follow the reference to `bookmark` as Ctrl+click does; the text of the paragraph the cursor lands in. */
+  followReference(bookmark: string): Promise<string>;
 }
 
 export type GatewayContractSetup = (fixture: ContractFixture) => Promise<GatewayContractHarness>;
@@ -395,7 +412,20 @@ export function defineDocumentGatewayContract(
     });
 
     wordOnly("7a (after update). formatting is kept after F9", async () => {
-      manual("insert into bold and italic text, select all, press F9, and check each reference keeps that formatting");
+      for (const [text, format] of [
+        ["Bold body text.", { bold: true, italic: false }],
+        ["Italic body text.", { bold: false, italic: true }],
+      ] as const) {
+        const h = await setup("spec-contract");
+        const word =
+          h.word ?? manual("insert into bold and italic text, select all, press F9, and check each reference keeps that formatting");
+        await h.select(text, { caretOffset: 4 });
+        const result = await insertOk(h, "Heading with bold word");
+        await word.updateFields();
+        const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+        expect(added).toHaveLength(2);
+        for (const field of added) expect(field.format).toEqual(format);
+      }
     });
 
     it("7b. no insertion changes bookmarks or fields the add-in did not make", async () => {
@@ -457,7 +487,20 @@ export function defineDocumentGatewayContract(
     });
 
     wordOnly("7c (jump). Ctrl+click on each reference jumps to its heading", async () => {
-      manual("Ctrl+click each reference from case 7c and check it jumps to its heading");
+      for (const text of [
+        "Fire strategy",
+        "Heading in a table cell",
+        "Heading in a text box",
+        "Heading in a footnote",
+        "Heading in an endnote",
+        "Heading in the header",
+      ]) {
+        const h = await setup("spec-contract");
+        const word = h.word ?? manual("Ctrl+click each reference from case 7c and check it jumps to its heading");
+        await h.select(BODY);
+        const result = await insertOk(h, text, { parts: TEXT });
+        expect({ text, landedIn: await word.followReference(result.bookmark) }).toEqual({ text, landedIn: text });
+      }
     });
 
     it("8. inserted content is the literals plus one hyperlinked field per part, with the R5 switches", async () => {
@@ -767,8 +810,36 @@ export function defineDocumentGatewayContract(
       }
     });
 
-    wordOnly("14. after F9 and moving the heading the references update, and one Undo restores the document", async () => {
-      manual("follow docs/spike-runbook.md and the acceptance checklist (FR-013): F9, move the heading, F9, one Undo");
+    wordOnly("14. one Undo restores the document after an insertion, whatever it replaced", async () => {
+      // A caret, a word, a confirmed picture, and a confirmed content control selected whole (FR-013).
+      const replaced: [string, SelectionRequest, "selection" | null][] = [
+        [BODY, {}, null],
+        [BODY, { length: 4 }, null],
+        ["Paragraph with an inline picture.", { pictures: 1 }, "selection"],
+        ["Rich text control body.", { contentControls: 1 }, "selection"],
+      ];
+      for (const [text, selection, confirmed] of replaced) {
+        const h = await setup("spec-contract");
+        const word = h.word ?? manual("follow docs/spike-runbook.md and the acceptance checklist (FR-013): insert, then one Undo");
+        await h.select(text, selection);
+        const before = await h.documentState();
+        await insertOk(h, "Fire strategy", { confirmed });
+        await word.undo();
+        expect({ selection, after: await h.documentState() }).toEqual({ selection, after: before });
+      }
+    });
+
+    wordOnly("14 (update). after the heading moves, F9 shows its new number and the reference still resolves", async () => {
+      const h = await setup("spec-contract");
+      const word = h.word ?? manual("follow docs/spike-runbook.md: insert, move the heading, select all, F9");
+      await h.select("Scope body.");
+      const result = await insertOk(h, "Fire strategy");
+      const shown = async () => (await h.fields()).filter((f) => f.bookmark === result.bookmark).map((f) => f.result);
+      expect(await shown()).toEqual(["4.3", "Fire strategy"]);
+      // "Fire strategy" and its body paragraph move above "Means of escape" (4.1).
+      await word.moveParagraphs("Fire strategy", "Means of escape", 2);
+      await word.updateFields();
+      expect(await shown()).toEqual(["4.1", "Fire strategy"]);
     });
   });
 }

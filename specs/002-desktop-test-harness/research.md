@@ -174,6 +174,26 @@ Ctrl+Shift+Y (D6), so layer 5 runs on the normal build. Details in `tests/deskto
 - **Decision**: try `Field.DoClick()` on a REF `\h` field and check that `Selection` lies within
   the target bookmark. If it does not move the selection, record that in the harness README and
   keep the Ctrl+click jump on the human list.
+- **Outcome (M1, 2026-10-15)**: `Field.DoClick()` leaves the cursor where it is, a REF `\h`
+  result has no `Hyperlinks`, and `Window.GetPoint` fails ("Command failed"). What works is a real
+  Ctrl+click: put the cursor one character into the reference through COM, read where Windows
+  draws Word's caret (`GetGUIThreadInfo`), and Ctrl+click there with FlaUI. Case 7c (jump) passes
+  for headings in the main text, a table cell, a text box, a footnote, an endnote and the header,
+  so the jump leaves the human list.
+
+## D13. Hand checks: a desktop bridge instead of C# copies (M1, 2026-10-15)
+
+- **Decision**: the contract pane's Word harness asks the desktop harness, through a function
+  Playwright exposes to the page (`__radcutDesktop`), for the states Office.js cannot create. Each
+  former hand check then runs as the contract case already written.
+- **Rationale**: one suite stays the single statement of the gateway contract (Constitution II);
+  C# copies of seven cases would drift from it. The bridge is dev-only and refused in `dist/`.
+- **Findings on the way**: a paragraph must be found by its whole text (a `Find` for "Fire
+  strategy" first hits its table of contents line); the pane's × is a "Close pane" button under
+  the pane titled "RAD·CUT" (the Navigation pane has one too); Word's shortcut and ribbon handlers
+  run after the keystroke or click returns, so the host-shell case waits for them as its other
+  cases already do; after an `insertOoxml` restore Office.js stops listing a plain-text control in
+  `contentControls` though Word COM still sees it (T047).
 
 ## D12. Keyboard and the interactive desktop
 

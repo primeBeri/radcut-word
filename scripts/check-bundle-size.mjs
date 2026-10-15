@@ -1,5 +1,6 @@
 // Release-build checks, run after `vite build`:
 // - no dev-only page (src/dev/**, src/adapters/office/spikes/**) in the output (Constitution V);
+// - no desktop-harness hook (the contract pane's results, the desktop bridge) in any output file;
 // - the task pane JavaScript within the 150 KB min+gzip budget (Constitution IV).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -19,6 +20,19 @@ const devPages = readdirSync(dist, { recursive: true })
   .filter((path) => path.startsWith("dev/") || path.includes("/spikes/"));
 if (devPages.length > 0) {
   console.error(`check-bundle-size: dev-only files in the release output: ${devPages.join(", ")}`);
+  process.exit(1);
+}
+
+// Hooks the desktop harness relies on (specs/002-desktop-test-harness) live only in dev pages.
+const HARNESS_HOOKS = ["__radcutContractResults", "contract-results", "__radcutDesktop"];
+const outputFiles = readdirSync(dist, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile());
+const leaks = outputFiles.flatMap((entry) => {
+  const path = join(entry.parentPath, entry.name);
+  const text = readFileSync(path, "latin1");
+  return HARNESS_HOOKS.filter((hook) => text.includes(hook)).map((hook) => `${relative(dist, path)} (${hook})`);
+});
+if (leaks.length > 0) {
+  console.error(`check-bundle-size: desktop-harness hooks in the release output: ${leaks.join(", ")}`);
   process.exit(1);
 }
 

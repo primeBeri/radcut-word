@@ -4,8 +4,10 @@
  *
  * Run on a scratch copy of the named fixture. The first case snapshots the main text and the
  * primary headers and footers; a case after one that wrote restores them (notes are not
- * restored, so reopen the copy between runs). Protecting the document cannot be scripted: cases
- * that need it fail with an instruction and are checked by hand (Review → Restrict Editing).
+ * restored, so reopen the copy between runs). States Office.js cannot create (protection, a caret
+ * in a comment or the re-created text box, a selection in the plain-text control, keystrokes,
+ * Undo, F9, following a hyperlink) come from the desktop harness through its bridge
+ * (src/dev/desktop-bridge.ts); in a run started by hand those cases fail with the manual steps.
  */
 import type {
   BookmarkInfo,
@@ -13,6 +15,7 @@ import type {
   FieldInfo,
   GatewayContractHarness,
   SelectionRequest,
+  WordDesktopOps,
 } from "../../../tests/contract/document-gateway.contract";
 import { defineDocumentGatewayContract } from "../../../tests/contract/document-gateway.contract";
 import { defineHostShellContract } from "../../../tests/contract/host-ports.contract";
@@ -21,6 +24,7 @@ import { normaliseHeadingText, startsWithNoteMark } from "../../core/headings/no
 import { withoutLinkedCopies } from "../../core/headings/scan";
 import { parseFieldCode } from "../../core/references/field-code";
 import { registerContract } from "../../dev/contract-registry";
+import { desktopBridge, type DesktopBridge } from "../../dev/desktop-bridge";
 import { runningCase, timed } from "../../dev/mini-test";
 import { OfficeHostShell } from "./office-host-shell";
 import { OfficeJsGateway, storyBodies } from "./office-js-gateway";
@@ -61,6 +65,9 @@ let snapshot: {
  */
 let dirty = false;
 
+/** Whether a case protected the document through the desktop bridge; undone before the next case. */
+let protectedByBridge = false;
+
 /** The case that last prepared the document: the one to blame if the guard finds a change. */
 let previousCase: string | null = null;
 
@@ -89,6 +96,10 @@ async function mainTextFacts(context: Word.RequestContext): Promise<{ textLength
  * case of a document, and check it is the fixture the case needs.
  */
 async function prepareDocument(fixture: ContractFixture): Promise<void> {
+  if (protectedByBridge) {
+    await desktopBridge()?.({ action: "unprotect" });
+    protectedByBridge = false;
+  }
   await Word.run(async (context) => {
     const body = context.document.body;
     const url = Office.context.document.url;
@@ -186,17 +197,25 @@ async function paragraphByText(context: Word.RequestContext, fixtureText: string
 }
 
 /**
- * The content control holding `text`, looked up in the whole body. The restore before each case
- * (`insertOoxml` over the body) keeps a rich-text control but drops a plain-text one, leaving its
- * text, and Word refuses to put one back from script (GeneralException at
- * `Range.insertContentControl("PlainText")`; in-Word contract runs, 2026-10-14). Those cases are
- * checked by hand.
+ * The content control holding `text`. After the restore before each case (`insertOoxml` over the
+ * body) a plain-text control is left half there: no longer listed in `body.contentControls`, still
+ * the parent of its text, and not taken as selected whole when its whole range is selected (contract
+ * runs, 2026-10-15). Office.js cannot rebuild it (GeneralException at
+ * `Range.insertContentControl("PlainText")`), so the desktop harness replaces it with a fresh one
+ * through Word COM before the selection (see `select`), and it is reached here from its paragraph;
+ * a run started by hand checks those cases by hand.
  */
 async function controlByText(context: Word.RequestContext, text: string): Promise<Word.ContentControl> {
   const controls = context.document.body.contentControls.load("items/text");
   await context.sync();
   const found = controls.items.find((c) => c.text.trim() === text);
   if (found) return found;
+  // Not listed after a restore, but reachable from its paragraph (contract runs, 2026-10-15).
+  const paragraph = await paragraphByText(context, text);
+  const inside = paragraph.search(text.slice(0, 2), { matchCase: true }).getFirst().parentContentControlOrNullObject;
+  inside.load("isNullObject");
+  await context.sync();
+  if (!inside.isNullObject) return inside;
   if (snapshot?.ooxml.includes("<w:text/>")) {
     throw new Error(
       "Manual check: the restore before each case drops the plain-text content control; " +
@@ -221,6 +240,27 @@ function trackCalls(gateway: IDocumentGateway, phase: string): IDocumentGateway 
       };
     },
   });
+}
+
+/** Word-only steps done through Word COM by the desktop harness; each may change the document. */
+function wordOps(desktop: DesktopBridge): WordDesktopOps {
+  return {
+    async updateFields() {
+      markDirty();
+      await desktop({ action: "updateFields" });
+    },
+    async undo() {
+      markDirty();
+      await desktop({ action: "undo" });
+    },
+    async moveParagraphs(text, before, paragraphs) {
+      markDirty();
+      await desktop({ action: "moveParagraphBefore", text, before, paragraphs });
+    },
+    async followReference(bookmark) {
+      return String(await desktop({ action: "followReference", bookmark }));
+    },
+  };
 }
 
 async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHarness> {
@@ -340,6 +380,13 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     });
 
   const select = async (text: string, selection: SelectionRequest) => {
+    const desktop = desktopBridge();
+    if (desktop && (selection.contentControls || selection.inContentControl)) {
+      // Before the Word.run that selects: a control replaced from outside is not seen by a
+      // context opened before the change (contract run, 2026-10-15). A rich-text control is left as is.
+      markDirty();
+      await desktop({ action: "renewPlainTextControl", text });
+    }
     try {
       await selectOnce(text, selection);
     } catch (error) {
@@ -356,10 +403,17 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
           }
         }
       }
-      // After the restore (insertOoxml over the body) Word may refuse to put the cursor inside the
-      // re-created text box: GeneralException at Range.select, also when tried again (in-Word
-      // contract runs, 2026-10-12 and 2026-10-15). The harness cannot place it, so the case is
-      // checked by hand.
+      // Office.js cannot put the cursor in a comment, and after the restore (insertOoxml over the
+      // body) Word refuses a caret in the re-created text box (in-Word contract runs, 2026-10-12
+      // and 2026-10-15); Word COM can, through the desktop bridge, for a caret or a selection from
+      // the paragraph's start.
+      const desktop = desktopBridge();
+      const plain = Object.keys(selection).every((key) => key === "caretOffset" || key === "length");
+      if (desktop && plain) {
+        await desktop({ action: "select", text, caretOffset: selection.caretOffset, length: selection.length });
+        return;
+      }
+
       if (text === "Text box body." || text === "Heading in a text box") {
         throw new Error(
           `Manual check: Word will not select "${text}" in the text box from script after the document is restored; ` +
@@ -371,11 +425,19 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     }
   };
 
+  const desktop = desktopBridge();
   return {
     gateway: trackedGateway,
+    ...(desktop ? { word: wordOps(desktop) } : {}),
     select: (text: string, selection: SelectionRequest = {}) => timed("select", () => select(text, selection)),
     async setProtected(on: boolean) {
-      if (on) throw new Error("Protect the document by hand (Review → Restrict Editing); not scriptable.");
+      const desktop = desktopBridge();
+      if (!desktop) {
+        if (on) throw new Error("Protect the document by hand (Review → Restrict Editing); not scriptable.");
+        return;
+      }
+      await desktop({ action: on ? "protect" : "unprotect" });
+      protectedByBridge = on;
     },
     async failNextWrite(options = {}) {
       markDirty();
@@ -451,14 +513,22 @@ export async function registerOfficeContracts(): Promise<void> {
           return {
             shell,
             pressShortcut: async () => {
-              throw new Error("Press Ctrl+Shift+Y in the document; the shortcut cannot be fired from script.");
+              const desktop = desktopBridge();
+              if (!desktop) throw new Error("Press Ctrl+Shift+Y in the document; the shortcut cannot be fired from script.");
+              await desktop({ action: "pressShortcut" });
             },
             clickCrossReferenceButton: async () => {
-              throw new Error("Click Cross-reference on the ribbon; ribbon buttons cannot be fired from script.");
+              const desktop = desktopBridge();
+              if (!desktop) throw new Error("Click Cross-reference on the ribbon; ribbon buttons cannot be fired from script.");
+              await desktop({ action: "clickCrossReference" });
             },
             paneVisible: async () => visible,
             closePaneByUser: async () => {
-              throw new Error("Close the pane with its × button; closing it as the user does cannot be done from script.");
+              const desktop = desktopBridge();
+              if (!desktop) {
+                throw new Error("Close the pane with its × button; closing it as the user does cannot be done from script.");
+              }
+              await desktop({ action: "closePane" });
             },
           };
         },

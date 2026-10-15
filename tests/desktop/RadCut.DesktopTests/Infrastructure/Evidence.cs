@@ -39,6 +39,7 @@ public sealed class EvidenceFolder
     {
         var invalid = System.IO.Path.GetInvalidFileNameChars();
         var safe = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
-        return safe.Length <= 120 ? safe : safe[..120];
+        // Windows drops trailing spaces and dots from folder names, so never end on one.
+        return (safe.Length <= 120 ? safe : safe[..120]).TrimEnd(' ', '.');
     }
 }
