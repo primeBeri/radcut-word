@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAD·CUT contract pane</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+      body { font: 13px "Segoe UI", sans-serif; margin: 12px; }
+      .pass { color: #107c10; }
+      .fail { color: #c50f1f; }
+      .skip { color: #616161; }
+      li { margin: 4px 0; }
+      pre { white-space: pre-wrap; margin: 2px 0 0 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>Contract pane</h1>
+    <p>Open the fixture document named next to the suite in Word, then run it.</p>
+    <label>Suite <select id="suite"></select></label>
+    <button id="run" type="button">Run</button>
+    <p id="summary" aria-live="polite"></p>
+    <ol id="results"></ol>
+    <script type="module" src="./contract-pane.ts"></script>
+  </body>
+</html>

@@ -4,6 +4,7 @@
 # Dependencies and build output
 node_modules/
 dist/
+dist-dev/
 coverage/
 *.tsbuildinfo
 
@@ -54,3 +55,9 @@ tmp/
 
 # Internal planning drafts (never commit)
 /planning/
+
+# TypeScript build info for project references
+.tsbuild/
+
+# Word lock files for open documents
+~$*

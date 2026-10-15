@@ -1,0 +1,32 @@
+/* Motion (FR-026): CSS transitions only, at most 150 ms, opacity and transform (plus the
+   selection highlight), never awaited by input handlers. All of it is off when Windows asks for
+   reduced motion, which Word's WebView reports (research R11). No Svelte transition: directives. */
+
+@keyframes radcut-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.radcut-pane {
+  animation: radcut-fade-in var(--durationFaster) var(--curveDecelerateMid);
+}
+
+[role="option"] {
+  transition:
+    background-color var(--durationUltraFast) var(--curveEasyEase),
+    box-shadow var(--durationUltraFast) var(--curveEasyEase);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radcut-pane {
+    animation: none;
+  }
+
+  [role="option"] {
+    transition: none;
+  }
+}

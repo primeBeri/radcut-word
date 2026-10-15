@@ -1,0 +1,34 @@
+/* Base look from Fluent 2 tokens only (FR-025). Light or dark comes from data-theme on <html>,
+   set from the Office theme (research R11), never from prefers-color-scheme. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--colorNeutralBackground1);
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  font-weight: var(--fontWeightRegular);
+}
+
+#app {
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: var(--strokeWidthThin);
+}

@@ -109,11 +109,14 @@ Proving them early is cheaper than building on guesses.
   custom keyboard shortcuts in Word require.
 - **Target platforms:** Word for Windows desktop for the MVP. Mac and web are later phases and
   MUST arrive as adapters and fallbacks, not forks of the core.
-- **Shortcut:** default Ctrl+Alt+K, and it MUST be user-configurable (AltGr clashes on UK and
-  European layouts). Ctrl+@ MUST NOT be used.
+- **Shortcut:** default Ctrl+Shift+Y (Word already uses Ctrl+Alt+K; Ctrl+Shift+Y is free and,
+  having no Alt, cannot clash with AltGr on any layout). It MUST be user-configurable. Ctrl+@
+  MUST NOT be used.
 - **Fallbacks:** if the task pane cannot take focus, the palette falls back to a
   `displayDialogAsync` popup; if `insertField` with Ref is unavailable, insertion falls back to
-  OOXML. Fallbacks live in the adapter, behind the same port.
+  OOXML. Fallbacks live in the adapter, behind the same port. On Word for Windows the spikes
+  (2026-10-11) showed the task pane takes focus and `insertField` works, so neither fallback is
+  built for the MVP; they remain the documented route if a later platform needs them.
 - **Testing:** Vitest for unit and contract suites; the Office.js contract run happens inside
   Word (Script Lab or a dev task pane).
 - **Licensing and repository hygiene:** the project is free and open source. Internal planning
@@ -155,4 +158,4 @@ Proving them early is cheaper than building on guesses.
   complexity is grounds to reject a change.
 - Runtime development guidance for agents lives in `CLAUDE.md`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-10
+**Version**: 1.1.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-11

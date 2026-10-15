@@ -1,0 +1,16 @@
+{
+  // The only program with Office.js types: adapters plus the entry points that start them.
+  // It includes the rest of src/ because adapters implement core ports, and the shared contract
+  // suites and fakes because the dev contract pane runs them inside Word.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".tsbuild/adapters",
+    "tsBuildInfoFile": ".tsbuild/adapters.tsbuildinfo",
+    "rootDir": ".",
+    "types": ["office-js", "office-runtime", "vite/client"]
+  },
+  "include": ["src/**/*.ts", "tests/contract/**/*.ts", "tests/fakes/**/*.ts"],
+  "exclude": ["tests/**/*.test.ts"]
+}
