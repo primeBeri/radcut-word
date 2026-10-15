@@ -35,16 +35,16 @@ in Word (research D2).
   `scripts/office-debug.mjs`; do not rebuild them.
 - No contract case is weakened, removed or skipped to save time (FR-016).
 - After each TypeScript task: `npm test`, `npm run lint` and `npm run typecheck` green. After each
-  harness task: `dotnet build tests/desktop` green.
+  harness task: `dotnet build tests/desktop/RadCut.DesktopTests.slnx` green.
 - Nothing from the gitignored PRD or `planning/` goes into committed files.
 
 ---
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `tests/desktop/**/bin/`, `tests/desktop/**/obj/` and `tests/desktop/test-results/` to `.gitignore`
-- [ ] T002 Create the .NET 10 test project `tests/desktop/RadCut.DesktopTests/RadCut.DesktopTests.csproj` (`net10.0-windows`, nullable and warnings-as-errors on, xUnit v3, Microsoft.Playwright, FlaUI.UIA3; no Office interop assemblies, COM is late-bound) and a solution file `tests/desktop/RadCut.DesktopTests.slnx`; `dotnet build tests/desktop` succeeds with an empty test
-- [ ] T003 [P] Create `tests/desktop/README.md` with prerequisites (quickstart.md), the commands from contracts/harness-commands.md, the safety rules above, and an empty "Routes that worked" section for T030
+- [X] T001 Add `tests/desktop/**/bin/`, `tests/desktop/**/obj/` and `tests/desktop/test-results/` to `.gitignore`
+- [X] T002 Create the .NET 10 test project `tests/desktop/RadCut.DesktopTests/RadCut.DesktopTests.csproj` (`net10.0-windows`, nullable and warnings-as-errors on, xUnit v3, Microsoft.Playwright, FlaUI.UIA3; no Office interop assemblies, COM is late-bound) and a solution file `tests/desktop/RadCut.DesktopTests.slnx`; `dotnet build tests/desktop/RadCut.DesktopTests.slnx` succeeds with an empty test
+- [X] T003 [P] Create `tests/desktop/README.md` with prerequisites (quickstart.md), the commands from contracts/harness-commands.md, the safety rules above, and an empty "Routes that worked" section for T030
 
 ---
 
@@ -56,14 +56,14 @@ unchanged, and shows where time goes. Benefits manual pane runs at once.
 **Independent test**: run the gateway suite from the dev pane on a scratch copy of
 `spec-contract.docx`: total under 5 minutes, per-case outcomes equal the baseline from T008.
 
-- [ ] T004 [P] [US2] [L1] Unit tests first for `MiniTest` in `tests/unit/mini-test.test.ts`: each `CaseResult` has `durationMs` ("wall time of the case body, ≥ 0; 0 for `skip`"), `error` "present only when `status` is `fail`", names are prefixes joined with " > "; a `timings` record set during a case through a new `mark(name, ms)` on the runner is attached to that case only; `run()` returns `ContractRunResults` (`suite`, `fixture`, `startedAt` ISO 8601, `totalMs`, `cases` in run order) per data-model.md; a pure `formatSummary(results)` gives the line text ("PASS 412 ms <name>") and the summary (counts, total, the five slowest cases), so T006's display is tested here
-- [ ] T005 [US2] [L1] Implement T004 in `src/dev/mini-test.ts` (`performance.now()` around each body; a `timing(name)` helper the harness can call); make the Vitest project include `src/dev/mini-test.ts` coverage if the config requires it
-- [ ] T006 [US2] [L1] Show per-case duration on each result line and the total plus the five slowest cases in the summary, using `formatSummary` from T004/T005, in `src/dev/contract-pane.ts`
-- [ ] T007 [US2] [L3] Instrument `wordHarness` in `src/adapters/office/dev-registration.ts`: time the restore, `select` (including `paragraphByText`) and `documentState`/`bookmarks`/`fields` reads through the runner's timing helper, so each case shows where its time went (depends on T005)
+- [X] T004 [P] [US2] [L1] Unit tests first for `MiniTest` in `tests/unit/mini-test.test.ts`: each `CaseResult` has `durationMs` ("wall time of the case body, ≥ 0; 0 for `skip`"), `error` "present only when `status` is `fail`", names are prefixes joined with " > "; a `timings` record set during a case through a new `mark(name, ms)` on the runner is attached to that case only; `run()` returns `ContractRunResults` (`suite`, `fixture`, `startedAt` ISO 8601, `totalMs`, `cases` in run order) per data-model.md; a pure `formatSummary(results)` gives the line text ("PASS 412 ms <name>") and the summary (counts, total, the five slowest cases), so T006's display is tested here
+- [X] T005 [US2] [L1] Implement T004 in `src/dev/mini-test.ts` (`performance.now()` around each body; a `timing(name)` helper the harness can call); make the Vitest project include `src/dev/mini-test.ts` coverage if the config requires it
+- [X] T006 [US2] [L1] Show per-case duration on each result line and the total plus the five slowest cases in the summary, using `formatSummary` from T004/T005, in `src/dev/contract-pane.ts`
+- [X] T007 [US2] [L3] Instrument `wordHarness` in `src/adapters/office/dev-registration.ts`: time the restore, `select` (including `paragraphByText`) and `documentState`/`bookmarks`/`fields` reads through the runner's timing helper, so each case shows where its time went (depends on T005)
 - [ ] T008 [US2] [L3] Baseline run in Word: run "IDocumentGateway: OfficeJsGateway" from the dev pane on a scratch copy of `spec-300.docx`; record the total, the five slowest cases with their phase timings, and each case's outcome in `specs/002-desktop-test-harness/research.md` (new section "D2 measurements"); confirm or correct the D2 hypotheses before T009 (needs the owner or the harness to run Word; depends on T007)
-- [ ] T009 [US2] [L2] Tests first: add `"spec-contract"` to `ContractFixture` in `tests/contract/document-gateway.contract.ts` and switch every `setup("spec-300")` to `setup("spec-contract")`; add `specContract` to `tests/fakes/fake-documents.ts` per contracts/spec-contract-fixture.md (the named paragraphs of `spec300`, filler only Chapters 5 and 6, footnote and endnote anchored as in `spec300`, marker paragraph "Contract fixture." as the last paragraph before "Title of the document", `documentId` `https://example.invalid/spec-contract.docx`); `npm test` green on the fake, and no case depends on a heading after Chapter 6
-- [ ] T010 [US2] Build `spec-contract.docx` and its manifest in `tests/fixtures/make-fixtures.ps1` (a function shared with `spec-300` that takes the filler chapter count, so the two stay identical up to Chapter 6; table of contents over the fixture's own headings); regenerate with Word closed; add a `spec-contract.docx` section to `tests/fixtures/README.md`; add the marker to `FIXTURE_MARKER` in `src/adapters/office/dev-registration.ts` and update its registration's `fixture` text to "a scratch copy of spec-contract.docx" (depends on T009)
-- [ ] T011 [US2] [L3] Restore only when dirty in `src/adapters/office/dev-registration.ts`, per data-model.md DirtyState: wrap the gateway so `insertReference` and any method not on the read-only list (`readHeadings`, `checkInsertionPoint`, `listBookmarkNames`, `readReferences`, `returnFocus`) marks the document dirty, as do `setParagraphText` and `failNextWrite`; the next `wordHarness()` restores only if dirty; when clean it still compares the main text's length and the bookmark count with the snapshot's and forces a restore with a `console.warn("[radcut:contract] …")` naming the previous case on a mismatch; the marker check reuses the restore's sync (depends on T010)
+- [X] T009 [US2] [L2] Tests first: add `"spec-contract"` to `ContractFixture` in `tests/contract/document-gateway.contract.ts` and switch every `setup("spec-300")` to `setup("spec-contract")`; add `specContract` to `tests/fakes/fake-documents.ts` per contracts/spec-contract-fixture.md (the named paragraphs of `spec300`, filler only Chapters 5 and 6, footnote and endnote anchored as in `spec300`, marker paragraph "Contract fixture." as the last paragraph before "Title of the document", `documentId` `https://example.invalid/spec-contract.docx`); `npm test` green on the fake, and no case depends on a heading after Chapter 6
+- [ ] T010 [US2] Build `spec-contract.docx` and its manifest in `tests/fixtures/make-fixtures.ps1` (a function shared with `spec-300` that takes the filler chapter count, so the two stay identical up to Chapter 6; table of contents over the fixture's own headings); regenerate with Word closed; add a `spec-contract.docx` section to `tests/fixtures/README.md`; add the marker to `FIXTURE_MARKER` in `src/adapters/office/dev-registration.ts` and update its registration's `fixture` text to "a scratch copy of spec-contract.docx" (depends on T009) (2026-10-15: script, README and markers done; regenerating the `.docx` and manifest needs Word closed, run with T008)
+- [X] T011 [US2] [L3] Restore only when dirty in `src/adapters/office/dev-registration.ts`, per data-model.md DirtyState: wrap the gateway so `insertReference` and any method not on the read-only list (`readHeadings`, `checkInsertionPoint`, `listBookmarkNames`, `readReferences`, `returnFocus`) marks the document dirty, as do `setParagraphText` and `failNextWrite`; the next `wordHarness()` restores only if dirty; when clean it still compares the main text's length and the bookmark count with the snapshot's and forces a restore with a `console.warn("[radcut:contract] …")` naming the previous case on a mismatch; the marker check reuses the restore's sync (depends on T010)
 - [ ] T012 [US2] [L3] Run the suite in Word on a scratch copy of `spec-contract.docx`: total under 5 minutes; every case's outcome equals T008's baseline (former hand checks still fail with their manual message). If not under 5 minutes, use T007's timings to cache story paragraph lists in `paragraphByText` until the next write, and rerun. Record before and after in `research.md` "D2 measurements" and in `docs/acceptance-checklist.md` (depends on T011)
 
 **Checkpoint**: manual contract runs are fast. Can be merged into `001` on its own if wanted.
@@ -74,18 +74,18 @@ unchanged, and shows where time goes. Benefits manual pane runs at once.
 
 **Purpose**: what every harness story needs. No story work before this phase is done.
 
-- [ ] T013 [P] `Wait.Until(Func<bool> condition, TimeSpan timeout, string description)` and an async variant, with short back-off polling and a time-out exception naming the description; default time-outs from research D8 (60 s Word start and sideload, 10 s pane, 2 s focus), in `tests/desktop/RadCut.DesktopTests/Infrastructure/Wait.cs`
-- [ ] T014 [P] `Preflight`: fails every test with exactly "Word is running. Save your work and close Word, then run again." if any `WINWORD.EXE` exists; checks the localhost certificate is trusted ("The localhost certificate is not trusted. Run npm run certs."); reports whether an interactive desktop is available (research D12) for `[L5]` tests to skip with "SKIPPED: no interactive desktop", in `tests/desktop/RadCut.DesktopTests/Infrastructure/Preflight.cs`
-- [ ] T015 [P] `ScratchFixture.Create(fixture)` copies `tests/fixtures/<fixture>.docx` to `%LOCALAPPDATA%\radcut-dev\scratch\<run id>\<test id>\` (refuse a non-ASCII path), deletes it after a pass, hands it to `Evidence` after a fail; at start, deletes scratch folders of earlier runs, in `tests/desktop/RadCut.DesktopTests/Infrastructure/ScratchFixture.cs`
-- [ ] T016 [P] `DevServer.Start(mode)` (`normal` → `npm run dev-server`, `devpane` → `vite --mode devpane`) as a child process, waits for `https://localhost:3000` to answer, fails with "Port 3000 is in use. Stop the other server (npm stop) and run again." when another process holds the port, and stops only its own process tree, in `tests/desktop/RadCut.DesktopTests/Infrastructure/DevServer.cs`
-- [ ] T017 [P] `Evidence.Capture(testName)`: Word window PNG (capture by window handle), the scratch document saved under a new name, the pane console log and the Playwright trace if a pane session exists, `harness.log`, under `tests/desktop/test-results/<test name>/`; hooked into a base fixture so every failing test captures, in `tests/desktop/RadCut.DesktopTests/Infrastructure/Evidence.cs`
-- [ ] T018 [P] `Summary` writes `tests/desktop/test-results/summary.md` (counts per category, failures with message and evidence folder, skips with reason, contract timings) at the end of the run, in `tests/desktop/RadCut.DesktopTests/Infrastructure/Summary.cs`
+- [X] T013 [P] `Wait.Until(Func<bool> condition, TimeSpan timeout, string description)` and an async variant, with short back-off polling and a time-out exception naming the description; default time-outs from research D8 (60 s Word start and sideload, 10 s pane, 2 s focus), in `tests/desktop/RadCut.DesktopTests/Infrastructure/Wait.cs`
+- [X] T014 [P] `Preflight`: fails every test with exactly "Word is running. Save your work and close Word, then run again." if any `WINWORD.EXE` exists; checks the localhost certificate is trusted ("The localhost certificate is not trusted. Run npm run certs."); reports whether an interactive desktop is available (research D12) for `[L5]` tests to skip with "SKIPPED: no interactive desktop", in `tests/desktop/RadCut.DesktopTests/Infrastructure/Preflight.cs`
+- [X] T015 [P] `ScratchFixture.Create(fixture)` copies `tests/fixtures/<fixture>.docx` to `%LOCALAPPDATA%\radcut-dev\scratch\<run id>\<test id>\` (refuse a non-ASCII path), deletes it after a pass, hands it to `Evidence` after a fail; at start, deletes scratch folders of earlier runs, in `tests/desktop/RadCut.DesktopTests/Infrastructure/ScratchFixture.cs`
+- [X] T016 [P] `DevServer.Start(mode)` (`normal` → `npm run dev-server`, `devpane` → `vite --mode devpane`) as a child process, waits for `https://localhost:3000` to answer, fails with "Port 3000 is in use. Stop the other server (npm stop) and run again." when another process holds the port, and stops only its own process tree, in `tests/desktop/RadCut.DesktopTests/Infrastructure/DevServer.cs`
+- [X] T017 [P] `Evidence.Capture(testName)`: Word window PNG (capture by window handle), the scratch document saved under a new name, the pane console log and the Playwright trace if a pane session exists, `harness.log`, under `tests/desktop/test-results/<test name>/`; hooked into a base fixture so every failing test captures, in `tests/desktop/RadCut.DesktopTests/Infrastructure/Evidence.cs`
+- [X] T018 [P] `Summary` writes `tests/desktop/test-results/summary.md` (counts per category, failures with message and evidence folder, skips with reason, contract timings) at the end of the run, in `tests/desktop/RadCut.DesktopTests/Infrastructure/Summary.cs`
 
 ---
 
 ## Phase 4: User Story 1 — Prove the harness can reach Word and the add-in (P1) 🎯 go/no-go
 
-**Goal**: M0. **Independent test**: `dotnet test tests/desktop --filter Category=M0` passes with
+**Goal**: M0. **Independent test**: `npm run test:desktop -- --filter-trait "Category=M0"` passes with
 Word closed, leaves no WINWORD process and no changed fixture, and the README names the routes.
 
 ### Checks first ⚠️
@@ -106,7 +106,7 @@ Word closed, leaves no WINWORD process and no changed fixture, and the README na
 
 ## Phase 5: User Story 2, part B — Run the contract suite unattended (P1)
 
-**Goal**: M1. **Independent test**: `dotnet test tests/desktop --filter Category=Contract` gives
+**Goal**: M1. **Independent test**: `npm run test:desktop -- --filter-trait "Category=Contract"` gives
 one result per case for every registered Office suite, none asking for a person.
 
 ### Tests first ⚠️
@@ -122,7 +122,7 @@ one result per case for every registered Office suite, none asking for a person.
 - [ ] T030 [P] [US2] `DocumentState` (COM): caret or selection by paragraph text in any story (main, table cell, header, footer, text box, footnote, endnote, comment), selection of a content control, picture, table or field, `Protect`/`Unprotect`, tracking on/off, in `tests/desktop/RadCut.DesktopTests/Infrastructure/DocumentState.cs`
 - [ ] T031 [P] [US2] `DocumentSnapshot` per data-model.md (text per story, fields code and result, bookmarks name/story/start/end, revisions), equality reporting the first differing item, in `tests/desktop/RadCut.DesktopTests/Infrastructure/DocumentSnapshot.cs`
 - [ ] T032 [US2] Make T027 and T028 pass (depends on T029–T031, T024); where a manual message remains in the Office registration (`setProtected`, `pressShortcut`, `clickCrossReferenceButton`, `closePaneByUser`, the text box and plain-text control fallbacks in `src/adapters/office/dev-registration.ts`), keep the manual message for pane runs and let the harness test cover the case; the pane suite's manual failures are reported by `ContractRunTests` as skipped with "covered by HandCheckTests.<name>", not as passes
-- [ ] T033 [US2] Run `dotnet test tests/desktop --filter Category=Contract` three times on an unchanged build: same outcome every time; record the result, the run time, and that T051's, T138's and T142's hand-check lists are now covered in `docs/acceptance-checklist.md` (depends on T032)
+- [ ] T033 [US2] Run `npm run test:desktop -- --filter-trait "Category=Contract"` three times on an unchanged build: same outcome every time; record the result, the run time, and that T051's, T138's and T142's hand-check lists are now covered in `docs/acceptance-checklist.md` (depends on T032)
 
 **Checkpoint**: M1 green. Commit; merge `002` into `001-heading-xref-palette` if feature 001 needs the faster run before Phase 6.
 
@@ -130,7 +130,7 @@ one result per case for every registered Office suite, none asking for a person.
 
 ## Phase 6: User Story 3 — Verify what is in the saved document (P2)
 
-**Goal**: M2. **Independent test**: `dotnet test tests/desktop --filter Category=Document` passes
+**Goal**: M2. **Independent test**: `npm run test:desktop -- --filter-trait "Category=Document"` passes
 on the current build; changing an expected switch makes the matching test fail.
 
 ### Checks first ⚠️
@@ -149,7 +149,7 @@ on the current build; changing an expected switch makes the matching test fail.
 
 ## Phase 7: User Story 4 — Rerun the US1 acceptance scenarios (P2)
 
-**Goal**: M3. **Independent test**: `dotnet test tests/desktop --filter Category=Scenario` passes
+**Goal**: M3. **Independent test**: `npm run test:desktop -- --filter-trait "Category=Scenario"` passes
 and writes `acceptance-summary.md`.
 
 - [ ] T038 [US4] [L3][L4][L5] Write `Us1Scenarios` red in `tests/desktop/RadCut.DesktopTests/Scenarios/Us1Scenarios.cs` (`[Trait("Category","Scenario")]`, names `ScenarioNN_<title>`), from `specs/001-heading-xref-palette/quickstart.md`: 1 (`fstrat`: "4.3 Fire strategy" first with highlighted letters in the DOM, "§ 4.3 Fire strategy" inserted, caret after it); 2 (Esc: snapshot and `Selection.Start` unchanged); 5 (no selection, a word, a confirmed two-paragraph selection; one Ctrl+Z restores the snapshot each time; again with tracking on); 12 (heading, Title, comment, plain-text control declined with the expected message; header, footer, text box inserted, one Undo, caret returns; protected document); 13 (caption, quote, table cell, footnote insert); 21 (COM moves the selection while the palette is open, then Enter); 22 (tracked-deleted heading not listed; after reject, as expected); 23 (words, multi-paragraph and table selections); 25 (badges in the DOM, results by COM); 27 (caret inside an existing REF field)
@@ -168,7 +168,7 @@ and writes `acceptance-summary.md`.
 
 ## Phase 9: Polish
 
-- [ ] T044 [P] Ten consecutive full runs (`dotnet test tests/desktop`) on an unchanged build: no test changes outcome (SC-006); fix any flaky test as a defect; record the full-run time against the plan's goal (under 30 minutes) in `tests/desktop/README.md`
+- [ ] T044 [P] Ten consecutive full runs (`npm run test:desktop`) on an unchanged build: no test changes outcome (SC-006); fix any flaky test as a defect; record the full-run time against the plan's goal (under 30 minutes) in `tests/desktop/README.md`
 - [ ] T045 [P] Do the safety checks of `quickstart.md` §5 (Word open → refusal and untouched; locked screen → skips; deliberate failure → evidence; no leftover WINWORD; no fixture changed) and record them in `tests/desktop/README.md`
 - [ ] T046 Update `CLAUDE.md` "Project state and commands" with the harness commands and the `spec-contract` fixture; update `docs/proposals/0001-automated-testing.md` status to "Accepted, implemented in 002"
 

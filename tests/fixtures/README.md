@@ -71,6 +71,19 @@ Bookmarks:
 - "Structural fire resistance": a bookmark `PartOfText` over part of the heading text only.
 - `_GoBack` is maintained by Word itself; it may sit anywhere.
 
+## `spec-contract.docx`
+
+The small copy of `spec-300.docx` that the gateway contract suite runs on, in Node and in Word.
+`make-fixtures.ps1` builds both from one function, so everything above is identical except:
+
+- the filler stops at Chapter 6 (Chapters 5 and 6 carry the footnote and endnote), so the
+  table of contents and its `_Toc…` bookmarks cover only these headings;
+- a body paragraph "Contract fixture." comes just before "Title of the document"; the Word
+  contract harness checks for it to know the right document is open.
+
+No contract case may depend on a heading after Chapter 6. `spec-300.docx` stays as it is for the
+performance budget and for scenarios that need its size.
+
 ## `guide-500.docx`
 
 500 headings for performance: 100 × (Heading 1 "Part N" numbered; two Heading 2 "Numbered

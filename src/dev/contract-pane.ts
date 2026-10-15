@@ -9,7 +9,7 @@ import { FakeHostShell } from "../../tests/fakes/fake-host-shell";
 import { FakeSettingsStore } from "../../tests/fakes/fake-settings-store";
 import { registerOfficeContracts } from "../adapters/office/dev-registration";
 import { registerContract, registeredContracts } from "./contract-registry";
-import { MiniTest } from "./mini-test";
+import { formatResultLine, formatSummary, MiniTest } from "./mini-test";
 
 await registerOfficeContracts();
 
@@ -65,18 +65,23 @@ run.addEventListener("click", async () => {
   run.disabled = true;
   const runner = new MiniTest();
   registration.define(runner.api);
-  const results = await runner.run((result) => {
-    const item = document.createElement("li");
-    item.className = result.status;
-    item.textContent = `${result.status.toUpperCase()} ${result.name}`;
-    if (result.error) {
-      const detail = document.createElement("pre");
-      detail.textContent = result.error;
-      item.append(detail);
-    }
-    list.append(item);
-  });
-  const count = (status: string) => results.filter((r) => r.status === status).length;
-  summary.textContent = `${count("pass")} passed, ${count("fail")} failed, ${count("skip")} skipped`;
+  const results = await runner.run(
+    (result) => {
+      const item = document.createElement("li");
+      item.className = result.status;
+      item.textContent = formatResultLine(result);
+      if (result.error) {
+        const detail = document.createElement("pre");
+        detail.textContent = result.error;
+        item.append(detail);
+      }
+      list.append(item);
+    },
+    { suite: registration.label, fixture: registration.fixture ?? null },
+  );
+  // Counts and total, then the slowest cases, one per line.
+  summary.replaceChildren(
+    ...formatSummary(results).flatMap((line, i) => (i === 0 ? [line] : [document.createElement("br"), line])),
+  );
   run.disabled = false;
 });

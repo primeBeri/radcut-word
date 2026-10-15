@@ -1,0 +1,148 @@
+using System.Diagnostics;
+using RadCut.DesktopTests.Infrastructure;
+
+namespace RadCut.DesktopTests.Infrastructure.Tests;
+
+/// <summary>The harness helpers that need no Word, no server and no keyboard.</summary>
+[Trait("Category", "Harness")]
+public class WaitTests
+{
+    [Fact]
+    public async Task Returns_as_soon_as_the_condition_holds()
+    {
+        var calls = 0;
+        await Wait.UntilAsync(() => Task.FromResult(++calls >= 3), TimeSpan.FromSeconds(5), "three calls");
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task Times_out_naming_what_it_waited_for_and_keeping_the_last_error()
+    {
+        var error = await Assert.ThrowsAsync<TimeoutException>(() =>
+            Wait.UntilValueAsync<string>(() => throw new InvalidOperationException("not ready"), TimeSpan.FromMilliseconds(100), "the pane"));
+        Assert.Contains("waiting for the pane", error.Message);
+        Assert.Equal("not ready", error.InnerException?.Message);
+    }
+
+    [Fact]
+    public async Task Returns_the_first_value_the_probe_gives()
+    {
+        var calls = 0;
+        var value = await Wait.UntilValueAsync(() => Task.FromResult(++calls < 2 ? null : "ready"), TimeSpan.FromSeconds(5), "a value");
+        Assert.Equal("ready", value);
+    }
+}
+
+[Trait("Category", "Harness")]
+public class PreflightTests
+{
+    [Fact]
+    public void Refuses_with_the_exact_message_when_a_Word_process_exists()
+    {
+        // A stub lookup that reports this test process as "WINWORD": never a real Word.
+        var error = Assert.Throws<HarnessRefusedException>(() =>
+            Preflight.RefuseIfWordRunning(_ => [Process.GetCurrentProcess()]));
+        Assert.Equal("Word is running. Save your work and close Word, then run again.", error.Message);
+    }
+
+    [Fact]
+    public void Starts_when_no_Word_process_exists() =>
+        Preflight.RefuseIfWordRunning(_ => []);
+
+    [Fact]
+    public void Asks_for_the_WINWORD_process_by_name()
+    {
+        string? asked = null;
+        Preflight.RefuseIfWordRunning(name => { asked = name; return []; });
+        Assert.Equal("WINWORD", asked);
+    }
+}
+
+[Trait("Category", "Harness")]
+public sealed class ScratchFixtureTests : IDisposable
+{
+    private readonly string root = Path.Combine(Path.GetTempPath(), "radcut-harness-tests-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
+    public void Copies_the_fixture_into_a_per_run_per_test_folder_and_leaves_the_original_alone()
+    {
+        var original = Path.Combine(HarnessPaths.Fixtures, "tracked.docx");
+        var before = File.ReadAllBytes(original);
+
+        var scratch = ScratchFixture.Create("tracked", "Some test: case 1", root);
+
+        Assert.Equal(Path.Combine(root, ScratchFixture.RunId, "Some_test__case_1", "tracked.docx"), scratch.Path);
+        Assert.Equal(before, File.ReadAllBytes(scratch.Path));
+        File.WriteAllText(scratch.Path, "changed");
+        Assert.Equal(before, File.ReadAllBytes(original));
+    }
+
+    [Fact]
+    public void Delete_removes_the_test_folder()
+    {
+        var scratch = ScratchFixture.Create("tracked", "t", root);
+        scratch.Delete();
+        Assert.False(Directory.Exists(Path.GetDirectoryName(scratch.Path)));
+    }
+
+    [Fact]
+    public void Rejects_an_unknown_fixture() =>
+        Assert.Throws<ArgumentException>(() => ScratchFixture.Create("nope", "t", root));
+
+    [Fact]
+    public void Cleaning_removes_earlier_runs_but_keeps_this_one()
+    {
+        Directory.CreateDirectory(Path.Combine(root, "20260101-000000-1", "old"));
+        var mine = ScratchFixture.Create("tracked", "t", root);
+
+        ScratchFixture.CleanOldRuns(root);
+
+        Assert.False(Directory.Exists(Path.Combine(root, "20260101-000000-1")));
+        Assert.True(File.Exists(mine.Path));
+    }
+}
+
+[Trait("Category", "Harness")]
+public class SummaryTests
+{
+    [Fact]
+    public void Formats_counts_failures_skips_and_contract_timings()
+    {
+        var text = RunSummary.Format(
+            [
+                new("M0 reaches the pane", "M0", Outcome.Passed, null, null, TimeSpan.FromSeconds(20)),
+                new("Contract 7c", "Contract", Outcome.Failed, "Expected: x\nto be y", @"C:\r\Contract 7c", TimeSpan.Zero),
+                new("Shortcut focuses", "M0", Outcome.Skipped, "SKIPPED: no interactive desktop", null, TimeSpan.Zero),
+            ],
+            [new("IDocumentGateway: OfficeJsGateway", 194_500, [("7c", 9_400), ("1", 120)])]);
+
+        Assert.Contains("| Contract | 0 | 1 | 0 |", text);
+        Assert.Contains("| M0 | 1 | 0 | 1 |", text);
+        Assert.Contains("- **Contract 7c**: Expected: x to be y", text);
+        Assert.Contains(@"  Evidence: `C:\r\Contract 7c`", text);
+        Assert.Contains("- Shortcut focuses: SKIPPED: no interactive desktop", text);
+        Assert.Contains("- IDocumentGateway: OfficeJsGateway: 3 min 14.5 s in all; slowest: 9.4 s 7c; 120 ms 1", text);
+    }
+
+    [Theory]
+    [InlineData(120, "120 ms")]
+    [InlineData(9_400, "9.4 s")]
+    [InlineData(194_500, "3 min 14.5 s")]
+    public void Durations_read_as_in_the_contract_pane(double ms, string expected) =>
+        Assert.Equal(expected, RunSummary.Duration(ms));
+}
+
+[Trait("Category", "Harness")]
+public class EvidenceTests
+{
+    [Fact]
+    public void Folder_names_are_safe_file_names()
+    {
+        Assert.Equal("Contract.IDocumentGateway_ OfficeJsGateway.7c", EvidenceFolder.SafeName("Contract.IDocumentGateway: OfficeJsGateway.7c"));
+    }
+}

@@ -22,7 +22,7 @@ last recorded run (only the former hand checks fail, with their manual message).
 ## 2. Feasibility (M0)
 
 ```powershell
-dotnet test tests/desktop --filter Category=M0
+npm run test:desktop -- --filter-trait "Category=M0"
 ```
 
 Expected: all pass; Word starts and closes; `tests/desktop/README.md` names the routes that
@@ -31,7 +31,7 @@ worked. If the pane test fails on every route, the run says so; stop there (spec
 ## 3. Contract run
 
 ```powershell
-dotnet test tests/desktop --filter Category=Contract
+npm run test:desktop -- --filter-trait "Category=Contract"
 ```
 
 Expected: one result per contract case across all suites, no manual messages; the total time is
@@ -40,8 +40,8 @@ in `tests/desktop/test-results/summary.md`.
 ## 4. Document verification and scenarios
 
 ```powershell
-dotnet test tests/desktop --filter Category=Document
-dotnet test tests/desktop --filter Category=Scenario
+npm run test:desktop -- --filter-trait "Category=Document"
+npm run test:desktop -- --filter-trait "Category=Scenario"
 ```
 
 Expected: quickstart scenarios 3, 4, 6, 14, 19, 20, 26 and 1, 2, 5, 12, 13, 21, 22, 23, 25, 27 of
@@ -49,7 +49,7 @@ feature 001 pass; `tests/desktop/test-results/acceptance-summary.md` exists.
 
 ## 5. Safety checks (once)
 
-- With Word open on any document, run `dotnet test tests/desktop --filter Category=M0`: it refuses
+- With Word open on any document, run `npm run test:desktop -- --filter-trait "Category=M0"`: it refuses
   with the Word-running message and Word is untouched.
 - Lock the screen during a scenario run: keyboard tests report `SKIPPED: no interactive desktop`.
 - Make a check fail on purpose (edit an expected value): its evidence folder holds a trace, a

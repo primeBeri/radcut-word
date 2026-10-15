@@ -121,7 +121,8 @@ fallback, so no question blocks planning.
 
 ## D10. Report format
 
-- **Decision**: `dotnet test --logger trx --logger "console;verbosity=normal"`, plus a Markdown
+- **Decision**: `npm run test:desktop` (Microsoft.Testing.Platform, opted in by `global.json`, since the
+  .NET 10 SDK no longer runs xUnit v3 through VSTest) with `--report-xunit-trx --report-xunit-junit`, plus a Markdown
   summary written by the harness (`test-results/summary.md`; the scenario run also writes
   `test-results/acceptance-summary.md` in the checklist's table format).
 

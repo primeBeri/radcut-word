@@ -1,0 +1,100 @@
+using System.Collections.Concurrent;
+using System.Text;
+
+[assembly: AssemblyFixture(typeof(RadCut.DesktopTests.Infrastructure.SummaryWriter))]
+
+namespace RadCut.DesktopTests.Infrastructure;
+
+public enum Outcome { Passed, Failed, Skipped }
+
+public sealed record TestOutcome(
+    string Name, string Category, Outcome Outcome, string? Message, string? EvidenceFolder, TimeSpan Duration);
+
+/// <summary>One in-Word contract suite run: its total and slowest cases (contract-pane results).</summary>
+public sealed record ContractTiming(string Suite, double TotalMs, IReadOnlyList<(string Name, double Ms)> Slowest);
+
+/// <summary>Outcomes gathered during the run, written to <c>summary.md</c> when the run ends.</summary>
+public static class RunSummary
+{
+    private static readonly ConcurrentQueue<TestOutcome> Outcomes = new();
+    private static readonly ConcurrentQueue<ContractTiming> Timings = new();
+
+    public static void Record(TestOutcome outcome) => Outcomes.Enqueue(outcome);
+
+    public static void Record(ContractTiming timing) => Timings.Enqueue(timing);
+
+    public static IReadOnlyList<TestOutcome> RecordedOutcomes => [.. Outcomes];
+
+    public static IReadOnlyList<ContractTiming> RecordedTimings => [.. Timings];
+
+    /// <summary>The Markdown summary (contracts/harness-commands.md "Outputs").</summary>
+    public static string Format(IReadOnlyList<TestOutcome> outcomes, IReadOnlyList<ContractTiming> timings)
+    {
+        var text = new StringBuilder();
+        text.AppendLine("# Desktop harness run").AppendLine();
+        text.AppendLine("| Category | Passed | Failed | Skipped |").AppendLine("|---|---|---|---|");
+        foreach (var group in outcomes.GroupBy(o => o.Category == "" ? "(none)" : o.Category).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            text.AppendLine($"| {group.Key} | {Count(group, Outcome.Passed)} | {Count(group, Outcome.Failed)} | {Count(group, Outcome.Skipped)} |");
+        }
+
+        var failed = outcomes.Where(o => o.Outcome == Outcome.Failed).ToList();
+        if (failed.Count > 0)
+        {
+            text.AppendLine().AppendLine("## Failures").AppendLine();
+            foreach (var o in failed)
+            {
+                text.AppendLine($"- **{o.Name}**: {OneLine(o.Message)}");
+                if (o.EvidenceFolder is not null) text.AppendLine($"  Evidence: `{o.EvidenceFolder}`");
+            }
+        }
+
+        var skipped = outcomes.Where(o => o.Outcome == Outcome.Skipped).ToList();
+        if (skipped.Count > 0)
+        {
+            text.AppendLine().AppendLine("## Skipped").AppendLine();
+            foreach (var o in skipped) text.AppendLine($"- {o.Name}: {OneLine(o.Message)}");
+        }
+
+        if (timings.Count > 0)
+        {
+            text.AppendLine().AppendLine("## Contract timings").AppendLine();
+            foreach (var t in timings)
+            {
+                text.AppendLine($"- {t.Suite}: {Duration(t.TotalMs)} in all; slowest: " +
+                    string.Join("; ", t.Slowest.Select(s => $"{Duration(s.Ms)} {s.Name}")));
+            }
+        }
+        return text.ToString();
+    }
+
+    /// <summary>"120 ms", "9.4 s", "3 min 14.5 s", as the contract pane shows them.</summary>
+    public static string Duration(double ms) => ms switch
+    {
+        < 1000 => $"{Math.Round(ms)} ms",
+        < 60_000 => $"{ms / 1000:0.0} s",
+        _ => $"{Math.Floor(ms / 60_000)} min {ms % 60_000 / 1000:0.0} s",
+    };
+
+    private static int Count(IEnumerable<TestOutcome> outcomes, Outcome outcome) => outcomes.Count(o => o.Outcome == outcome);
+
+    private static string OneLine(string? message) =>
+        string.IsNullOrWhiteSpace(message) ? "(no message)" : message.ReplaceLineEndings(" ").Trim();
+}
+
+/// <summary>Writes <c>summary.md</c> once, when the whole run ends.</summary>
+public sealed class SummaryWriter : IAsyncDisposable
+{
+    public ValueTask DisposeAsync()
+    {
+        var outcomes = RunSummary.RecordedOutcomes;
+        if (outcomes.Count > 0)
+        {
+            Directory.CreateDirectory(HarnessPaths.TestResults);
+            File.WriteAllText(
+                Path.Combine(HarnessPaths.TestResults, "summary.md"),
+                RunSummary.Format(outcomes, RunSummary.RecordedTimings));
+        }
+        return ValueTask.CompletedTask;
+    }
+}

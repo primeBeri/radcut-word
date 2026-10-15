@@ -31,7 +31,7 @@ browsers), FlaUI.UIA3, Word COM late-bound; existing Vitest, `office-addin-debug
 **Storage**: files only: fixtures in `tests/fixtures/`, scratch copies in
 `%LOCALAPPDATA%\radcut-dev\scratch\`, evidence in `tests/desktop/test-results/` (gitignored).
 
-**Testing**: the harness is itself the test suite (`dotnet test tests/desktop`). Its
+**Testing**: the harness is itself the test suite (`npm run test:desktop`). Its
 infrastructure is proved by the M0 checks; TypeScript changes are unit-tested with Vitest
 (`tests/unit/mini-test.test.ts`) and proved in Word by an unchanged contract outcome.
 

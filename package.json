@@ -17,6 +17,7 @@
     "test:unit": "vitest run --project unit",
     "test:component": "vitest run --project component",
     "bench": "vitest bench --run",
+    "test:desktop": "dotnet test --solution tests/desktop/RadCut.DesktopTests.slnx --results-directory tests/desktop/test-results --report-xunit-trx --report-xunit-junit",
     "lint": "eslint .",
     "typecheck": "tsc -b && svelte-check --tsconfig ./tsconfig.json"
   },
