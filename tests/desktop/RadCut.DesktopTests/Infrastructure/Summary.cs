@@ -82,9 +82,28 @@ public static class RunSummary
         string.IsNullOrWhiteSpace(message) ? "(no message)" : message.ReplaceLineEndings(" ").Trim();
 }
 
-/// <summary>Writes <c>summary.md</c> once, when the whole run ends.</summary>
+/// <summary>
+/// Clears the previous run's evidence and reports when the run starts, and writes <c>summary.md</c>
+/// once, when it ends.
+/// </summary>
 public sealed class SummaryWriter : IAsyncDisposable
 {
+    public SummaryWriter()
+    {
+        var results = HarnessPaths.TestResults;
+        if (!Directory.Exists(results)) return;
+        foreach (var folder in Directory.GetDirectories(results)) Directory.Delete(folder, recursive: true);
+        foreach (var file in Directory.GetFiles(results))
+        {
+            var name = Path.GetFileName(file);
+            if (name is "summary.md" or "routes.md" || name.EndsWith(".trx", StringComparison.Ordinal) ||
+                name.EndsWith(".junit.xml", StringComparison.Ordinal) || name.EndsWith(".log", StringComparison.Ordinal))
+            {
+                File.Delete(file);
+            }
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         var outcomes = RunSummary.RecordedOutcomes;

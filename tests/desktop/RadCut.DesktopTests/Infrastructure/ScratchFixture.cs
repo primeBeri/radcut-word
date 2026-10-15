@@ -45,9 +45,28 @@ public sealed class ScratchFixture
         return new ScratchFixture(fixture, path);
     }
 
+    /// <summary><c>RADCUT_KEEP_SCRATCH=1</c> keeps every scratch copy, to look at what a passing check left.</summary>
+    public static bool Keep => Environment.GetEnvironmentVariable("RADCUT_KEEP_SCRATCH") == "1";
+
+    /// <summary>
+    /// Saves the open copy in place and copies it to a sibling folder named <paramref name="label"/>,
+    /// to reopen after this Word has closed; the path of the copy.
+    /// </summary>
+    public string SaveCopy(WordSession word, string label)
+    {
+        word.Document.Save();
+        var folder = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Path)!)!,
+            System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(Path)!) + "-" + label);
+        Directory.CreateDirectory(folder);
+        var copy = System.IO.Path.Combine(folder, Fixture + ".docx");
+        File.Copy(Path, copy, overwrite: true);
+        return copy;
+    }
+
     /// <summary>Removes the copy and its folder after a passing test; a failing test hands it to <see cref="Evidence"/> first.</summary>
     public void Delete()
     {
+        if (Keep) return;
         var folder = System.IO.Path.GetDirectoryName(Path)!;
         if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
     }

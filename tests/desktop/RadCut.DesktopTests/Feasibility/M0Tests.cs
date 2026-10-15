@@ -73,7 +73,7 @@ public sealed class M0Tests : HarnessTest, IClassFixture<NormalBuildSession>
         if (!Preflight.HasInteractiveDesktop()) Assert.Skip(Preflight.NoDesktopMessage);
         var session = fixture.Require();
         Assert.True(session.Pane is not null, $"No route reached the task pane: {session.PaneFailure}.");
-        DocumentState.PutCaretAt(session.Word!.Document, "The fire strategy is described here.");
+        WordActions.PutCaretIn(session.Word!.Document, "The fire strategy is described here.");
 
         using var keys = new Keys(session.Word);
         keys.FocusDocument();
@@ -137,7 +137,7 @@ public sealed class M0LifecycleTests : HarnessTest
         // Research D6: does the dev-pane build still answer Ctrl+Shift+Y? Recorded, not asserted.
         if (Preflight.HasInteractiveDesktop())
         {
-            DocumentState.PutCaretAt(session.Word!.Document, "The fire strategy is described here.");
+            WordActions.PutCaretIn(session.Word!.Document, "The fire strategy is described here.");
             using var keys = new Keys(session.Word);
             keys.FocusDocument();
             keys.Shortcut();

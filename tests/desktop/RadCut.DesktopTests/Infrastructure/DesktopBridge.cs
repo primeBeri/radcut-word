@@ -18,7 +18,6 @@ public sealed class DesktopBridge(WordSession word)
 {
     private const int WdAllowOnlyReading = 3;
     private const int WdNoProtection = -1;
-    private const int WdParagraph = 4;
     private const int WdContentControlText = 1;
 
     /// <summary>Every request handled, for the run's evidence.</summary>
@@ -52,7 +51,7 @@ public sealed class DesktopBridge(WordSession word)
                 var text = request["text"]!.GetValue<string>();
                 var start = (int?)request["caretOffset"] ?? 0;
                 var length = (int?)request["length"] ?? 0;
-                dynamic found = Find(document, text, mainOnly: false);
+                dynamic found = WordActions.Find(document, text);
                 int at = found.Start + start;
                 found.SetRange(at, at + length);
                 found.Select();
@@ -64,11 +63,11 @@ public sealed class DesktopBridge(WordSession word)
                 // it with a fresh one over the same text. Over a paragraph's whole text Word refuses
                 // an inline control, so add it with a spare character after the text, then remove
                 // that character, as tests/fixtures/make-fixtures.ps1 does.
-                dynamic found = Find(document, request["text"]!.GetValue<string>(), mainOnly: true);
+                dynamic found = WordActions.Find(document, request["text"]!.GetValue<string>(), mainOnly: true);
                 dynamic old = found.ParentContentControl;
                 if (old is not null && (int)old.Type != WdContentControlText) return null; // a rich-text control stays
                 if (old is not null) old.Delete(false); // keep the text
-                found = Find(document, request["text"]!.GetValue<string>(), mainOnly: true);
+                found = WordActions.Find(document, request["text"]!.GetValue<string>(), mainOnly: true);
                 int start = found.Start, end = found.End;
                 document.Range(end, end).InsertAfter("#");
                 try
@@ -109,185 +108,17 @@ public sealed class DesktopBridge(WordSession word)
                 return null;
             case "updateFields":
             {
-                var failed = new List<int>();
-                foreach (var story in Stories(document))
-                {
-                    int result = story.Fields.Update();
-                    if (result != 0) failed.Add(result);
-                }
+                var failed = WordActions.UpdateFields(document);
                 return failed.Count == 0 ? null : new { failedFieldIndexes = failed };
             }
             case "moveParagraphBefore":
-                return MoveParagraphs(document, request["text"]!.GetValue<string>(), request["before"]!.GetValue<string>(), (int)request["paragraphs"]!);
+                return new { around = WordActions.MoveParagraphs(document, request["text"]!.GetValue<string>(), request["before"]!.GetValue<string>(), (int)request["paragraphs"]!) };
             case "followReference":
-                return FollowReference(document, request["bookmark"]!.GetValue<string>());
+                return WordActions.FollowReference(word, request["bookmark"]!.GetValue<string>());
             default:
                 throw new ArgumentException($"Unknown desktop action \"{action}\".");
         }
     }
-
-    /// <summary>Every story range, including each linked header, footer, note and text box story.</summary>
-    private static IEnumerable<dynamic> Stories(dynamic document)
-    {
-        foreach (dynamic first in document.StoryRanges)
-        {
-            for (dynamic? story = first; story is not null; story = story.NextStoryRange)
-            {
-                yield return story;
-            }
-        }
-    }
-
-    /// <summary>
-    /// The text <paramref name="text"/> where it is a whole paragraph's text (as the contract
-    /// harness finds paragraphs), in the main text or in any story. A table of contents line such
-    /// as "4.3 Fire strategy 2" is not a match for "Fire strategy".
-    /// </summary>
-    private static dynamic Find(dynamic document, string text, bool mainOnly)
-    {
-        // Plain object lists: LINQ over `dynamic` COM values fails at run time.
-        var stories = new List<object>();
-        if (mainOnly)
-        {
-            object content = document.Content;
-            stories.Add(content);
-        }
-        else
-        {
-            foreach (object story in Stories(document)) stories.Add(story);
-            // Comments are not in StoryRanges until one is shown; look there too.
-            foreach (dynamic comment in document.Comments)
-            {
-                object range = comment.Range;
-                stories.Add(range);
-            }
-        }
-        foreach (dynamic story in stories)
-        {
-            dynamic range = story.Duplicate;
-            range.Find.ClearFormatting();
-            while ((bool)range.Find.Execute(text, true))
-            {
-                if (ParagraphText(range.Paragraphs.First) == text) return range;
-                range.Collapse(0); // wdCollapseEnd: search on from here
-            }
-        }
-        throw new InvalidOperationException($"No paragraph \"{text}\" in any story.");
-    }
-
-    /// <summary>A paragraph's text without its mark, cell mark or note reference mark.</summary>
-    private static string ParagraphText(dynamic paragraph) =>
-        ((string)paragraph.Range.Text).Trim(' ', '\t', '\r', '\n', '\a', '\u0002', '\u0005');
-
-    /// <summary>
-    /// Moves paragraphs as cut and paste does, so their bookmarks move with them, and returns the
-    /// paragraph texts and list numbers around the place they went, for the log.
-    /// </summary>
-    private static object MoveParagraphs(dynamic document, string text, string before, int paragraphs)
-    {
-        dynamic source = Find(document, text, mainOnly: true).Paragraphs.First.Range;
-        if (paragraphs > 1) source.MoveEnd(WdParagraph, paragraphs - 1);
-        dynamic target = Find(document, before, mainOnly: true).Paragraphs.First.Range;
-        target.Collapse(1); // wdCollapseStart
-        source.Cut();
-        target.Paste();
-        dynamic moved = Find(document, text, mainOnly: true).Paragraphs.First;
-        var around = new List<string>();
-        dynamic? paragraph = moved.Previous();
-        for (var i = 0; i < 5 && paragraph is not null; i++, paragraph = paragraph.Next())
-        {
-            string number = paragraph.Range.ListFormat.ListString;
-            around.Add($"{number} {ParagraphText(paragraph)}");
-        }
-        return new { around };
-    }
-
-    /// <summary>Follows the hyperlinked REF to <paramref name="bookmark"/> as Ctrl+click does; the paragraph the cursor lands in.</summary>
-    private string FollowReference(dynamic document, string bookmark)
-    {
-        foreach (var story in Stories(document))
-        {
-            foreach (dynamic field in story.Fields)
-            {
-                string code = field.Code.Text;
-                if (!code.Contains(bookmark, StringComparison.Ordinal)) continue;
-                // Field.DoClick() leaves the cursor where it was and a REF \h result has no
-                // Hyperlinks (contract runs, 2026-10-15), so Ctrl+click the field on screen.
-                if (!Preflight.HasInteractiveDesktop()) throw new InvalidOperationException(Preflight.NoDesktopMessage);
-                CtrlClick(document, field.Result);
-                dynamic selection = document.Application.Selection;
-                return ParagraphText(selection.Paragraphs.First);
-            }
-        }
-        throw new InvalidOperationException($"No field refers to {bookmark}.");
-    }
-
-    /// <summary>Ctrl+click in the middle of the first character of <paramref name="range"/>, as a person follows a link.</summary>
-    private void CtrlClick(dynamic document, dynamic range)
-    {
-        using var keys = new Keys(word);
-        keys.FocusDocument();
-        dynamic window = document.ActiveWindow;
-        // Word.Window.GetPoint fails here ("Command failed", contract runs 2026-10-15), so put the
-        // cursor one character into the reference and click where Windows draws the caret (Word
-        // keeps a system caret for accessibility tools).
-        window.ScrollIntoView(range, true);
-        document.Range((int)range.Start + 1, (int)range.Start + 1).Select();
-        System.Drawing.Point? point = null;
-        Wait.Until(() => (point = CaretOnScreen()) is not null, Wait.Pane, "Word's caret on screen");
-        string from = ParagraphText(range.Paragraphs.First);
-        using (FlaUI.Core.Input.Keyboard.Pressing(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL))
-        {
-            FlaUI.Core.Input.Mouse.Click(point!.Value);
-        }
-        // The click itself puts the cursor in the reference; the jump then moves it to the bookmark.
-        try
-        {
-            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Focus,
-                "the cursor to leave the reference's paragraph after Ctrl+click");
-        }
-        catch (TimeoutException)
-        {
-            // Reported by the case: it lands where it lands.
-        }
-    }
-
-    /// <summary>The middle of the foreground thread's caret in screen coordinates, or null if none is shown.</summary>
-    private static System.Drawing.Point? CaretOnScreen()
-    {
-        var info = new GuiThreadInfo { Size = Marshal.SizeOf<GuiThreadInfo>() };
-        var thread = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-        if (!GetGUIThreadInfo(thread, ref info) || info.Caret == IntPtr.Zero || info.CaretBottom <= info.CaretTop) return null;
-        var point = new NativePoint { X = info.CaretLeft + 2, Y = (info.CaretTop + info.CaretBottom) / 2 };
-        return ClientToScreen(info.Caret, ref point) ? new System.Drawing.Point(point.X, point.Y) : null;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct GuiThreadInfo
-    {
-        public int Size;
-        public int Flags;
-        public IntPtr Active, Focus, Capture, MenuOwner, MoveSize, Caret;
-        public int CaretLeft, CaretTop, CaretRight, CaretBottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct NativePoint
-    {
-        public int X, Y;
-    }
-
-    [DllImport("user32.dll")]
-    private static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr window, IntPtr processId);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    private static extern bool ClientToScreen(IntPtr window, ref NativePoint point);
 
     /// <summary>Closes RAD·CUT's task pane with its own Close button, as the user's × does.</summary>
     private void ClosePane()

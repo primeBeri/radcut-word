@@ -166,18 +166,3 @@ public static class RouteReport
         }
     }
 }
-
-/// <summary>Document set-up through COM (grows in T030).</summary>
-public static class DocumentState
-{
-    /// <summary>Puts the caret at the start of the first paragraph text matching <paramref name="text"/> in the main text.</summary>
-    public static void PutCaretAt(dynamic document, string text)
-    {
-        dynamic range = document.Content;
-        range.Find.ClearFormatting();
-        bool found = range.Find.Execute(text);
-        if (!found) throw new InvalidOperationException($"No \"{text}\" in the document.");
-        range.Collapse(1); // wdCollapseStart
-        range.Select();
-    }
-}

@@ -214,3 +214,18 @@ public sealed class TaskpaneDocumentTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest));
     }
 }
+
+[Trait("Category", "Harness")]
+public class DocumentInspectorTests
+{
+    [Theory]
+    [InlineData(@" REF _Ref123 \w \h \* CHARFORMAT ", "_Ref123", new[] { @"\w", @"\h", @"\* CHARFORMAT" })]
+    [InlineData(@" REF _Ref123 \r \h ", "_Ref123", new[] { @"\r", @"\h" })]
+    [InlineData(@"PAGEREF _RCabc \h", "_RCabc", new[] { @"\h" })]
+    public void Parses_a_field_code_into_its_bookmark_and_switches(string code, string bookmark, string[] switches)
+    {
+        var (parsedBookmark, parsedSwitches) = DocumentInspector.ParseCode(code);
+        Assert.Equal(bookmark, parsedBookmark);
+        Assert.Equal(switches, parsedSwitches);
+    }
+}

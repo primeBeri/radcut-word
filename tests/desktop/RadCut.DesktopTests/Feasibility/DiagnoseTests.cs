@@ -116,7 +116,7 @@ public sealed class DiagnoseShortcutTests
         }
 
         await Record("after the ribbon button opened the pane");
-        DocumentState.PutCaretAt(session.Word!.Document, "The fire strategy is described here.");
+        WordActions.PutCaretIn(session.Word!.Document, "The fire strategy is described here.");
         await Record("after COM put the caret in body text");
         keys.FocusDocument();
         await Record("after FocusDocument");
