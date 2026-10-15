@@ -231,6 +231,7 @@ reference (7c, in every story); one Undo after a caret, a word, a picture and a 
 (14); the number after moving a heading and F9 (14); the shortcut, the ribbon button and the
 pane's × (host shell).
 
-Still by hand until 002 T047: case 10f, the plain-text control selected whole (Office.js stops
-listing the control after the harness's restore, so the case cannot be set up there). The 10a hand
-check above covers it.
+Deferred past V1 (002 T047, owner's decision 2026-10-15): case 10f, the plain-text control
+selected whole, and the plain-text part of the 10a hand check. Office.js stops listing the control
+after the harness's restore, so the case cannot be set up in Word; it still runs against the fake.
+See `docs/backlog.md`.

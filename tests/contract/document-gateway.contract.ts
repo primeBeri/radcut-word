@@ -148,6 +148,11 @@ export function defineDocumentGatewayContract(
 ): void {
   const { describe, it, expect } = api;
   const wordOnly = api.environment === "word" ? api.it : api.skip;
+  /**
+   * Not run in Word: the Word run cannot set the case up (after the harness's restore Office.js
+   * no longer lists a plain-text control). Deferred past V1 (docs/backlog.md); the fake keeps the rule.
+   */
+  const notInWord = api.environment === "word" ? api.skip : api.it;
 
   async function insertOk(h: GatewayContractHarness, text: string, overrides: Parameters<typeof request>[2] = {}) {
     const result = await h.gateway.insertReference(await request(h.gateway, await headingByText(h.gateway, text), overrides));
@@ -659,7 +664,7 @@ export function defineDocumentGatewayContract(
       }
     });
 
-    it("10f. a plain-text content control selected whole needs confirmation; once confirmed it is replaced", async () => {
+    notInWord("10f. a plain-text content control selected whole needs confirmation; once confirmed it is replaced", async () => {
       const h = await setup("spec-contract");
       await h.select("Plain text control body.", { contentControls: 1 });
       const before = await h.documentState();

@@ -193,7 +193,8 @@ Ctrl+Shift+Y (D6), so layer 5 runs on the normal build. Details in `tests/deskto
   the pane titled "RAD·CUT" (the Navigation pane has one too); Word's shortcut and ribbon handlers
   run after the keystroke or click returns, so the host-shell case waits for them as its other
   cases already do; after an `insertOoxml` restore Office.js stops listing a plain-text control in
-  `contentControls` though Word COM still sees it (T047).
+  `contentControls` though Word COM still sees it, so case 10f (a plain-text control selected
+  whole) is not run in Word: deferred past V1 by the owner (T047).
 
 ## D12. Keyboard and the interactive desktop
 
