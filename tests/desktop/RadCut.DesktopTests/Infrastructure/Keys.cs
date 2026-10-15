@@ -45,17 +45,42 @@ public sealed class Keys : IDisposable
     /// <summary>The default shortcut, Ctrl+Shift+Y.</summary>
     public void Shortcut() => Chord(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_Y);
 
-    /// <summary>The accessible name of the element with keyboard focus (UI Automation), if any.</summary>
-    public string? FocusedName()
+    /// <summary>Office's host window for a task pane's WebView2 (UI Automation class name).</summary>
+    public const string TaskPaneHostClass = "WebView2Holder";
+
+    /// <summary>Word's document window (UI Automation class name).</summary>
+    public const string DocumentClass = "_WwG";
+
+    /// <summary>
+    /// The UI Automation class of the focused element. Focus inside a task pane is reported on
+    /// Office's <see cref="TaskPaneHostClass"/>, not on the element inside the WebView2 (M0
+    /// diagnostic, 2026-10-15), so which element has focus inside is read from the page instead.
+    /// </summary>
+    public string? FocusedClass()
     {
         try
         {
-            var name = automation.FocusedElement()?.Name;
-            return string.IsNullOrEmpty(name) ? null : name;
+            return automation.FocusedElement()?.ClassName;
         }
         catch (COMException)
         {
             return null;
+        }
+    }
+
+    /// <summary>The focused element's name, class, framework and control type, for diagnosis.</summary>
+    public string FocusedDescription()
+    {
+        try
+        {
+            var e = automation.FocusedElement();
+            if (e is null) return "(none)";
+            string Get(Func<string> read) { try { return read(); } catch (Exception) { return "?"; } }
+            return $"name \"{Get(() => e.Name)}\", class \"{Get(() => e.ClassName)}\", framework \"{Get(() => e.FrameworkAutomationElement.FrameworkId.ValueOrDefault ?? "")}\", type {Get(() => e.ControlType.ToString())}, aria \"{Get(() => e.FrameworkAutomationElement.AriaProperties.ValueOrDefault ?? "")}\"";
+        }
+        catch (COMException)
+        {
+            return "(unavailable)";
         }
     }
 

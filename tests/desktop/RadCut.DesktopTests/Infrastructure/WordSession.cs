@@ -80,7 +80,7 @@ public sealed class WordSession : IAsyncDisposable
         }
         catch
         {
-            await session.DisposeAsync();
+            await Cleanup.QuietlyAsync(session.DisposeAsync);
             throw;
         }
     }
@@ -106,13 +106,23 @@ public sealed class WordSession : IAsyncDisposable
         }
     }
 
-    /// <summary>Word's main (document) window.</summary>
+    /// <summary>
+    /// Word's document window, from COM (<c>Window.Hwnd</c>): the process's "main window" can be a
+    /// small helper window instead.
+    /// </summary>
     public IntPtr MainWindow
     {
         get
         {
-            process.Refresh();
-            return process.MainWindowHandle;
+            try
+            {
+                return new IntPtr((int)Document.ActiveWindow.Hwnd);
+            }
+            catch (COMException)
+            {
+                process.Refresh();
+                return process.MainWindowHandle;
+            }
         }
     }
 

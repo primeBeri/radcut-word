@@ -149,6 +149,23 @@ public class EvidenceTests
 }
 
 [Trait("Category", "Harness")]
+public class DevServerTests
+{
+    [Fact]
+    public async Task Starts_answers_and_stops_leaving_the_port_free()
+    {
+        if (DevServer.IsPortInUse(DevServer.Port)) Assert.Skip("Port 3000 is in use by another server.");
+        await using (var server = await DevServer.StartAsync(DevServerMode.Normal))
+        {
+            using var http = new HttpClient();
+            using var response = await http.GetAsync(new Uri(DevServer.Origin, "app/taskpane.html"), TestContext.Current.CancellationToken);
+            Assert.True(response.IsSuccessStatusCode, $"taskpane.html: {(int)response.StatusCode}");
+        }
+        Assert.False(DevServer.IsPortInUse(DevServer.Port), "The dev server is still listening after it was stopped.");
+    }
+}
+
+[Trait("Category", "Harness")]
 public sealed class TaskpaneDocumentTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "radcut-harness-tests-" + Guid.NewGuid().ToString("N"));

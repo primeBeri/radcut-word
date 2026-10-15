@@ -108,6 +108,15 @@ Findings from T008's per-case timings:
 - **Fallback if neither works**: layers 4–5 still run; palette state is read through UI
   Automation; the contract run stays manual but faster (D2). Stop and report (FR-012).
 
+### D3–D6 outcome (M0, 2026-10-15)
+
+Route B works and is the default; route A fails (no debugging port in this Office build). The
+injected task pane parts are needed to load the development add-in for the scratch copy but do
+not open the pane, which the harness opens from RAD·CUT's ribbon button through UI Automation.
+COM attaches through the Running Object Table (D4). The dev-pane build does not answer
+Ctrl+Shift+Y (D6), so layer 5 runs on the normal build. Details in `tests/desktop/README.md`,
+"Routes that worked".
+
 ## D4. Attaching COM to the Word the harness started (M0 question, §8.2)
 
 - **Decision**: P/Invoke `oleaut32!GetActiveObject("Word.Application")` after the started

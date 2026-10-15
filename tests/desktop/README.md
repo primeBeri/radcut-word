@@ -45,9 +45,18 @@ Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
 
 ## Routes that worked
 
-Filled in by the feasibility checks (task T024): how the harness reaches the task pane over CDP
-(route A: the `office-addin-debugging` port; route B: a debugging port on the WINWORD process it
-starts), how it attaches COM to that Word, how the pane opens on the scratch document, and
-whether the dev-pane build answers Ctrl+Shift+Y.
+Settled by the M0 checks on 2026-10-15 (Word for Microsoft 365 16.0.20430, WebView2 155):
+`npm run test:desktop -- --filter-trait "Category=M0"`, 5 of 5 in about 2 minutes. Each run
+appends its attempts to `test-results/routes.md`.
 
-_Not yet run._
+| Question | Answer |
+|---|---|
+| Loading the add-in for the scratch copy | Register it (`office-addin-dev-settings register`, ASCII manifest copy) **and** add the sideload template's task pane parts to the scratch copy (`TaskpaneDocument`). Without the parts Word never shows the RAD·CUT ribbon group for the document. |
+| Opening the pane without the keyboard | The parts load the add-in but do not open its pane. The harness invokes RAD·CUT's own "Cross-reference" ribbon button through UI Automation (Invoke needs no keyboard or foreground). Search from the "RAD·CUT" group: the References tab has its own "Cross-reference" button. |
+| Reaching the pane over CDP: route A | Fails. Office's direct debugger setting (`UseDirectDebugger`) puts no `--remote-debugging-port` on WebView2 in this build; nothing listens on 9229. Kept behind `RADCUT_PANE_ROUTE=A`. |
+| Reaching the pane over CDP: route B | Works. The harness starts `WINWORD.EXE` itself with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<free port>` on that process only. All Office panes share one WebView2 browser (one data folder), so the endpoint also shows Word's preloaded Copilot pane; the harness picks the page from `https://localhost:3000/`. The pane's WebView2 starts about 30 s after Word, so the harness waits up to 90 s. |
+| Attaching COM | Find the scratch document in the Running Object Table by its path and take `Document.Application`. This never starts Word and never matches another document. |
+| Word's window | `Document.ActiveWindow.Hwnd`. The process's "main window" is a small helper window. |
+| Keyboard focus | Windows reports focus inside a task pane on Office's `WebView2Holder` window, not on the element inside the WebView2. The harness checks that focus moved from the document (`_WwG`) to `WebView2Holder` and reads the active element from the page. Whether a screen reader can name it stays on the human Narrator check. |
+| Dev-pane build and Ctrl+Shift+Y (research D6) | The dev-pane build does not answer the shortcut (its pane is the dev launcher), so keyboard checks run on the normal build and contract runs on the dev-pane build. |
+| Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. |

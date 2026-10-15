@@ -77,15 +77,15 @@ public sealed class M0Tests : HarnessTest, IClassFixture<NormalBuildSession>
 
         using var keys = new Keys(session.Word);
         keys.FocusDocument();
+        Assert.Equal(Keys.DocumentClass, keys.FocusedClass());
         keys.Shortcut();
 
+        // Windows focus leaves the document for the pane's host, and inside the page the search box
+        // is the active element (UI Automation does not reach inside the WebView2).
         await Wait.UntilAsync(
-            () => Task.FromResult(keys.FocusedName() == TaskPane.SearchBoxName),
+            async () => keys.FocusedClass() == Keys.TaskPaneHostClass && (await session.Pane.FocusAsync()) == (true, TaskPane.SearchBoxName),
             Wait.Pane,
-            $"UI Automation focus on \"{TaskPane.SearchBoxName}\" (now: \"{keys.FocusedName()}\")");
-        var (pageHasFocus, focusedName) = await session.Pane.FocusAsync();
-        Assert.True(pageHasFocus, "The pane page does not have focus.");
-        Assert.Equal(TaskPane.SearchBoxName, focusedName);
+            $"focus in the pane on \"{TaskPane.SearchBoxName}\" (UI Automation: {keys.FocusedDescription()})");
     }
 }
 
@@ -144,7 +144,7 @@ public sealed class M0LifecycleTests : HarnessTest
             string? focused = null;
             try
             {
-                await Wait.UntilAsync(() => Task.FromResult((focused = keys.FocusedName()) == TaskPane.SearchBoxName), Wait.Pane, "the search box");
+                await Wait.UntilAsync(() => Task.FromResult((focused = keys.FocusedClass()) == Keys.TaskPaneHostClass), Wait.Pane, "focus in the pane");
                 RouteReport.Note("D6: the dev-pane build answers Ctrl+Shift+Y (search box focused).");
             }
             catch (TimeoutException)

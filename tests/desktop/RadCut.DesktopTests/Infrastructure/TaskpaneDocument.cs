@@ -17,9 +17,11 @@ public sealed record AddinManifest(string Id, string Version)
 }
 
 /// <summary>
-/// Makes a scratch document open the add-in's task pane when Word opens it, without a click
-/// (research D5): the same webextension and taskpanes parts that office-addin-dev-settings'
-/// sideload template carries, pointing at the add-in registered for development.
+/// Makes Word load the development add-in for a scratch document: the same webextension and
+/// taskpanes parts that office-addin-dev-settings' sideload template carries, pointing at the
+/// add-in registered for development. Without them the add-in's ribbon group never appears; with
+/// them the add-in loads but its pane stays shut, so the harness opens it from the ribbon (M0,
+/// 2026-10-15, research D5).
 /// </summary>
 public static class TaskpaneDocument
 {
