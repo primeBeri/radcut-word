@@ -28,6 +28,7 @@ and palette timing. Development tooling only; never shipped. Design:
 | `npm run test:desktop -- --filter-trait "Category=Scenario"` | feature 001 quickstart scenarios |
 | `npm run test:desktop -- --filter-trait "Category=Performance"` | palette timing |
 | `npm run test:desktop -- --filter-method "*Scenario01*"` | one test |
+| `npm run test:desktop -- --filter-trait "Category=Diagnose" --explicit only` | diagnostics (not checks): WebView2 processes, CDP targets, focus and Esc; explicit, so never part of a normal run |
 
 Exit code 0 means nothing failed; 8 means the filter matched no test. Each run clears the previous
 run's evidence and reports first. Set `RADCUT_KEEP_SCRATCH=1` to keep every scratch document under
@@ -74,3 +75,20 @@ appends its attempts to `test-results/routes.md`.
 | Keyboard focus | Windows reports focus inside a task pane on Office's `WebView2Holder` window, not on the element inside the WebView2. The harness checks that focus moved from the document (`_WwG`) to `WebView2Holder` and reads the active element from the page. Whether a screen reader can name it stays on the human Narrator check. |
 | Dev-pane build and Ctrl+Shift+Y (research D6) | The dev-pane build does not answer the shortcut (its pane is the dev launcher), so keyboard checks run on the normal build and contract runs on the dev-pane build. |
 | Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. |
+
+## Safety checks (T045), 2026-10-15
+
+| Check | Result |
+|---|---|
+| A Word of the owner's open (a blank document with text typed in) | Every check fails at once with "Word is running. Save your work and close Word, then run again."; that Word keeps running, its text untouched |
+| A deliberate failure (an expected value changed in scenario 19) | Fails with the scratch document, the Word window, the Playwright trace, the pane console and the harness log kept |
+| After every run | No WINWORD, dev server or test process left; `git status` shows no fixture changed |
+| Outlook open with an add-in running | Works: the harness's Word has its own WebView2 data folder (research D15) |
+| Another window brought to the front during a run | The keyboard step fails and names the window in the way; nothing is typed elsewhere |
+| A locked screen | To do with the owner: keyboard checks should report `SKIPPED: no interactive desktop` |
+
+## A full run, 2026-10-15
+
+`npm run test:desktop`: 112 passed, 3 failed, 4 skipped in 7 min 41 s. The failures are the add-in
+findings recorded as feature 001 T143 (caret after the reference) and T144 (Esc with the warning
+up, scenarios 23 and 27); the skips are the three explicit diagnostics and the deferred case 10f.

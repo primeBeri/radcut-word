@@ -11,7 +11,7 @@ namespace RadCut.DesktopTests.Feasibility;
 [Trait("Category", "Diagnose")]
 public sealed class DiagnoseTests
 {
-    [Theory]
+    [Theory(Explicit = true)]
     [InlineData(PaneRoute.B)]
     public async Task Record_the_task_pane_WebView2_processes(PaneRoute route)
     {
@@ -98,7 +98,7 @@ public sealed class DiagnoseTests
 [Trait("Category", "Diagnose")]
 public sealed class DiagnoseShortcutTests
 {
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task Record_focus_around_the_shortcut()
     {
         await using var session = await PaneSession.StartAsync("spec-contract", DevServerMode.Normal, "diagnose-shortcut");
@@ -142,7 +142,7 @@ public sealed class DiagnoseShortcutTests
 [Trait("Category", "Diagnose")]
 public sealed class DiagnoseEscapeTests : ScenarioTest
 {
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task Record_what_Esc_does_in_the_palette()
     {
         var (palette, document) = await OpenAsync("spec-contract", "diagnose-escape");

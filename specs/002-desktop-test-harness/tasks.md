@@ -181,8 +181,8 @@ and writes `acceptance-summary.md`.
 ## Phase 9: Polish
 
 - [ ] T044 [P] Ten consecutive full runs (`npm run test:desktop`) on an unchanged build: no test changes outcome (SC-006); fix any flaky test as a defect; record the full-run time against the plan's goal (under 30 minutes) in `tests/desktop/README.md`
-- [ ] T045 [P] Do the safety checks of `quickstart.md` §5 (Word open → refusal and untouched; locked screen → skips; deliberate failure → evidence; no leftover WINWORD; no fixture changed) and record them in `tests/desktop/README.md`
-- [ ] T046 Update `CLAUDE.md` "Project state and commands" with the harness commands and the `spec-contract` fixture; update `docs/proposals/0001-automated-testing.md` status to "Accepted, implemented in 002"
+- [ ] T045 [P] Do the safety checks of `quickstart.md` §5 (Word open → refusal and untouched; locked screen → skips; deliberate failure → evidence; no leftover WINWORD; no fixture changed) and record them in `tests/desktop/README.md` (2026-10-15: all but the locked-screen check done, see tests/desktop/README.md)
+- [X] T046 Update `CLAUDE.md` "Project state and commands" with the harness commands and the `spec-contract` fixture; update `docs/proposals/0001-automated-testing.md` status to "Accepted, implemented in 002" (2026-10-15: done with the merge into 001: CLAUDE.md commands and testing strategy, proposal accepted)
 
 ---
 
