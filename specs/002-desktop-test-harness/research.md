@@ -58,6 +58,29 @@ fallback, so no question blocks planning.
   run on `spec-300` (46 passed in T142's run, the rest manual by design); any difference is a
   defect in the change, not in the case (FR-016).
 
+### D2 measurements
+
+| Run | Fixture | Change | Total | Outcomes |
+|---|---|---|---|---|
+| Before (T051/T142 runs) | `spec-300` | none | 20–25 min (owner's estimate) | 46 passed, the rest manual or other fixtures |
+| T008, 2026-10-15 | `spec-300` | restore only when dirty | 17 min 16.6 s | 46 passed, 13 failed: the same cases (manual checks, other fixtures); 0 skipped |
+
+Findings from T008's per-case timings:
+
+- Read-only cases now cost about 0.33 s for the guard instead of a full restore (about 30
+  cases), which accounts for the saving.
+- **A full restore gets slower over the run** on the same snapshot: about 5 s for cases 6–7,
+  10–18 s by cases 7a–10b, 20–23 s by cases 11–13 (one restore each). Something accumulates in
+  the document with each `insertOoxml` restore. Hypotheses, to test if the growth survives the
+  small fixture: list numbering definitions or styles duplicated by each `insertOoxml`; inline
+  picture parts duplicated; Word's Undo history growing.
+- Writing with the cursor in a header or footer is slow in the gateway itself (case 9c: about
+  51 s of gateway time for the seven formats in the header and in the footer, against 28 s in
+  the text box and 5–8 s in notes and table cells). Worth a look in feature 001 (product
+  latency, not only the harness).
+- The multi-restore cases dominate: case 9 (1 min 9.6 s of restores), 10a (47 s), 13a (45 s),
+  7c and 7d (40 s each).
+
 ## D3. Reaching the task pane (M0 question, proposal §8.1)
 
 - **Route A (try first)**: `office-addin-debugging start` (via `scripts/office-debug.mjs`) is

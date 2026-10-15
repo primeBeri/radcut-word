@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatResultLine, formatSummary, MiniTest, timed, type ContractRunResults } from "../../src/dev/mini-test";
+import { formatResultLine, formatSummary, MiniTest, note, timed, type ContractRunResults } from "../../src/dev/mini-test";
 
 /** A clock that moves only when told, so durations are exact. */
 function fakeClock() {
@@ -97,6 +97,32 @@ describe("timed phases", () => {
 
   it("does nothing outside a running case and returns the work's value", async () => {
     expect(await timed("restore", async () => 42)).toBe(42);
+  });
+});
+
+describe("notes", () => {
+  it("attaches notes to the running case only, in order", async () => {
+    const { mini } = runner();
+    mini.api.it("restores", () => {
+      note("lists 3");
+      note("styles 160");
+    });
+    mini.api.it("reads", () => {});
+
+    const run = await mini.run(() => {}, { suite: "S", fixture: null });
+
+    expect(run.cases[0]!.notes).toEqual(["lists 3", "styles 160"]);
+    expect(run.cases[1]).not.toHaveProperty("notes");
+  });
+
+  it("does nothing outside a running case", () => {
+    expect(() => note("ignored")).not.toThrow();
+  });
+
+  it("shows notes after the result line", () => {
+    expect(formatResultLine({ name: "x", status: "pass", durationMs: 5, notes: ["lists 3", "styles 160"] })).toBe(
+      "PASS 5 ms x [lists 3; styles 160]",
+    );
   });
 });
 

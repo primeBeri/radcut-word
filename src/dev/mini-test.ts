@@ -13,6 +13,8 @@ export interface CaseResult {
   readonly error?: string;
   /** Time spent in named phases of the case (see `timed`), in ms. */
   readonly timings?: Readonly<Record<string, number>>;
+  /** Diagnostic notes the harness attached to the case (see `note`). */
+  readonly notes?: readonly string[];
 }
 
 /** One run of a suite, as the pane shows it and publishes it for the desktop harness. */
@@ -40,7 +42,7 @@ export interface MiniTestClock {
 const systemClock: MiniTestClock = { now: () => performance.now(), date: () => new Date() };
 
 /** The phases of the case now running; one case runs at a time. */
-let running: { name: string; phases: Record<string, number>; now: () => number } | null = null;
+let running: { name: string; phases: Record<string, number>; notes: string[]; now: () => number } | null = null;
 
 /** The name of the case now running, if any. */
 export function runningCase(): string | null {
@@ -51,6 +53,11 @@ export function runningCase(): string | null {
  * Run `work` as a named phase of the running case, adding its time to that case's `timings`
  * (repeats add up). Outside a running case it just runs `work`.
  */
+/** Attach a diagnostic note to the running case; outside a running case it does nothing. */
+export function note(text: string): void {
+  running?.notes.push(text);
+}
+
 export async function timed<T>(phase: string, work: () => Promise<T>): Promise<T> {
   const current = running;
   if (!current) return work();
@@ -105,7 +112,8 @@ export class MiniTest {
 
   private async runCase(c: RegisteredCase): Promise<CaseResult> {
     const phases: Record<string, number> = {};
-    running = { name: c.name, phases, now: this.clock.now };
+    const notes: string[] = [];
+    running = { name: c.name, phases, notes, now: this.clock.now };
     const start = this.clock.now();
     let error: string | undefined;
     try {
@@ -121,6 +129,7 @@ export class MiniTest {
       durationMs: this.clock.now() - start,
       ...(error === undefined ? {} : { error }),
       ...(Object.keys(phases).length > 0 ? { timings: phases } : {}),
+      ...(notes.length > 0 ? { notes } : {}),
     };
   }
 
@@ -145,7 +154,8 @@ function phases(result: CaseResult): string {
 export function formatResultLine(result: CaseResult): string {
   const status = result.status.toUpperCase();
   if (result.status === "skip") return `${status} ${result.name}`;
-  return `${status} ${duration(result.durationMs)} ${result.name}${phases(result)}`;
+  const notes = result.notes?.length ? ` [${result.notes.join("; ")}]` : "";
+  return `${status} ${duration(result.durationMs)} ${result.name}${phases(result)}${notes}`;
 }
 
 /** Counts and total on the first line, then the five slowest cases, slowest first. */

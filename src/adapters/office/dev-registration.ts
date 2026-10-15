@@ -21,7 +21,7 @@ import { normaliseHeadingText, startsWithNoteMark } from "../../core/headings/no
 import { withoutLinkedCopies } from "../../core/headings/scan";
 import { parseFieldCode } from "../../core/references/field-code";
 import { registerContract } from "../../dev/contract-registry";
-import { runningCase, timed } from "../../dev/mini-test";
+import { note, runningCase, timed } from "../../dev/mini-test";
 import { OfficeHostShell } from "./office-host-shell";
 import { OfficeJsGateway, storyBodies } from "./office-js-gateway";
 
@@ -85,6 +85,23 @@ async function mainTextFacts(context: Word.RequestContext): Promise<{ textLength
 }
 
 /**
+ * Notes counts that would grow if each restore left something behind: full restores got slower
+ * over the T008 run on the same snapshot (research D2 measurements).
+ */
+async function noteDocumentSize(context: Word.RequestContext): Promise<void> {
+  const body = context.document.body;
+  const lists = body.lists.load("items/id");
+  const pictures = body.inlinePictures.load("items/width");
+  const styles = context.document.getStyles().load("items/nameLocal");
+  const paragraphs = body.paragraphs.load("items/style");
+  await context.sync();
+  note(
+    `after restore: ${paragraphs.items.length} paragraphs, ${lists.items.length} lists, ` +
+      `${styles.items.length} styles, ${pictures.items.length} pictures`,
+  );
+}
+
+/**
  * Bring the open document back to the snapshot before a case, taking the snapshot on the first
  * case of a document, and check it is the fixture the case needs.
  */
@@ -131,6 +148,7 @@ async function prepareDocument(fixture: ContractFixture): Promise<void> {
       document.changeTrackingMode = mode;
       await context.sync();
       dirty = false;
+      await noteDocumentSize(context);
     }
     previousCase = runningCase();
     let hasMarker = snapshot.fixtures.get(fixture);
