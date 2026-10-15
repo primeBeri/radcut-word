@@ -29,7 +29,10 @@ and palette timing. Development tooling only; never shipped. Design:
 | `npm run test:desktop -- --filter-trait "Category=Performance"` | palette timing |
 | `npm run test:desktop -- --filter-method "*Scenario01*"` | one test |
 
-Exit code 0 means nothing failed; 8 means the filter matched no test. Reports (TRX, JUnit,
+Exit code 0 means nothing failed; 8 means the filter matched no test. Each run clears the previous
+run's evidence and reports first. Set `RADCUT_KEEP_SCRATCH=1` to keep every scratch document under
+`%LOCALAPPDATA%\radcut-dev\scratch\` (by default only a failed test's copy is kept, in its evidence
+folder). Reports (TRX, JUnit,
 `summary.md`) and the evidence of failed tests go to `tests/desktop/test-results/` (gitignored).
 Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
 

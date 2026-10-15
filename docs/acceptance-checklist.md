@@ -235,3 +235,19 @@ Deferred past V1 (002 T047, owner's decision 2026-10-15): case 10f, the plain-te
 selected whole, and the plain-text part of the 10a hand check. Office.js stops listing the control
 after the harness's restore, so the case cannot be set up in Word; it still runs against the fake.
 See `docs/backlog.md`.
+
+## Automated document checks (feature 002, M2), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Document"`, three runs, 7 of 7 each time, about
+1.5 minutes. Each scenario inserts through the real palette (Ctrl+Shift+Y, typing, Enter) and
+reads the result through Word itself:
+
+| # | Result | Notes |
+|---|---|---|
+| 3 | Pass | "4.3" becomes "4.1" after moving the section and F9; Ctrl+click lands on the heading |
+| 4 | Pass | The second reference reuses the first one's `_RC…` bookmark; one bookmark added in all |
+| 6 | Pass | Saved, reopened with the add-in unregistered, F9: same results, no errors |
+| 14 | Pass | `tracked.docx`: the insertion is tracked; correct after Accept All; Reject All removes it with no errors. With Track Changes on, F9 itself is tracked (Word), so the check after accepting runs with tracking off |
+| 19 | Pass | A new `_RC…` bookmark (the `_Toc…` one not reused); still correct after the TOC update and F9 |
+| 20 | Pass | Bold and italic follow the surrounding text, not the heading, before and after F9 |
+| 26 | Pass | Against Word's own dialog: same field types and bookmark extent, switches differ only by design (`\w`, `\* CHARFORMAT`); B gets `_RC…`, A reuses Word's `_Ref…`; Word's bookmark and fields untouched |

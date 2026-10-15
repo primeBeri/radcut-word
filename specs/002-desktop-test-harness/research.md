@@ -196,6 +196,21 @@ Ctrl+Shift+Y (D6), so layer 5 runs on the normal build. Details in `tests/deskto
   `contentControls` though Word COM still sees it, so case 10f (a plain-text control selected
   whole) is not run in Word: deferred past V1 by the owner (T047).
 
+## D14. Document checks (M2, 2026-10-15)
+
+- **Palette driving**: caret placed through COM, real Ctrl+Shift+Y, the query typed with real keys,
+  the highlighted row (`[role=option][aria-selected=true]`) checked, real Enter, then a wait until
+  Word has more reference fields and keyboard focus is back in the document.
+- **Which bookmark an insertion used**: the one whose number of referring fields went up. Not
+  "the first field pointing at the heading": a table of contents points at it too, through
+  `PAGEREF` fields to its `_Toc` bookmark.
+- **Track Changes and F9**: with tracking on, Word records a field update as a tracked deletion and
+  insertion, so a range's text holds the old result beside the new one ("Kept headingKept
+  heading"). Scenario 14 checks the result after Accept All with tracking off. Worth a line in
+  feature 001's known behaviours (T100).
+- **COM from C#**: pass documents around as `object`; a `dynamic` argument makes the whole call
+  dynamically bound, which rejects lambdas in it.
+
 ## D12. Keyboard and the interactive desktop
 
 - **Decision**: detect a locked or non-interactive desktop (input desktop not "Default", or
