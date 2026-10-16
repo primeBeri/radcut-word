@@ -66,6 +66,8 @@ public sealed class Keys : IDisposable
     /// The UI Automation class of the focused element. Focus inside a task pane is reported on
     /// Office's <see cref="TaskPaneHostClass"/>, not on the element inside the WebView2 (M0
     /// diagnostic, 2026-10-15), so which element has focus inside is read from the page instead.
+    /// Null when UI Automation cannot say: on the test VM the query sometimes times out while focus
+    /// moves into the WebView2, which FlaUI throws as a <see cref="TimeoutException"/> (UIA_E_TIMEOUT).
     /// </summary>
     public string? FocusedClass()
     {
@@ -73,7 +75,7 @@ public sealed class Keys : IDisposable
         {
             return automation.FocusedElement()?.ClassName;
         }
-        catch (COMException)
+        catch (Exception e) when (e is COMException or TimeoutException)
         {
             return null;
         }
@@ -89,7 +91,7 @@ public sealed class Keys : IDisposable
             string Get(Func<string> read) { try { return read(); } catch (Exception) { return "?"; } }
             return $"name \"{Get(() => e.Name)}\", class \"{Get(() => e.ClassName)}\", framework \"{Get(() => e.FrameworkAutomationElement.FrameworkId.ValueOrDefault ?? "")}\", type {Get(() => e.ControlType.ToString())}, aria \"{Get(() => e.FrameworkAutomationElement.AriaProperties.ValueOrDefault ?? "")}\"";
         }
-        catch (COMException)
+        catch (Exception e) when (e is COMException or TimeoutException)
         {
             return "(unavailable)";
         }

@@ -95,7 +95,11 @@ appends its attempts to `test-results/routes.md`.
 | After an insertion or Esc | The add-in still hides the pane and then returns the cursor, which lands on whatever is selected by then (it collapsed a test's selection to its end). The harness counts the add-in's Office calls in the page (Word.run and show or hide, wrapped by the harness, not the add-in) and waits for 100 ms of quiet; `routes.md` notes waits over 400 ms (up to about 1.1 s). |
 | Placing the cursor | After a comment is selected Word's active pane is the comments pane, with its own cursor: a selection made from there is dropped for the main pane's older one when focus comes back. `WordActions.SelectIn` (used by the tests and the desktop bridge) activates the main pane, leaves header view for body text and enters it for header or footer text. |
 | Ctrl+click | The caret's place on screen is read once it has settled (150 ms unchanged); the first reading can be the old place. |
-| A Word that will not quit | `Quit` is retried while Word answers "busy" (which dynamic COM can report as `MissingMemberException`); if Word still runs after 60 s its windows are recorded in `word-did-not-quit-<pid>/` and it is stopped, and the harness waits until it has gone. |
+| A Word that will not quit | `Quit` is retried while Word answers "busy" (which dynamic COM can report as `MissingMemberException`); if Word still runs after 60 s its windows are recorded in `word-did-not-quit-<pid>/` and it is stopped, and the harness waits until it has gone, and then until Windows no longer lists it (a stopped Word stays listed while handles to it are open, and the next test refused). |
+| Reopening a saved copy "without the add-in" (scenarios 6 and 14) | The copy is saved without the task pane parts. With them the add-in loaded from the catalogue in that Word, and quitting it 2–3 s after it started, while the add-in was still starting, crashed Word in `osf99.dll` (0xc0000005, 3 times in 8 full runs); the next Word then stopped on "Word couldn't start last time… safe mode?" and the run failed from there. |
+| A text box after the contract restore | Word draws the re-created text box only once its anchor has been on screen; until then Office.js cannot select in it, and a selection Word COM makes there reads in Office.js as the start of the main text (contract 9c failed 9 runs in 10). The contract harness asks the desktop bridge to scroll each text box's anchor into view (`showTextBoxes`) and selects again through Office.js, which then reads the text box. |
+| The debugging endpoint refusing | Once the endpoint answered and then refused the connection a moment later. The harness waits for it to answer again within the same 90 s and notes it in `routes.md`, with the WebView2 browser processes listening each time. |
+| Asking UI Automation which element has focus | While focus moves into the WebView2 the query sometimes times out, which FlaUI throws as `TimeoutException: UIA Timeout` (2 of 10 full runs, in the palette-ready timing). It now counts as "not known yet", like the COM errors it already tolerated, and the timing loop asks the page first and UI Automation only once the list is there. |
 
 ## Safety checks (T045), 2026-10-15
 
@@ -116,6 +120,21 @@ up, scenarios 23 and 27); the skips are the three explicit diagnostics and the d
 
 ## Full runs on the test VM, 2026-10-16
 
+Ten consecutive runs (T044) after the fixes in "Added on the test VM", all with the same outcome
+for every test: 113 passed, 3 failed, 6 skipped, in 13 min 13 s to 14 min 42 s (under the
+30-minute goal; the VM is about twice as slow as the first machine). No Word crashed, the debugging
+endpoint never refused, and no Word was left. The skips are the five explicit diagnostics and 10f.
+The failures:
+
+- Scenario 01: the caret after the reference, feature 001 T143.
+- Scenario 23: with a table selected the add-in declines when the palette opens; the owner decides
+  (below).
+- Palette ready on spec-300: median 606 to 996 ms against the 500 ms budget, the VM's speed. In 2 of
+  the 10 runs it failed instead on the harness's own focus query ("UIA Timeout"), now fixed (table
+  above).
+
+Contract 9c passed in all ten. The earlier runs, before those fixes:
+
 Two consecutive runs, identical: 111 passed, 4 failed, 6 skipped, in 15 min 36 s and 14 min 20 s
 (the VM is about twice as slow as the first machine). The skips are the five explicit diagnostics
 and 10f. The failures:
@@ -128,7 +147,7 @@ and 10f. The failures:
 - Contract 9c at "Text box body.": Office.js cannot select in the text box after the restore, the
   desktop bridge selects it (story 5), and the gateway then reports a location for which the
   preview does not warn "position unknown". It passed this morning, when Office.js could still
-  select there; open.
+  select there. Fixed since: the text box was not yet laid out (`showTextBoxes`, table above).
 - Palette ready on spec-300: median about 950 ms against the 500 ms budget, the VM's speed.
 
 Scenario 27 passes here.

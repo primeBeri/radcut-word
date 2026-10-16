@@ -8,6 +8,7 @@
 /** A request the desktop harness understands (tests/desktop/.../DesktopBridge.cs). */
 export type DesktopRequest =
   | { action: "select"; text: string; caretOffset?: number | undefined; length?: number | undefined }
+  | { action: "showTextBoxes" }
   | { action: "renewPlainTextControl"; text: string }
   | { action: "protect" }
   | { action: "unprotect" }

@@ -234,6 +234,19 @@ public sealed class TaskpaneDocumentTests : IDisposable
         TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer);
         Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer));
     }
+
+    [Fact]
+    public void Removing_the_task_panes_leaves_no_add_in_part_and_the_document_intact()
+    {
+        var scratch = ScratchFixture.Create("tracked", "t", root);
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, AddinManifest.Load(), AddinStore.Catalogue(@"\\localhost\radcut-catalog"));
+        TaskpaneDocument.RemoveTaskpanes(scratch.Path);
+
+        using var package = Package.Open(scratch.Path, FileMode.Open, FileAccess.Read);
+        Assert.Empty(package.GetRelationshipsByType(TaskpaneDocument.TaskpanesRelationship));
+        Assert.DoesNotContain(package.GetParts(), p => p.Uri.OriginalString.Contains("webextension", StringComparison.OrdinalIgnoreCase));
+        Assert.True(package.PartExists(new Uri("/word/document.xml", UriKind.Relative)));
+    }
 }
 
 [Trait("Category", "Harness")]

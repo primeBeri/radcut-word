@@ -204,9 +204,50 @@ public static class WordActions
         // whole result when it is one character ("0").
         window.ScrollIntoView(range, true);
         document.Range((int)range.Start, (int)range.Start).Select();
-        // Windows moves the caret after Word does: the first reading can still be the old place,
-        // and the click then follows another reference (scenario 25 on the VM, 2026-10-16). Click
-        // once the reading has settled.
+        var point = SettledCaret("the reference");
+        string from = ParagraphText(range.Paragraphs.First);
+        using (FlaUI.Core.Input.Keyboard.Pressing(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL))
+        {
+            FlaUI.Core.Input.Mouse.Click(point);
+        }
+        // The click itself puts the cursor in the reference; the jump then moves it to the bookmark.
+        try
+        {
+            // A jump into a note or a header takes Word a moment longer.
+            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Pane,
+                "the cursor to leave the reference's paragraph after Ctrl+click");
+        }
+        catch (TimeoutException)
+        {
+            // Reported by the caller: it lands where it lands.
+        }
+    }
+
+    /// <summary>
+    /// Scrolls each text box's anchor into view, as a person scrolls to a text box before clicking
+    /// in it; the number of text boxes. After the contract harness's restore Word draws a text box
+    /// only once its anchor has been on screen, and until then a selection in it is shown at the
+    /// start of the main text (contract 9c on the VM, 2026-10-16).
+    /// </summary>
+    public static int ShowTextBoxes(dynamic document)
+    {
+        var shown = 0;
+        foreach (dynamic shape in document.Shapes)
+        {
+            if (shape.TextFrame.HasText == 0) continue;
+            document.ActiveWindow.ScrollIntoView(shape.Anchor, true);
+            shown++;
+        }
+        return shown;
+    }
+
+    /// <summary>
+    /// Where Windows draws Word's caret, once that has settled: Windows moves the caret after Word
+    /// does, so the first reading can still be the old place, and a click there lands elsewhere
+    /// (scenario 25 on the VM, 2026-10-16).
+    /// </summary>
+    private static System.Drawing.Point SettledCaret(string what)
+    {
         System.Drawing.Point? point = null;
         var settled = System.Diagnostics.Stopwatch.StartNew();
         Wait.Until(
@@ -222,23 +263,8 @@ public static class WordActions
                 return settled.Elapsed >= CaretSettles;
             },
             Wait.Pane,
-            "Word's caret to settle on the reference");
-        string from = ParagraphText(range.Paragraphs.First);
-        using (FlaUI.Core.Input.Keyboard.Pressing(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL))
-        {
-            FlaUI.Core.Input.Mouse.Click(point!.Value);
-        }
-        // The click itself puts the cursor in the reference; the jump then moves it to the bookmark.
-        try
-        {
-            // A jump into a note or a header takes Word a moment longer.
-            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Pane,
-                "the cursor to leave the reference's paragraph after Ctrl+click");
-        }
-        catch (TimeoutException)
-        {
-            // Reported by the caller: it lands where it lands.
-        }
+            $"Word's caret to settle on {what}");
+        return point!.Value;
     }
 
     /// <summary>The foreground thread's caret in screen coordinates, or null if none is shown.</summary>

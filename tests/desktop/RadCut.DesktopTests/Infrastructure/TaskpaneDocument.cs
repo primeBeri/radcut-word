@@ -70,6 +70,21 @@ public static class TaskpaneDocument
         package.CreateRelationship(new Uri(TaskpanesPart.TrimStart('/'), UriKind.Relative), TargetMode.Internal, TaskpanesRelationship);
     }
 
+    /// <summary>
+    /// Removes every task pane and web extension part from <paramref name="docxPath"/>, as Word
+    /// saved them (it renames webextension.xml to webextension1.xml), so the copy opens without the
+    /// add-in: the catalogue keeps offering it, unlike the developer registration the harness undoes.
+    /// </summary>
+    public static void RemoveTaskpanes(string docxPath)
+    {
+        using var package = Package.Open(docxPath, FileMode.Open, FileAccess.ReadWrite);
+        foreach (var link in package.GetRelationshipsByType(TaskpanesRelationship).ToList()) package.DeleteRelationship(link.Id);
+        var parts = package.GetParts().Select(p => p.Uri)
+            .Where(u => u.OriginalString.StartsWith("/word/webextensions/", StringComparison.OrdinalIgnoreCase)).ToList();
+        // Deleting a part deletes its relationships part too.
+        foreach (var uri in parts.Where(package.PartExists)) package.DeletePart(uri);
+    }
+
     private static void Write(PackagePart part, XElement root)
     {
         using var stream = part.GetStream(FileMode.Create, FileAccess.Write);

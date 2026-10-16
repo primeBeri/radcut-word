@@ -248,7 +248,27 @@ public sealed class WordSession : IAsyncDisposable
         }
         finally
         {
+            var id = process.Id;
             process.Dispose();
+            // An ended process is still listed while handles to it are open; the next test's check
+            // for a running Word then refuses (full run 14 on the VM, 2026-10-16, after a stopped Word).
+            try
+            {
+                await Wait.UntilAsync(
+                    () =>
+                    {
+                        var words = Process.GetProcessesByName("WINWORD");
+                        var listed = words.Any(p => p.Id == id);
+                        foreach (var word in words) word.Dispose();
+                        return Task.FromResult(!listed);
+                    },
+                    TimeSpan.FromSeconds(30),
+                    $"Word {id} to leave the process list");
+            }
+            catch (TimeoutException e)
+            {
+                Console.Error.WriteLine($"[radcut:harness] {e.Message}");
+            }
         }
     }
 

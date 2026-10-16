@@ -28,9 +28,11 @@ public sealed class BudgetTests : ScenarioTest
             keys.FocusDocument();
             var clock = Stopwatch.StartNew();
             keys.Shortcut();
-            // Tight polling: the default back-off would blur a budget measured in milliseconds.
-            while (!(keys.FocusedClass() == Keys.TaskPaneHostClass &&
-                     await pane.EvaluateAsync<bool>("() => document.activeElement?.getAttribute('aria-label') === 'Search headings' && document.querySelectorAll('[role=option]').length > 0")))
+            // Tight polling: the default back-off would blur a budget measured in milliseconds. The
+            // page is asked first: UI Automation is only asked once the list is there, not while
+            // the WebView2 is still taking focus, when its focus query can stall for seconds.
+            while (!(await pane.EvaluateAsync<bool>("() => document.activeElement?.getAttribute('aria-label') === 'Search headings' && document.querySelectorAll('[role=option]').length > 0") &&
+                     keys.FocusedClass() == Keys.TaskPaneHostClass))
             {
                 if (clock.Elapsed > Wait.Pane) throw new TimeoutException("The palette did not become ready.");
                 await Task.Delay(5, TestContext.Current.CancellationToken);

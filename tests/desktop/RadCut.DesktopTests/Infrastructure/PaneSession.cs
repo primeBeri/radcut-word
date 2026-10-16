@@ -88,16 +88,30 @@ public sealed class PaneSession : IAsyncDisposable
             RouteReport.Add(Mode, route, false, failure);
             return failure;
         }
-        try
+        // Once the endpoint answered and then refused the connection a moment later (contract run on
+        // the VM, 2026-10-16): wait for it to answer again, within the same time, and record which
+        // WebView2 browsers listened each time, to see whether Office restarted the browser.
+        var refusals = new List<string>();
+        while (true)
         {
-            Pane = await TaskPane.ConnectAsync(Word.CdpEndpoint);
+            try
+            {
+                Pane = await TaskPane.ConnectAsync(Word.CdpEndpoint);
+                break;
+            }
+            catch (Exception e) when (e.Message.Contains("ECONNREFUSED", StringComparison.Ordinal) && clock.Elapsed < CdpWait)
+            {
+                refusals.Add($"refused at {clock.Elapsed.TotalSeconds:0.0} s, browsers {WebViewBrowsers(Word.CdpEndpoint)}");
+                await Word.WaitForCdpAsync(CdpWait - clock.Elapsed);
+            }
+            catch (Exception e)
+            {
+                var failure = $"endpoint answered but no pane page: {e.Message}" + (refusals.Count > 0 ? $" ({string.Join("; ", refusals)})" : "");
+                RouteReport.Add(Mode, route, false, failure);
+                return failure;
+            }
         }
-        catch (Exception e)
-        {
-            var failure = $"endpoint answered but no pane page: {e.Message}";
-            RouteReport.Add(Mode, route, false, failure);
-            return failure;
-        }
+        if (refusals.Count > 0) RouteReport.Add(Mode, route, true, $"connected after the endpoint refused: {string.Join("; ", refusals)}; now {WebViewBrowsers(Word.CdpEndpoint)}");
         var clicks = 1;
         try
         {
@@ -117,6 +131,27 @@ public sealed class PaneSession : IAsyncDisposable
         }
         RouteReport.Add(Mode, route, true, $"pane page {Pane.Page.Url} at {Word.CdpEndpoint}" + (clicks > 1 ? $"; palette open after {clicks} ribbon clicks" : ""));
         return null;
+    }
+
+    /// <summary>The WebView2 browser processes started with this endpoint's port: id and start time.</summary>
+    private static string WebViewBrowsers(string endpoint)
+    {
+        var port = new Uri(endpoint).Port;
+        try
+        {
+            using var search = new System.Management.ManagementObjectSearcher(
+                "SELECT ProcessId, CreationDate, CommandLine FROM Win32_Process WHERE Name = 'msedgewebview2.exe'");
+            var browsers = search.Get().Cast<System.Management.ManagementObject>()
+                .Where(p => (p["CommandLine"] as string)?.Contains($"--remote-debugging-port={port}", StringComparison.Ordinal) == true
+                    && (p["CommandLine"] as string)?.Contains("--type=", StringComparison.Ordinal) == false)
+                .Select(p => $"{p["ProcessId"]}@{System.Management.ManagementDateTimeConverter.ToDateTime((string)p["CreationDate"]):HH:mm:ss.fff}")
+                .ToList();
+            return browsers.Count == 0 ? "(none)" : string.Join(", ", browsers);
+        }
+        catch (Exception e)
+        {
+            return $"(unreadable: {e.Message})";
+        }
     }
 
     /// <summary>

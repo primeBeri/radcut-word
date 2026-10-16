@@ -54,6 +54,10 @@ public sealed class DesktopBridge(WordSession word)
                 // The story goes to desktop-bridge.log: which copy of a text was selected.
                 return $"story {WordActions.SelectIn(document, request["text"]!.GetValue<string>(), (int?)request["caretOffset"] ?? 0, (int?)request["length"] ?? 0)}";
             }
+            case "showTextBoxes":
+            {
+                return WordActions.ShowTextBoxes(document);
+            }
             case "renewPlainTextControl":
             {
                 // The contract harness's restore leaves the plain-text control half there; replace
