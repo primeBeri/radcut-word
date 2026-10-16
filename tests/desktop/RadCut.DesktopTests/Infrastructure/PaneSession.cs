@@ -59,9 +59,9 @@ public sealed class PaneSession : IAsyncDisposable
         await CloseWordAsync();
         sideload = Sideload.Register(directDebugger: route == PaneRoute.A);
         Scratch = ScratchFixture.Create(fixture, $"{testId}-{route}");
-        // The document must reference the add-in for Word to load a development add-in for it
+        // The document must reference the add-in, where the sideload put it, for Word to load it
         // (without it the RAD·CUT ribbon group never appears: M0, 2026-10-15).
-        TaskpaneDocument.AddAutoOpenTaskpane(Scratch.Path, AddinManifest.Load());
+        TaskpaneDocument.AddAutoOpenTaskpane(Scratch.Path, AddinManifest.Load(), sideload.Store);
         Word = await WordSession.StartAsync(Scratch.Path, route);
 
         // The task pane part loads the add-in but does not open its pane (M0 diagnostic,
@@ -91,8 +91,6 @@ public sealed class PaneSession : IAsyncDisposable
         try
         {
             Pane = await TaskPane.ConnectAsync(Word.CdpEndpoint);
-            RouteReport.Add(Mode, route, true, $"pane page {Pane.Page.Url} at {Word.CdpEndpoint}");
-            return null;
         }
         catch (Exception e)
         {
@@ -100,7 +98,59 @@ public sealed class PaneSession : IAsyncDisposable
             RouteReport.Add(Mode, route, false, failure);
             return failure;
         }
+        var clicks = 1;
+        try
+        {
+            await Pane.WaitForOfficeAsync(Wait.WordStart);
+            if (Mode == DevServerMode.Normal)
+            {
+                clicks = await WaitForRibbonOpenAsync(Pane, Word);
+                await Pane.WatchVisibilityAsync();
+                await Pane.TrackOfficeCallsAsync();
+            }
+        }
+        catch (TimeoutException e)
+        {
+            var failure = $"pane page found but not ready: {e.Message}";
+            RouteReport.Add(Mode, route, false, failure);
+            return failure;
+        }
+        RouteReport.Add(Mode, route, true, $"pane page {Pane.Page.Url} at {Word.CdpEndpoint}" + (clicks > 1 ? $"; palette open after {clicks} ribbon clicks" : ""));
+        return null;
     }
+
+    /// <summary>
+    /// Waits for the open the ribbon button started (palette, or a message instead) to finish, so
+    /// a test does not hide the pane or press keys while it is still running. When the click
+    /// started the add-in, Word often loads it without running the command: the add-in has
+    /// associated OpenPalette but is never called, and the pane stays 120×11 (7 of 11 sessions on
+    /// the VM, 2026-10-16; office-js#2744). Like a person, the harness then clicks again.
+    /// </summary>
+    /// <returns>How many clicks it took, the first included.</returns>
+    private static async Task<int> WaitForRibbonOpenAsync(TaskPane pane, WordSession word)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var clicks = 1;
+        while (true)
+        {
+            try
+            {
+                await Wait.UntilAsync(
+                    async () => await pane.Page.Locator($"input[aria-label='{TaskPane.SearchBoxName}'], .message-view").CountAsync() > 0,
+                    RibbonRetry,
+                    "the palette opened by the ribbon button");
+                return clicks;
+            }
+            catch (TimeoutException) when (clock.Elapsed + RibbonRetry < Wait.WordStart)
+            {
+                Ribbon.Invoke(word, Ribbon.CrossReference);
+                clicks++;
+            }
+        }
+    }
+
+    /// <summary>How long a ribbon click may take to show the palette before the harness clicks again (it takes about 1 s when the command arrives).</summary>
+    private static readonly TimeSpan RibbonRetry = TimeSpan.FromSeconds(10);
 
     private static IEnumerable<PaneRoute> Routes() =>
         Environment.GetEnvironmentVariable("RADCUT_PANE_ROUTE") switch

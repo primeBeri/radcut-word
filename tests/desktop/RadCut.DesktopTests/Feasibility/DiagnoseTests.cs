@@ -1,5 +1,6 @@
 using System.Management;
 using System.Text;
+using FlaUI.Core.WindowsAPI;
 using RadCut.DesktopTests.Infrastructure;
 
 namespace RadCut.DesktopTests.Feasibility;
@@ -19,7 +20,7 @@ public sealed class DiagnoseTests
         await using var server = await DevServer.StartAsync(DevServerMode.Normal);
         using var sideload = Sideload.Register(directDebugger: route == PaneRoute.A);
         var scratch = ScratchFixture.Create("spec-contract", $"diagnose-{route}");
-        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, AddinManifest.Load());
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, AddinManifest.Load(), sideload.Store);
         var report = new StringBuilder($"# Route {route}, {DateTime.Now:yyyy-MM-dd HH:mm}\n\n");
         await using (var word = await WordSession.StartAsync(scratch.Path, route))
         {
@@ -115,6 +116,18 @@ public sealed class DiagnoseShortcutTests
                 $"selection story {(int)selection.StoryType}, start {(int)selection.Start}, text \"{((string)selection.Paragraphs[1].Range.Text).Trim()}\"");
         }
 
+        // What Office has registered for the add-in, as the add-in itself would ask (research R4).
+        await Wait.UntilAsync(() => pane.Page.EvaluateAsync<bool>("() => typeof Office !== 'undefined' && !!Office.actions"), Wait.Pane, "Office.js in the pane");
+        const string readRegistration = @"async () => {
+            const read = async (f) => { try { return JSON.stringify(await f()); } catch (e) { return 'error: ' + (e?.code ?? '') + ' ' + (e?.message ?? e); } };
+            return [
+              'KeyboardShortcuts 1.1: ' + Office.context.requirements.isSetSupported('KeyboardShortcuts', '1.1'),
+              'getShortcuts: ' + await read(() => Office.actions.getShortcuts()),
+              'areShortcutsInUse: ' + await read(() => Office.actions.areShortcutsInUse(['Ctrl+Shift+Y'])),
+            ].map(l => '- ' + l).join('\n');
+        }";
+        report.AppendLine($"## Shortcut registration at {DateTime.Now:HH:mm:ss}\n\n" + await pane.Page.EvaluateAsync<string>(readRegistration) + "\n\n## Focus\n");
+
         await Record("after the ribbon button opened the pane");
         WordActions.PutCaretIn(session.Word!.Document, "The fire strategy is described here.");
         await Record("after COM put the caret in body text");
@@ -131,6 +144,7 @@ public sealed class DiagnoseShortcutTests
         keys.Shortcut();
         await Task.Delay(3000, TestContext.Current.CancellationToken);
         await Record("3 s after Ctrl+Shift+Y with the palette hidden");
+        report.AppendLine($"\n## Shortcut registration at {DateTime.Now:HH:mm:ss}\n\n" + await pane.Page.EvaluateAsync<string>(readRegistration));
 
         var folder = new EvidenceFolder("diagnose-shortcut");
         folder.SaveWindow(session.Word.MainWindow);
@@ -191,6 +205,63 @@ public sealed class DiagnoseEscapeTests : ScenarioTest
         await Record("1.5 s after Esc with the warning showing");
 
         var folder = new EvidenceFolder("diagnose-escape");
+        File.WriteAllText(Path.Combine(folder.Path, "diagnose.md"), report.ToString());
+    }
+}
+
+/// <summary>
+/// Not a check: where Word's cursor goes when the palette opens from a header after declined places
+/// (scenario 12 on the VM, 2026-10-16: the open finds the cursor back on an earlier heading).
+/// </summary>
+[Trait("Category", "Diagnose")]
+public sealed class DiagnoseHeaderCaretTests : ScenarioTest
+{
+    [Theory(Explicit = true)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Record_the_cursor_when_opening_from_a_header(bool afterComment)
+    {
+        var (palette, document) = await OpenAsync("spec-contract", $"diagnose-header-{afterComment}");
+        var page = Session!.Pane!.Page;
+        var word = Session.Word!;
+        using var keys = new Keys(word);
+        var report = new StringBuilder($"# Cursor from a header (after a comment: {afterComment}), {DateTime.Now:yyyy-MM-dd HH:mm}\n\n");
+        async Task Record(string step)
+        {
+            dynamic selection = word.Application.Selection;
+            dynamic window = ((dynamic)document).ActiveWindow;
+            string seek;
+            try { seek = ((int)window.ActivePane.View.SeekView).ToString(); } catch (Exception e) { seek = $"({e.Message})"; }
+            var view2 = await page.EvaluateAsync<string>(
+                @"() => document.querySelector(""input[aria-label='Search headings']"") ? 'palette' : (document.querySelector('.message-view')?.innerText ?? 'empty').slice(0, 40)");
+            report.AppendLine($"- {step}: story {(int)selection.StoryType}, start {(int)selection.Start}, \"{((string)selection.Paragraphs[1].Range.Text).Trim()}\", " +
+                $"seek view {seek}, panes {(int)window.Panes.Count}, active pane {(int)window.ActivePane.Index}; UIA {keys.FocusedDescription()}; pane: {view2}");
+        }
+
+        var places = afterComment ? new[] { "Title of the document", "A comment." } : new[] { "Title of the document" };
+        foreach (var place in places)
+        {
+            WordActions.PutCaretIn(document, place);
+            await palette.OpenAsync();
+            await Wait.UntilAsync(async () => await page.Locator(".message-view").CountAsync() == 1, Wait.Pane, "a message");
+            Palette.Press(VirtualKeyShort.ESCAPE);
+            await palette.WaitForDocumentFocusAsync($"after {place}");
+            await Record($"after the message for \"{place}\" was closed");
+        }
+        WordActions.PutCaretIn(document, "Header text.");
+        await Record("after PutCaretIn(\"Header text.\")");
+        await palette.WaitUntilHiddenAsync();
+        keys.FocusDocument();
+        await Record("after FocusDocument");
+        keys.Shortcut();
+        foreach (var ms in new[] { 100, 300, 600, 1200, 2500 })
+        {
+            await Task.Delay(ms, TestContext.Current.CancellationToken);
+            await Record($"after Ctrl+Shift+Y (+{ms} ms)");
+        }
+
+        var folder = new EvidenceFolder($"diagnose-header-{afterComment}");
+        folder.SaveWindow(word.MainWindow);
         File.WriteAllText(Path.Combine(folder.Path, "diagnose.md"), report.ToString());
     }
 }

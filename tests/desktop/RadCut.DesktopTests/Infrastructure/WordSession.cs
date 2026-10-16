@@ -147,13 +147,54 @@ public sealed class WordSession : IAsyncDisposable
         foreach (var window in automation.GetDesktop().FindAllChildren(cf.ByProcessId(process.Id)))
         {
             var texts = window.FindAllDescendants(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Text))
-                .Select(t => { try { return t.Name ?? ""; } catch (COMException) { return ""; } })
+                // Some of Office's own windows (pane tabs, tips) have text without a Name, and windows
+                // come and go while Word starts: neither is an add-in error.
+                .Select(t => { try { return t.Properties.Name.ValueOrDefault ?? ""; } catch (Exception e) when (e is COMException or FlaUI.Core.Exceptions.ElementNotAvailableException) { return ""; } })
                 .ToList();
             if (!texts.Any(t => t.Contains("ADD-IN ERROR", StringComparison.OrdinalIgnoreCase))) continue;
             window.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName("Cancel")))?.AsButton().Invoke();
             return string.Join(" ", texts.Where(t => t.Length > 0));
         }
         return null;
+    }
+
+    /// <summary>
+    /// Asks Word to close or quit, again while it answers that it is busy (RPC_E_SERVERCALL_RETRYLATER,
+    /// which dynamic COM can also report as a MissingMemberException: full run, 2026-10-16). If Word
+    /// still refuses, teardown goes on to wait for the process and stop it, rather than throw and
+    /// leave Word running for the next test.
+    /// </summary>
+    private static async Task AskWordAsync(Action call, string what)
+    {
+        try
+        {
+            await Wait.UntilAsync(
+                () =>
+                {
+                    // Any other refusal (document already closed, Word gone) has nothing to retry.
+                    try { call(); } catch (Exception e) when (!IsBusy(e)) { }
+                    return Task.FromResult(true);
+                },
+                TimeSpan.FromSeconds(15),
+                $"Word to accept {what}");
+        }
+        catch (TimeoutException e)
+        {
+            Console.Error.WriteLine($"[radcut:harness] {e.Message} Last answer: {e.InnerException?.Message}");
+        }
+    }
+
+    private static bool IsBusy(Exception e) =>
+        e is COMException { HResult: unchecked((int)0x8001010A) } || e.Message.Contains("0x8001010A", StringComparison.Ordinal);
+
+    /// <summary>Each top-level window of this Word: class and title, to see a dialog that is in the way.</summary>
+    private IEnumerable<string> TopLevelWindows()
+    {
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        var cf = automation.ConditionFactory;
+        return automation.GetDesktop().FindAllChildren(cf.ByProcessId(process.Id))
+            .Select(w => $"{w.Properties.ClassName.ValueOrDefault} | {w.Properties.Name.ValueOrDefault}")
+            .ToList();
     }
 
     /// <summary>
@@ -166,13 +207,15 @@ public sealed class WordSession : IAsyncDisposable
         {
             if (document is not null)
             {
-                try { document.Close(0); } catch (COMException) { }
+                var doc = document;
+                await AskWordAsync(() => doc.Close(0), "Close");
                 Marshal.FinalReleaseComObject(document);
                 document = null;
             }
             if (application is not null)
             {
-                try { application.Quit(0); } catch (COMException) { }
+                var app = application;
+                await AskWordAsync(() => app.Quit(0), "Quit");
                 Marshal.FinalReleaseComObject(application);
                 application = null;
             }
@@ -184,7 +227,22 @@ public sealed class WordSession : IAsyncDisposable
                 }
                 catch (TimeoutException)
                 {
+                    // A passing test keeps no evidence, so say here what kept Word open.
+                    var folder = new EvidenceFolder($"word-did-not-quit-{process.Id}");
+                    try
+                    {
+                        folder.WriteLines("windows.txt", TopLevelWindows());
+                        process.Refresh();
+                        folder.SaveWindow(process.MainWindowHandle);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine($"[radcut:harness] evidence of a Word that did not quit could not be saved: {e.GetType().Name}: {e.Message}");
+                    }
+                    Console.Error.WriteLine($"[radcut:harness] Word {process.Id} did not quit within {Wait.WordStart.TotalSeconds:0} s; stopped it. Evidence: {folder.Path}");
                     process.Kill(entireProcessTree: true);
+                    // Kill returns before the process has gone; the next test refuses while it is still there.
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
                 }
             }
         }

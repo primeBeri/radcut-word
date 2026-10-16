@@ -180,9 +180,10 @@ and writes `acceptance-summary.md`.
 
 ## Phase 9: Polish
 
-- [ ] T044 [P] Ten consecutive full runs (`npm run test:desktop`) on an unchanged build: no test changes outcome (SC-006); fix any flaky test as a defect; record the full-run time against the plan's goal (under 30 minutes) in `tests/desktop/README.md`
+- [ ] T044 [P] Ten consecutive full runs (`npm run test:desktop`) on an unchanged build: no test changes outcome (SC-006); fix any flaky test as a defect; record the full-run time against the plan's goal (under 30 minutes) in `tests/desktop/README.md` (2026-10-16, test VM: 2 of 10 so far, identical: 111 passed, 4 failed, 6 skipped in 14 to 16 minutes; see T048)
 - [ ] T045 [P] Do the safety checks of `quickstart.md` §5 (Word open → refusal and untouched; locked screen → skips; deliberate failure → evidence; no leftover WINWORD; no fixture changed) and record them in `tests/desktop/README.md` (2026-10-15: all but the locked-screen check done, see tests/desktop/README.md)
 - [X] T046 Update `CLAUDE.md` "Project state and commands" with the harness commands and the `spec-contract` fixture; update `docs/proposals/0001-automated-testing.md` status to "Accepted, implemented in 002" (2026-10-15: done with the merge into 001: CLAUDE.md commands and testing strategy, proposal accepted)
+- [X] T048 Bring the harness up on the isolated test VM (Word 2609, slower than the first machine) and fix what it showed, each as a defect, not a retry (2026-10-16; details in `tests/desktop/README.md`, "Added on the test VM"): load the add-in from a trusted shared-folder catalogue, because a developer registration loses its shortcuts in Word 2609 (office-js#6973); click the ribbon again when the first click only loads the add-in (office-js#2744); wait for Office.js before touching the pane; wait for Office's hidden event and for the add-in's Office calls to finish before the next keystroke or selection; place the cursor in Word's main pane and the right view; read the caret's place on screen once settled for Ctrl+click; retry Quit while Word is busy and wait for a stopped Word to go; log dev-server requests. Left open: contract 9c at "Text box body." (Office.js cannot select in the restored text box; after the desktop bridge selects it, the gateway does not report a text-box location) and scenario 23's last step (see the README)
 
 ---
 

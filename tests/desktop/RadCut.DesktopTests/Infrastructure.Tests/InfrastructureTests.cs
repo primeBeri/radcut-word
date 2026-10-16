@@ -203,10 +203,11 @@ public sealed class TaskpaneDocumentTests : IDisposable
     }
 
     [Fact]
-    public void Adds_a_task_pane_that_opens_the_registered_add_in()
+    public void Adds_a_task_pane_that_opens_the_add_in_from_its_store()
     {
         var scratch = ScratchFixture.Create("tracked", "t", root);
-        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, new AddinManifest("11111111-2222-3333-4444-555555555555", "1.2.3.4"));
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, new AddinManifest("11111111-2222-3333-4444-555555555555", "1.2.3.4"),
+            AddinStore.Catalogue(@"\\localhost\radcut-catalog"));
 
         using var package = Package.Open(scratch.Path, FileMode.Open, FileAccess.Read);
         var toTaskpanes = Assert.Single(package.GetRelationshipsByType(TaskpaneDocument.TaskpanesRelationship));
@@ -220,8 +221,9 @@ public sealed class TaskpaneDocumentTests : IDisposable
         var xml = extensionXml.ReadToEnd();
         Assert.Contains("id=\"11111111-2222-3333-4444-555555555555\"", xml);
         Assert.Contains("version=\"1.2.3.4\"", xml);
-        Assert.Contains("store=\"developer\"", xml);
-        Assert.Contains("storeType=\"Registry\"", xml);
+        // As Word writes it when the add-in is inserted from a shared-folder catalogue.
+        Assert.Contains("store=\"\\\\localhost\\radcut-catalog\"", xml);
+        Assert.Contains("storeType=\"Filesystem\"", xml);
     }
 
     [Fact]
@@ -229,8 +231,8 @@ public sealed class TaskpaneDocumentTests : IDisposable
     {
         var scratch = ScratchFixture.Create("tracked", "t", root);
         var manifest = AddinManifest.Load();
-        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest);
-        Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest));
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer);
+        Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer));
     }
 }
 

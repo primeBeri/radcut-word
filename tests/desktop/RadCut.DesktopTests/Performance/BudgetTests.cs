@@ -24,6 +24,7 @@ public sealed class BudgetTests : ScenarioTest
         for (var run = 0; run <= Runs; run++)
         {
             WordActions.PutCaretIn(document, "The fire strategy is described here.");
+            await palette.WaitUntilHiddenAsync();
             keys.FocusDocument();
             var clock = Stopwatch.StartNew();
             keys.Shortcut();

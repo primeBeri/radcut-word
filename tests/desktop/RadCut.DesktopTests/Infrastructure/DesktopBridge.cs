@@ -48,14 +48,11 @@ public sealed class DesktopBridge(WordSession word)
         {
             case "select":
             {
-                var text = request["text"]!.GetValue<string>();
-                var start = (int?)request["caretOffset"] ?? 0;
-                var length = (int?)request["length"] ?? 0;
-                dynamic found = WordActions.Find(document, text);
-                int at = found.Start + start;
-                found.SetRange(at, at + length);
-                found.Select();
-                return null;
+                // With the same care for Word's views and panes as the tests' own cursor placing: after
+                // a jump into the header a bare Select() into the text box is not what the add-in
+                // then reads (contract 9c on the VM, 2026-10-16).
+                // The story goes to desktop-bridge.log: which copy of a text was selected.
+                return $"story {WordActions.SelectIn(document, request["text"]!.GetValue<string>(), (int?)request["caretOffset"] ?? 0, (int?)request["length"] ?? 0)}";
             }
             case "renewPlainTextControl":
             {

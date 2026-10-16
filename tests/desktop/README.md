@@ -11,6 +11,14 @@ and palette timing. Development tooling only; never shipped. Design:
 - Node.js 22 LTS or later, `npm install` and `npm run certs` done.
 - .NET 10 SDK. `global.json` at the repository root opts `dotnet test` into
   Microsoft.Testing.Platform, which the .NET 10 SDK needs for xUnit v3.
+- Once per machine, a trusted add-in catalogue (the harness loads RAD·CUT from it, see "Routes
+  that worked"): in an elevated PowerShell, `New-Item -ItemType Directory -Force C:\radcut-catalog`
+  and `New-SmbShare -Name radcut-catalog -Path C:\radcut-catalog -ReadAccess $env:USERNAME`; then
+  in Word, File > Options > Trust Center > Trust Center Settings > Trusted Add-in Catalogs, add
+  `\\localhost\radcut-catalog` with "Show in Menu" ticked. Without it every check refuses and says
+  so. The harness copies `manifest.xml` there on each run.
+- On a fresh Office, start Word once by hand and answer its first-run prompts (the "Default File
+  Types" choice is modal and blocks every COM call).
 - **Save your work and close Word before a run.** The harness refuses to start while Word is
   running, and never closes or reuses a Word it did not start.
 - **Leave the keyboard and mouse alone during a run.** Keyboard checks send real keystrokes to
@@ -28,7 +36,7 @@ and palette timing. Development tooling only; never shipped. Design:
 | `npm run test:desktop -- --filter-trait "Category=Scenario"` | feature 001 quickstart scenarios |
 | `npm run test:desktop -- --filter-trait "Category=Performance"` | palette timing |
 | `npm run test:desktop -- --filter-method "*Scenario01*"` | one test |
-| `npm run test:desktop -- --filter-trait "Category=Diagnose" --explicit only` | diagnostics (not checks): WebView2 processes, CDP targets, focus and Esc; explicit, so never part of a normal run |
+| `npm run test:desktop -- --filter-trait "Category=Diagnose" --explicit only` | diagnostics (not checks): WebView2 processes, CDP targets, focus, the shortcut's registration, Esc, and the cursor when opening from a header; explicit, so never part of a normal run |
 
 Exit code 0 means nothing failed; 8 means the filter matched no test. Each run clears the previous
 run's evidence and reports first. Set `RADCUT_KEEP_SCRATCH=1` to keep every scratch document under
@@ -74,7 +82,20 @@ appends its attempts to `test-results/routes.md`.
 | Word's window | `Document.ActiveWindow.Hwnd`. The process's "main window" is a small helper window. |
 | Keyboard focus | Windows reports focus inside a task pane on Office's `WebView2Holder` window, not on the element inside the WebView2. The harness checks that focus moved from the document (`_WwG`) to `WebView2Holder` and reads the active element from the page. Whether a screen reader can name it stays on the human Narrator check. |
 | Dev-pane build and Ctrl+Shift+Y (research D6) | The dev-pane build does not answer the shortcut (its pane is the dev launcher), so keyboard checks run on the normal build and contract runs on the dev-pane build. |
-| Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. |
+| Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. With `RADCUT_LOG_REQUESTS=1` (the harness sets it) `vite.config.ts` logs every request to `dev-server-<mode>.log`, one log per run. |
+
+### Added on the test VM, 2026-10-16 (Word 2609, 16.0.20430)
+
+| Question | Answer |
+|---|---|
+| Developer registration (`office-addin-dev-settings register`) | Since Word 2609 an add-in registered this way loses its custom shortcuts on most starts: `Office.actions.getShortcuts()` returns `{}` and Ctrl+Shift+Y does nothing, although Office has fetched `shortcuts.json` (office-js#6973). Route B now loads the add-in from the trusted catalogue above; scratch documents refer to it with `store="\\localhost\radcut-catalog"`, `storeType="Filesystem"`, as Word writes it. Route A keeps the developer registration (Office's direct debugger needs it). |
+| The ribbon click that starts the add-in | Often loads the add-in without running OpenPalette: the page is ready and has associated the action, but is never called, and the pane stays 120×11 (7 of 11 sessions; office-js#2744). The harness clicks again when no palette has appeared after 10 s; most sessions need two clicks. |
+| Pane ready | The page appears over CDP before Office.js has initialised; the harness waits for `Office.onReady()` and, on the normal build, for the palette the ribbon opened, before a test touches the pane. |
+| Hidden event | Office tells the page the pane is hidden 0.1–1.5 s after the hide. The add-in clears itself on that event, so a Ctrl+Shift+Y pressed before it is cancelled by it (pane back, empty). The harness subscribes to the event itself and waits for it before the next Ctrl+Shift+Y; `routes.md` notes each wait over 100 ms. |
+| After an insertion or Esc | The add-in still hides the pane and then returns the cursor, which lands on whatever is selected by then (it collapsed a test's selection to its end). The harness counts the add-in's Office calls in the page (Word.run and show or hide, wrapped by the harness, not the add-in) and waits for 100 ms of quiet; `routes.md` notes waits over 400 ms (up to about 1.1 s). |
+| Placing the cursor | After a comment is selected Word's active pane is the comments pane, with its own cursor: a selection made from there is dropped for the main pane's older one when focus comes back. `WordActions.SelectIn` (used by the tests and the desktop bridge) activates the main pane, leaves header view for body text and enters it for header or footer text. |
+| Ctrl+click | The caret's place on screen is read once it has settled (150 ms unchanged); the first reading can be the old place. |
+| A Word that will not quit | `Quit` is retried while Word answers "busy" (which dynamic COM can report as `MissingMemberException`); if Word still runs after 60 s its windows are recorded in `word-did-not-quit-<pid>/` and it is stopped, and the harness waits until it has gone. |
 
 ## Safety checks (T045), 2026-10-15
 
@@ -92,3 +113,22 @@ appends its attempts to `test-results/routes.md`.
 `npm run test:desktop`: 112 passed, 3 failed, 4 skipped in 7 min 41 s. The failures are the add-in
 findings recorded as feature 001 T143 (caret after the reference) and T144 (Esc with the warning
 up, scenarios 23 and 27); the skips are the three explicit diagnostics and the deferred case 10f.
+
+## Full runs on the test VM, 2026-10-16
+
+Two consecutive runs, identical: 111 passed, 4 failed, 6 skipped, in 15 min 36 s and 14 min 20 s
+(the VM is about twice as slow as the first machine). The skips are the five explicit diagnostics
+and 10f. The failures:
+
+- Scenario 01: the caret after the reference, feature 001 T143 (as before).
+- Scenario 23: it now gets past the warning and Esc (T144 does not show here), then fails at its
+  last step: with a table selected, the add-in declines when the palette opens ("References can't
+  replace a table."), while the test expects the palette and the refusal on Enter. The spec says
+  only "declined with a message" (FR-008a); the owner decides which is right.
+- Contract 9c at "Text box body.": Office.js cannot select in the text box after the restore, the
+  desktop bridge selects it (story 5), and the gateway then reports a location for which the
+  preview does not warn "position unknown". It passed this morning, when Office.js could still
+  select there; open.
+- Palette ready on spec-300: median about 950 ms against the 500 ms budget, the VM's speed.
+
+Scenario 27 passes here.
