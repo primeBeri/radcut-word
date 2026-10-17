@@ -7,6 +7,11 @@ export const SETTINGS_TEXT = {
   saved: "Settings saved.",
   saveFailed: "The settings couldn't be saved. Try again.",
   settingsReset: "Your saved settings couldn't be read, so the defaults are in use. Save to keep new ones.",
+  templatesIntro: "Your own wording, offered after the built-in formats when you press Tab.",
+  noTemplates: "No templates yet.",
+  templateHelp: "Use {number}, {text}, {page} and {abovebelow}; write {{ or }} for a brace.",
+  noPreview: "The preview appears once the template is valid.",
+  templateDropped: "A saved template couldn't be read, so it was left out.",
   unsavedTitle: "Unsaved changes",
   unsavedBody: "Your changes haven't been saved.",
 } as const;

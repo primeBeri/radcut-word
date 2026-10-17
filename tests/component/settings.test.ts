@@ -11,7 +11,7 @@ import type { SettingsProps } from "../../src/ui/settings/types";
 function setup(overrides: Partial<SettingsProps> = {}) {
   const save = vi.fn<SettingsProps["save"]>(async (): Promise<SaveSettingsResult> => ({ ok: true }));
   const close = vi.fn();
-  const props: SettingsProps = { settings: DEFAULT_SETTINGS, formats: BUILT_IN_FORMATS, notice: null, save, close, ...overrides };
+  const props: SettingsProps = { settings: DEFAULT_SETTINGS, notice: null, save, close, ...overrides };
   const result = render(Settings, { props });
   const group = screen.getByRole("radiogroup", { name: "Default format" });
   const radio = (name: string) => within(group).getByRole("radio", { name });

@@ -304,6 +304,55 @@ public sealed class Palette(PaneSession session) : IDisposable
         await WaitForMessageAsync("Settings saved.");
     }
 
+    /// <summary>A template in the settings view, by its name (its fieldset's legend).</summary>
+    private ILocator Template(string name) =>
+        Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Group, new() { Name = name, Exact = true });
+
+    /// <summary>Clicks Add template and types the new template's name and text into its fields (FR-018).</summary>
+    public async Task AddTemplateAsync(string name, string text)
+    {
+        var view = Pane.Page.Locator(SettingsView);
+        await view.GetByRole(AriaRole.Button, new() { Name = "Add template", Exact = true }).ClickAsync();
+        var added = view.GetByRole(AriaRole.Group).Last;
+        await added.GetByRole(AriaRole.Textbox, new() { Name = "Template name", Exact = true }).FillAsync(name);
+        await added.GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true }).FillAsync(text);
+    }
+
+    /// <summary>Replaces the text of the template named <paramref name="name"/>.</summary>
+    public Task EditTemplateTextAsync(string name, string text) =>
+        Template(name).GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true }).FillAsync(text);
+
+    /// <summary>The live sample preview of the template named <paramref name="name"/>.</summary>
+    public Task<string> TemplatePreviewAsync(string name) => Template(name).GetByTestId("template-preview").InnerTextAsync();
+
+    /// <summary>Clicks Delete on the template named <paramref name="name"/>.</summary>
+    public Task DeleteTemplateAsync(string name) =>
+        Template(name).GetByRole(AriaRole.Button, new() { Name = $"Delete template {name}", Exact = true }).ClickAsync();
+
+    /// <summary>Clicks Save, saving as it stands, and waits for "Settings saved.".</summary>
+    public async Task SaveSettingsAsIsAsync()
+    {
+        await Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await WaitForMessageAsync("Settings saved.");
+    }
+
+    /// <summary>
+    /// Clicks Save expecting it to be refused: waits for <paramref name="error"/> next to the template text of
+    /// <paramref name="template"/>, announced, and for focus to be on that field.
+    /// </summary>
+    public async Task SaveSettingsRefusedAsync(string template, string error)
+    {
+        await Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        var field = Template(template).GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true });
+        await Wait.UntilAsync(
+            async () => await Template(template).GetByRole(AriaRole.Alert).CountAsync() == 1 &&
+                await Template(template).GetByRole(AriaRole.Alert).InnerTextAsync() == error &&
+                await field.GetAttributeAsync("aria-invalid") == "true" &&
+                await field.EvaluateAsync<bool>("element => element === document.activeElement"),
+            Wait.Pane,
+            $"\"{error}\" on the template \"{template}\", with focus on its text");
+    }
+
     /// <summary>Clicks Close in the settings view.</summary>
     public Task CloseSettingsAsync() =>
         Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();

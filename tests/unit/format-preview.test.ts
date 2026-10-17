@@ -78,12 +78,12 @@ describe("previewReference", () => {
   it.each(["textBox", "header", "footer"] as const)("cannot tell above/below for a target in a %s", (location) => {
     expect(
       previewReference([{ kind: "aboveBelow" }], { ...fireStrategy, location }, { precedingHeadingOrder: 20, location: "main" }),
-    ).toEqual({ text: "above/below ?", warnings: ["positionUnknown"] });
+    ).toEqual({ text: "{above/below}", warnings: ["positionUnknown"] });
   });
 
   it.each(["footnote", "endnote", "header", "footer", "textBox"] as const)("cannot tell above/below with the cursor in a %s", (location) => {
     expect(previewReference([{ kind: "aboveBelow" }], fireStrategy, { precedingHeadingOrder: null, location })).toEqual({
-      text: "above/below ?",
+      text: "{above/below}",
       warnings: ["positionUnknown"],
     });
   });

@@ -324,3 +324,17 @@ harness test passes, US1 after the T143, T144 and T145 changes and US2 for the f
 | 25 | Pass | Automated. By hand: The badges' colours, by eye |
 | 26 | Pass | Automated |
 | 27 | Pass | Automated |
+
+## Automated US3 run (feature 001, T078), 2026-10-17
+
+`npm run test:desktop -- --filter-class "*Us3Scenarios"` and the Contract category on the test
+VM (Word 2609), no person involved. Scenario 9 makes the template in the settings view, sees
+`{num}` refused with its message next to the field and focus on it, cycles to the template
+after the built-ins, inserts it as previewed, updates fields, then edits and deletes the
+template and checks the inserted reference is unchanged. Contract case 9e inserts a template
+with every placeholder kind, a repeat and literal braces: 72 passed, 2 skipped (10f deferred,
+S5 Node only).
+
+| # | Result | Notes |
+|---|---|---|
+| 9 | Pass | Automated (`Scenario09`) |

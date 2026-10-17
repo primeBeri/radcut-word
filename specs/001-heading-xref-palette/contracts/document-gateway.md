@@ -135,6 +135,9 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
     (spike 4 and hand checks).
 9d. Each built-in format inserted in the main text writes exactly its R5 fields and shows what
     the preview said (page: a positive integer) (US2, T059).
+9e. A template's parts, with every placeholder kind, a repeated one and literal braces, write one
+    field per placeholder with the R5 switches, its literal text as typed, and show what the
+    preview said (US3, T078).
 10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
     selected text without confirmation.
 10a. With a selection spanning two paragraphs, or containing a picture, shape or content

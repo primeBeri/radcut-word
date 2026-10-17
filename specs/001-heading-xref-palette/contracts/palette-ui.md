@@ -80,7 +80,14 @@ The cog button stays in the accessibility tree with its shortcut announced
   the first control (FR-021a).
 - Sections: Default format (radio list of all formats with a sample preview); Templates (list
   with add, edit, delete; editor shows live preview against a sample heading and inline
-  validation errors from [format-templates.md](format-templates.md)); Shortcut (current value,
+  validation errors from [format-templates.md](format-templates.md); refined 2026-10-17: each
+  template is a fieldset named by its name, with "Template name" and "Template text" inputs, a
+  hint on the placeholders, a live preview of the sample heading "4.3 Fire strategy" (page 12,
+  above) in a polite live region, and "Delete template <name>"; "Add template" adds a blank one
+  and focuses its name, and says "There can be at most 20 templates." at 20; deleting moves
+  focus to the next template's name, else Add template; the default-format list follows the
+  draft, so a template is listed there once its text is valid; errors appear on Save, set
+  `aria-invalid`, are linked by `aria-describedby`, and go once their field is edited); Shortcut (current value,
   "Record new shortcut" capture, reset to default; read-only with explanation when signed out);
   Headings (two checkboxes, each with a description linked by `aria-describedby`):
   - "Allow references in headings" (off): "Not recommended. Headings feed the table of

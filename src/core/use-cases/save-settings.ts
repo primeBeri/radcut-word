@@ -1,32 +1,39 @@
 import type { ISettingsStore } from "../ports/settings-store";
 import type { UserSettings } from "../settings/types";
+import { templateProblems, TOO_MANY_TEMPLATES, type TemplateProblem } from "../settings/templates";
 import { formatExists, MAX_TEMPLATES } from "../settings/user-settings";
 
-/** A reason a setting cannot be saved, shown next to its field. */
-export interface SettingsError {
-  readonly field: "defaultFormatId" | "templates";
-  readonly message: string;
-}
+/** A reason a setting cannot be saved, shown next to its field (a template's name or text: `templateId` says which). */
+export type SettingsError =
+  | { readonly field: "defaultFormatId" | "templates"; readonly message: string }
+  | TemplateProblem;
 
 export type SaveSettingsResult =
   | { readonly ok: true }
   /** `failed`: valid, but the store could not write them (logged locally). */
   | { readonly ok: false; readonly errors: readonly SettingsError[]; readonly failed?: true };
 
-/** Every reason `settings` cannot be saved; empty when they can. */
+/** Names as they will be shown and compared: without surrounding spaces. */
+const trimmed = (settings: UserSettings): UserSettings => ({
+  ...settings,
+  templates: settings.templates.map((t) => ({ ...t, label: t.label.trim() })),
+});
+
+/** Every reason `settings` cannot be saved, templates first in their order; empty when they can. */
 export function validateSettings(settings: UserSettings): SettingsError[] {
-  const errors: SettingsError[] = [];
+  const errors: SettingsError[] = templateProblems(settings.templates);
   if (!formatExists(settings.defaultFormatId, settings.templates)) {
     errors.push({ field: "defaultFormatId", message: "Choose a default format." });
   }
   if (settings.templates.length > MAX_TEMPLATES) {
-    errors.push({ field: "templates", message: `There can be at most ${MAX_TEMPLATES} templates.` });
+    errors.push({ field: "templates", message: TOO_MANY_TEMPLATES });
   }
   return errors;
 }
 
 /** Validate, then persist through the store (FR-021); nothing is written if anything is invalid. */
-export async function saveSettings(store: ISettingsStore, settings: UserSettings): Promise<SaveSettingsResult> {
+export async function saveSettings(store: ISettingsStore, unsaved: UserSettings): Promise<SaveSettingsResult> {
+  const settings = trimmed(unsaved);
   const errors = validateSettings(settings);
   if (errors.length > 0) return { ok: false, errors };
   try {

@@ -12,6 +12,9 @@ const POSITION_UNKNOWN: ReadonlySet<Heading["location"]> = new Set(["textBox", "
 /** Shown for a page part: Word only knows the page once the field is in the document. */
 export const PAGE_PLACEHOLDER = "{page}";
 
+/** Shown for above/below where the add-in cannot tell which; Word decides once the field is in. */
+export const POSITION_PLACEHOLDER = "{above/below}";
+
 /** Cursor places outside the main text, where the gateways do not count headings, so above/below is not known. */
 const CURSOR_POSITION_UNKNOWN: ReadonlySet<InsertionLocation> = new Set(["footnote", "endnote", "header", "footer", "textBox"]);
 
@@ -43,7 +46,7 @@ export function previewReference(
         case "aboveBelow":
           if (POSITION_UNKNOWN.has(target.location) || CURSOR_POSITION_UNKNOWN.has(context.location)) {
             warnings.add("positionUnknown");
-            return "above/below ?";
+            return POSITION_PLACEHOLDER;
           }
           return context.precedingHeadingOrder !== null && target.order <= context.precedingHeadingOrder
             ? "above"

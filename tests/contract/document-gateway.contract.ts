@@ -2,6 +2,7 @@ import { generateBookmarkName } from "../../src/core/bookmarks/naming";
 import { BUILT_IN_FORMATS, formatById } from "../../src/core/formats/built-ins";
 import { fieldFor } from "../../src/core/formats/fields";
 import { previewReference } from "../../src/core/formats/preview";
+import { parseTemplate } from "../../src/core/formats/template-parser";
 import type { FormatPart } from "../../src/core/formats/types";
 import { headingFingerprint } from "../../src/core/headings/key";
 import type { Heading } from "../../src/core/headings/types";
@@ -573,6 +574,24 @@ export function defineDocumentGatewayContract(
         if (format.id === "page") expect(shown).toMatch(/^[1-9][0-9]*$/);
         else expect({ id: format.id, shown }).toEqual({ id: format.id, shown: previewReference(format.parts, target, point).text });
       }
+    });
+
+    it("9e. a template writes one field per placeholder, repeats included, and its literal text as typed (US3, T078)", async () => {
+      const parsed = parseTemplate("{{see}} §{number} {text}, {abovebelow} ({TEXT})");
+      if (!parsed.ok) throw new Error(parsed.error);
+      const h = await setup("spec-contract");
+      await h.select(BODY);
+      const point = await h.gateway.checkInsertionPoint(OFF);
+      if (point.kind !== "insertionPoint") throw new Error("expected an insertion point");
+      const target = await headingByText(h.gateway, "Fire strategy");
+      const result = await insertOk(h, "Fire strategy", { parts: parsed.parts });
+      const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+      expect(added.map((f) => ({ type: f.type, switches: f.switches }))).toEqual(
+        ["number", "text", "aboveBelow", "text"].map((kind) => fieldFor(kind as Exclude<FormatPart["kind"], "literal">)),
+      );
+      const shown = await h.insertionText(result.reference);
+      expect(shown).toBe(previewReference(parsed.parts, target, point).text);
+      expect(shown).toMatch(/^\{see\} §4\.3 Fire strategy, (above|below) \(Fire strategy\)$/);
     });
 
     describe("9b. writing with the cursor in a footnote, an endnote or a table cell", () => {

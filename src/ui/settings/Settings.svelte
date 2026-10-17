@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import type { UserSettings } from "../../core/settings/types";
+  import { addTemplate, deleteTemplate, formatsFor, templateId, updateTemplate, type TemplateProblem } from "../../core/settings/templates";
+  import type { TemplateDefinition, UserSettings } from "../../core/settings/types";
   import FormatPicker from "./FormatPicker.svelte";
   import HeadingOptions from "./HeadingOptions.svelte";
   import { SETTINGS_TEXT } from "./labels";
+  import Templates from "./Templates.svelte";
   import type { SettingsProps } from "./types";
 
-  let { settings, formats, notice, save, close }: SettingsProps = $props();
+  let { settings, notice, save, close, newId = () => crypto.randomUUID() }: SettingsProps = $props();
+
+  const NOTICES = { settingsReset: SETTINGS_TEXT.settingsReset, templateDropped: SETTINGS_TEXT.templateDropped } as const;
 
   // The view edits a copy; `kept` is what the store now holds, to tell unsaved changes.
   // svelte-ignore state_referenced_locally
@@ -16,23 +20,48 @@
   const dirty = $derived(
     draft.defaultFormatId !== kept.defaultFormatId ||
       draft.allowReferencesInHeadings !== kept.allowReferencesInHeadings ||
-      draft.showHeadingsOutsideMainText !== kept.showHeadingsOutsideMainText,
+      draft.showHeadingsOutsideMainText !== kept.showHeadingsOutsideMainText ||
+      JSON.stringify(draft.templates) !== JSON.stringify(kept.templates),
   );
+  /** The default-format list follows the draft: a template shows up there once its text is valid. */
+  const formats = $derived(formatsFor(draft));
 
   // svelte-ignore state_referenced_locally
-  let status = $state<string>(notice === "settingsReset" ? SETTINGS_TEXT.settingsReset : "");
+  let status = $state<string>(notice ? NOTICES[notice] : "");
   /** A failure that belongs to no one field. */
   let failure = $state<string | null>(null);
   let formatError = $state<string | null>(null);
+  let templateProblems = $state<TemplateProblem[]>([]);
+  let addError = $state<string | null>(null);
   /** The in-pane "unsaved changes" prompt (never a browser confirm()). */
   let confirming = $state(false);
   let saving = false;
   let picker: FormatPicker;
+  let region: HTMLElement;
   let keepButton = $state<HTMLButtonElement>();
   /** Where focus goes back to when the prompt is dismissed. */
   let beforePrompt: HTMLElement | null = null;
 
   onMount(() => picker.focus());
+
+  function onAdd(): void {
+    const result = addTemplate(draft, templateId(newId()));
+    addError = result.ok ? null : result.error;
+    if (result.ok) draft = result.settings;
+  }
+
+  function onUpdate(id: string, change: Partial<Pick<TemplateDefinition, "label" | "source">>): void {
+    draft = updateTemplate(draft, id, change);
+    // An edited field's error goes; it is checked again on Save.
+    const edited = new Set(Object.keys(change).map((key) => (key === "label" ? "templateLabel" : "templateSource")));
+    templateProblems = templateProblems.filter((p) => p.templateId !== id || !edited.has(p.field));
+  }
+
+  function onDelete(id: string): void {
+    draft = deleteTemplate(draft, id);
+    templateProblems = templateProblems.filter((p) => p.templateId !== id);
+    addError = null;
+  }
 
   async function onSave(): Promise<void> {
     if (saving) return;
@@ -40,9 +69,12 @@
     status = "";
     failure = null;
     formatError = null;
+    templateProblems = [];
     const result = await save($state.snapshot(draft));
     saving = false;
     if (result.ok) {
+      // Saved with names trimmed (save-settings); show what was stored.
+      draft = { ...draft, templates: draft.templates.map((t) => ({ ...t, label: t.label.trim() })) };
       kept = { ...draft };
       status = SETTINGS_TEXT.saved;
       return;
@@ -52,9 +84,12 @@
       return;
     }
     formatError = result.errors.find((e) => e.field === "defaultFormatId")?.message ?? null;
-    failure = result.errors.find((e) => e.field !== "defaultFormatId")?.message ?? null;
+    templateProblems = result.errors.filter((e): e is TemplateProblem => e.field === "templateLabel" || e.field === "templateSource");
+    failure = result.errors.find((e) => e.field === "templates")?.message ?? null;
     await tick();
+    // The first error in the view's order: the default format comes before the templates.
     if (formatError) picker.focus();
+    else region.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
   }
 
   async function requestClose(): Promise<void> {
@@ -83,10 +118,11 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div class="settings radcut-pane" role="region" aria-label="Settings" onkeydown={onKeydown}>
+<div bind:this={region} class="settings radcut-pane" role="region" aria-label="Settings" onkeydown={onKeydown}>
   <h1 class="title">Settings</h1>
   <div class="body">
     <FormatPicker bind:this={picker} {formats} bind:value={draft.defaultFormatId} error={formatError} />
+    <Templates templates={draft.templates} problems={templateProblems} {addError} onadd={onAdd} onupdate={onUpdate} ondelete={onDelete} />
     <HeadingOptions bind:allowInHeadings={draft.allowReferencesInHeadings} bind:showOutsideMainText={draft.showHeadingsOutsideMainText} />
   </div>
 

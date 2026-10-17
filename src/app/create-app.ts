@@ -1,5 +1,4 @@
 import { mount, unmount } from "svelte";
-import { BUILT_IN_FORMATS } from "../core/formats/built-ins";
 import type { ReferenceFormat } from "../core/formats/types";
 import { filterHeadings } from "../core/headings/filter";
 import { HeadingIndex } from "../core/headings/heading-index";
@@ -10,6 +9,7 @@ import type { IDocumentGateway } from "../core/ports/document-gateway";
 import type { IHostShell } from "../core/ports/host-shell";
 import type { ISettingsStore } from "../core/ports/settings-store";
 import { DEFAULT_SETTINGS } from "../core/settings/defaults";
+import { formatsFor } from "../core/settings/templates";
 import type { UserSettings } from "../core/settings/types";
 import { loadUserSettings, type LoadedSettings } from "../core/settings/user-settings";
 import { insertReference } from "../core/use-cases/insert-reference";
@@ -38,15 +38,12 @@ function report(where: string, error: unknown): void {
   console.error(`[radcut:${where}]`, error);
 }
 
-/** Every format in cycle order: the built-ins, then templates (US3). */
-const FORMATS: readonly ReferenceFormat[] = BUILT_IN_FORMATS;
-
 function optionsFor(settings: UserSettings): OpenPaletteOptions {
   return {
     policy: { allowInHeadings: settings.allowReferencesInHeadings },
     showHeadingsOutsideMainText: settings.showHeadingsOutsideMainText,
     defaultFormatId: settings.defaultFormatId,
-    formats: FORMATS,
+    formats: formatsFor(settings),
   };
 }
 
@@ -121,7 +118,7 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
     const props = reactivePaletteProps({
       headings: state.headings,
       format: state.format,
-      formats: FORMATS,
+      formats: formatsFor(settings),
       point: state.point,
       initialQuery,
       cancel: () => void close(),
@@ -219,7 +216,6 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
         target,
         props: {
           settings: loaded.settings,
-          formats: FORMATS,
           notice: loaded.notice,
           save,
           // Back to the palette with its query, or to the document (FR-021b).
