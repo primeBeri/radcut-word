@@ -37,6 +37,8 @@ public sealed class Keys : IDisposable
         }
         catch (TimeoutException e)
         {
+            // The screen was locked during the test: a skip, as at the start of one (T045).
+            if (!Preflight.HasInteractiveDesktop()) Preflight.SkipWithoutDesktop();
             throw new TimeoutException($"{e.Message} In front instead: {ForegroundDescription()}. Close it and leave the machine alone during the run.", e);
         }
         word.Document.ActiveWindow.SetFocus();

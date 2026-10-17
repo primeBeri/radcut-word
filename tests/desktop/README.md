@@ -110,7 +110,7 @@ appends its attempts to `test-results/routes.md`.
 | After every run | No WINWORD, dev server or test process left; `git status` shows no fixture changed |
 | Outlook open with an add-in running | Works: the harness's Word has its own WebView2 data folder (research D15) |
 | Another window brought to the front during a run | The keyboard step fails and names the window in the way; nothing is typed elsewhere |
-| A locked screen | To do with the owner: keyboard checks should report `SKIPPED: no interactive desktop` |
+| A locked screen (Win+L during the Scenario category, 2026-10-16, test VM) | Every test started after the lock reports `SKIPPED: no interactive desktop`, also in summary.md; no Word or dev server left, no fixture changed. The first attempt found that Windows 11 shows the lock screen on the normal desktop for a minute or two before it switches desktops, so three tests started behind it and failed; the check now also asks Windows whether the session is locked. A test caught mid-way skips when Word cannot be brought to the front with the screen locked (not yet seen in a run: the lock fell between tests) |
 
 ## A full run, 2026-10-15
 

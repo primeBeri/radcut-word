@@ -22,7 +22,7 @@ public abstract class ScenarioTest : HarnessTest
     /// <summary>Word on a scratch copy of <paramref name="fixture"/> with the palette ready; skipped without an interactive desktop.</summary>
     protected async Task<(Palette Palette, object Document)> OpenAsync(string fixture, string name)
     {
-        if (!Preflight.HasInteractiveDesktop()) Assert.Skip(Preflight.NoDesktopMessage);
+        if (!Preflight.HasInteractiveDesktop()) Preflight.SkipWithoutDesktop();
         Session = await PaneSession.StartAsync(fixture, DevServerMode.Normal, name);
         if (Session.Pane is null) throw new InvalidOperationException($"No route reached the task pane: {Session.PaneFailure}");
         // The ribbon button opened the pane to start the session; hide it again, as a person

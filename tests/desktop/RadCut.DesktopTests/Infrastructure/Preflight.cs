@@ -52,12 +52,14 @@ public static class Preflight
     }
 
     /// <summary>
-    /// True when keystrokes can reach Word: the session is interactive and the input desktop is the
-    /// normal one (not the lock screen or a secure desktop).
+    /// True when keystrokes can reach Word: the session is interactive and not locked, and the input
+    /// desktop is the normal one (not a secure desktop). The lock is asked separately because after
+    /// Win+L Windows 11 shows the lock screen on the normal desktop for a minute or two before it
+    /// switches desktops (T045, 2026-10-16: three tests passed the desktop check behind LockApp).
     /// </summary>
     public static bool HasInteractiveDesktop()
     {
-        if (!Environment.UserInteractive) return false;
+        if (!Environment.UserInteractive || SessionLocked()) return false;
         var desktop = OpenInputDesktop(0, false, DesktopReadObjects);
         if (desktop == IntPtr.Zero) return false;
         try
@@ -71,6 +73,36 @@ public static class Preflight
             CloseDesktop(desktop);
         }
     }
+
+    /// <summary>Skips the running test because keystrokes cannot reach Word; the reason goes to summary.md.</summary>
+    public static void SkipWithoutDesktop() => HarnessSkip.Because(NoDesktopMessage);
+
+    /// <summary>
+    /// True when this session is locked (WTSSessionInfoEx). WTSINFOEXW: Level at 0, then the level-1
+    /// data, 8-byte aligned, with SessionId at 8 and SessionFlags at 16; flags 0 is locked, 1 unlocked.
+    /// </summary>
+    private static bool SessionLocked()
+    {
+        if (!WTSQuerySessionInformationW(IntPtr.Zero, CurrentSession, WtsSessionInfoEx, out var buffer, out _)) return false;
+        try
+        {
+            return Marshal.ReadInt32(buffer, 0) == 1 && Marshal.ReadInt32(buffer, 16) == WtsSessionStateLock;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
+
+    private const int CurrentSession = -1;
+    private const int WtsSessionInfoEx = 25;
+    private const int WtsSessionStateLock = 0;
+
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSQuerySessionInformationW(IntPtr server, int sessionId, int infoClass, out IntPtr buffer, out int bytes);
+
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr memory);
 
     private const uint DesktopReadObjects = 0x0001;
     private const int UoiName = 2;

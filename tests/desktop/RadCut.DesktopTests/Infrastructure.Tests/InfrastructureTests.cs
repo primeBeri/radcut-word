@@ -57,6 +57,14 @@ public class PreflightTests
         Preflight.RefuseIfWordRunning(name => { asked = name; return []; });
         Assert.Equal("WINWORD", asked);
     }
+
+    [Fact]
+    public void A_skip_keeps_its_reason_for_the_summary_once()
+    {
+        HarnessSkip.Remember(Preflight.NoDesktopMessage);
+        Assert.Equal(Preflight.NoDesktopMessage, HarnessSkip.Take());
+        Assert.Null(HarnessSkip.Take());
+    }
 }
 
 [Trait("Category", "Harness")]
@@ -173,7 +181,7 @@ public class DevServerTests
     [Fact]
     public async Task Starts_answers_and_stops_leaving_the_port_free()
     {
-        if (DevServer.IsPortInUse(DevServer.Port)) Assert.Skip("Port 3000 is in use by another server.");
+        if (DevServer.IsPortInUse(DevServer.Port)) HarnessSkip.Because("Port 3000 is in use by another server.");
         await using (var server = await DevServer.StartAsync(DevServerMode.Normal))
         {
             using var http = new HttpClient();

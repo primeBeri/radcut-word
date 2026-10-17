@@ -120,10 +120,10 @@ public sealed class ContractRunTests : HarnessTest
             case "pass":
                 return;
             case "skip":
-                Assert.Skip("Registered as skipped in Word.");
+                HarnessSkip.Because("Registered as skipped in Word.");
                 break;
             default:
-                if (result.Error?.Contains(Preflight.NoDesktopMessage, StringComparison.Ordinal) == true) Assert.Skip(Preflight.NoDesktopMessage);
+                if (result.Error?.Contains(Preflight.NoDesktopMessage, StringComparison.Ordinal) == true) Preflight.SkipWithoutDesktop();
                 Assert.Fail($"{result.Error} (evidence: test-results/contract-run-*/)");
                 break;
         }
