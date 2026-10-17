@@ -277,6 +277,9 @@ export class OfficeJsGateway implements IDocumentGateway {
         // update comes back empty (in-Word contract run).
         const start = first instanceof Word.Field ? first.result : first;
         const span = this.debug.onInserted && start ? start.expandTo(anchor.getRange("Start")).track() : null;
+        // Every part went in before the anchor, so its start is the reference's end. Word leaves
+        // the selection at the insertion point, before the reference (T143), so put it after.
+        anchor.getRange("Start").select();
         this.debug.duringWrite?.(anchor);
         // Queued last: a batch that fails part-way stops before it, so the check below can still
         // read the paragraph.
@@ -301,7 +304,8 @@ export class OfficeJsGateway implements IDocumentGateway {
 
   async returnFocus(after?: InsertedReference): Promise<void> {
     await Word.run(async (context) => {
-      // After an insertion the selection sits just after the reference; collapse to its end.
+      // insertReference left the selection just after the reference; select it again, collapsed,
+      // now the pane is hidden, so Word takes keyboard focus (research R3).
       context.document.getSelection().select(after ? "End" : "Select");
       await context.sync();
     });

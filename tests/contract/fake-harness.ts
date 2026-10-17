@@ -30,6 +30,7 @@ export async function fakeGatewayHarness(fixture: ContractFixture): Promise<Gate
     insertionText: async (reference: InsertedReference) => gateway.insertionText(reference.id),
     insertionParagraph: async (reference: InsertedReference) => gateway.insertionParagraph(reference.id),
     replacedText: async (reference: InsertedReference) => gateway.replacedText(reference.id),
+    caretIsAfter: async (reference: InsertedReference) => gateway.focusReturned?.after === reference.id,
     documentState: async () => gateway.documentState(),
   };
 }

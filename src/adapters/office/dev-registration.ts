@@ -486,6 +486,15 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     async replacedText(reference) {
       return spanOf(reference).replaced;
     },
+    async caretIsAfter(reference) {
+      const { span } = spanOf(reference);
+      return Word.run(span, async (context) => {
+        const selection = context.document.getSelection().load("isEmpty");
+        const where = span.getRange("End").compareLocationWith(selection);
+        await context.sync();
+        return selection.isEmpty && where.value === "Equal";
+      });
+    },
     async documentState() {
       const text = await timed("state", () =>
         Word.run(async (context) => {

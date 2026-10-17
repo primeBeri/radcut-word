@@ -77,6 +77,11 @@ export interface GatewayContractHarness {
   insertionParagraph(reference: InsertedReference): Promise<string>;
   /** The selected text the reference replaced ("" for a caret). */
   replacedText(reference: InsertedReference): Promise<string>;
+  /**
+   * True when the cursor is a caret just after the reference. The fake has no positions, so there
+   * it means returnFocus was given this reference.
+   */
+  caretIsAfter(reference: InsertedReference): Promise<boolean>;
   /** Comparable snapshot of the whole document for "unchanged" assertions. */
   documentState(): Promise<unknown>;
   /**
@@ -519,6 +524,22 @@ export function defineDocumentGatewayContract(
         { type: "ref", bookmark: result.bookmark, switches: fieldFor("text").switches },
       ]);
       expect(await h.insertionText(result.reference)).toBe("§ 4.3 Fire strategy");
+    });
+
+    it("8a. returnFocus after an insertion leaves a caret just after the reference, whatever it replaced", async () => {
+      const cases: { text: string; selection: SelectionRequest; parts?: readonly FormatPart[]; confirmed?: InsertReferenceRequest["confirmed"] }[] = [
+        { text: BODY, selection: {} },
+        { text: BODY, selection: { length: 4 } },
+        { text: "First of two paragraphs.", selection: { paragraphs: 2, length: 5 }, confirmed: "selection" },
+        { text: "References made by Word: see section and heading.", selection: { inField: true }, parts: TEXT, confirmed: "field" },
+      ];
+      for (const { text, selection, parts, confirmed } of cases) {
+        const h = await setup("spec-contract");
+        await h.select(text, selection);
+        const result = await insertOk(h, "Scope", { ...(parts ? { parts } : {}), confirmed: confirmed ?? null });
+        await h.gateway.returnFocus(result.reference);
+        expect({ selection, after: await h.caretIsAfter(result.reference) }).toEqual({ selection, after: true });
+      }
     });
 
     it("9. each field's result equals the core's preview for every built-in format", async () => {

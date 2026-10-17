@@ -135,7 +135,13 @@ The failures:
   the 10 runs it failed instead on the harness's own focus query ("UIA Timeout"), now fixed (table
   above).
 
-Contract 9c passed in all ten. The earlier runs, before those fixes:
+Contract 9c passed in all ten.
+
+After feature 001's T143 fix (caret after the reference) and the scenario 23 change, 2026-10-17:
+117 passed, 1 failed, 6 skipped in 14 min 51 s; every scenario passes, and the one failure is the
+palette-ready time on the VM (median 1009 ms).
+
+The earlier runs, before those fixes:
 
 Two consecutive runs, identical: 111 passed, 4 failed, 6 skipped, in 15 min 36 s and 14 min 20 s
 (the VM is about twice as slow as the first machine). The skips are the five explicit diagnostics
