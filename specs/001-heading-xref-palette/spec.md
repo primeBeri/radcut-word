@@ -22,6 +22,8 @@
 
 **Refined**: 2026-10-14 — From the Phase 10 hand checks: references may also be inserted with the cursor in a header, a footer or a text box, as Word's own cross-reference dialog allows (FR-001a); comments and plain-text content controls stay declined. Outside the main text no heading order is known, so the preview does not guess above/below there; formats with an above/below part are also hidden in headers, footers and text boxes if Word shows the heading text there (FR-016a, to be confirmed in Word). Behaviour there (one Undo step, caret return, F9, Ctrl+click, linked headers and footers) is to be confirmed by an in-Word spike before the rule changes.
 
+**Refined**: 2026-10-17 — From the owner's decision on T145: for a heading without a number, a format's number part and its padding are left out of the preview and of the inserted reference (Word would show "0"), while text before the number such as "§" stays as a cue that this is a reference; a format whose only field is the number inserts nothing and suggests Tab. From the T144 hand check: Esc dismisses the field or selection warning and a second Esc closes the palette, as intended.
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -222,8 +224,11 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - **No headings**: the palette opens with a message explaining that headings must use Word's
   heading styles or outline levels; Esc closes it.
 - **No matches**: the list shows an empty-state message; Enter does nothing; Esc closes.
-- **Unnumbered heading with a number format**: the preview shows what Word will display (empty or
-  an error) and a warning; the user can still insert or Tab to another format.
+- **Unnumbered heading with a number format**: the number part and its padding (the text after it
+  up to the next part, or brackets around it) are left out, in the preview and in the inserted
+  reference alike. Text before the number stays as a cue that this is a reference, so
+  "§ number text" gives "§ " and the heading text. If the number is the format's
+  only field, Enter inserts nothing and a message suggests Tab for another format.
 - **Duplicate heading text**: both headings are listed and distinguishable by number, level and
   position; each reference targets the heading actually selected.
 - **Heading with several usable bookmarks**: the first by case-insensitive name order is reused,

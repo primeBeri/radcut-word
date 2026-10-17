@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BUILT_IN_FORMATS, DEFAULT_FORMAT_ID, formatById } from "../../src/core/formats/built-ins";
 import { fieldFor } from "../../src/core/formats/fields";
-import { normaliseParts } from "../../src/core/formats/parts";
+import { normaliseParts, partsForHeading } from "../../src/core/formats/parts";
 import { previewReference } from "../../src/core/formats/preview";
 import type { Heading } from "../../src/core/headings/types";
 
@@ -50,10 +50,14 @@ describe("previewReference", () => {
     });
   });
 
-  it("warns noNumber for an unnumbered heading", () => {
+  it("leaves the number out for an unnumbered heading but keeps the § mark, and warns noNumber (T145)", () => {
     const preview = previewReference(sectionNumberText, { ...fireStrategy, number: null }, { precedingHeadingOrder: 20, location: "main" });
-    expect(preview.warnings).toEqual(["noNumber"]);
-    expect(preview.text).toBe("§  Fire strategy");
+    expect(preview).toEqual({ text: "§ Fire strategy", warnings: ["noNumber"] });
+  });
+
+  it("previews nothing for a number-only format and an unnumbered heading", () => {
+    const preview = previewReference([{ kind: "number" }], { ...fireStrategy, number: null }, { precedingHeadingOrder: 20, location: "main" });
+    expect(preview).toEqual({ text: "", warnings: ["noNumber"] });
   });
 
   it("shows page as ? with pageUnknown", () => {
@@ -108,6 +112,41 @@ describe("normaliseParts", () => {
         { kind: "text" },
       ]),
     ).toEqual([{ kind: "literal", text: "see § " }, { kind: "number" }, { kind: "text" }]);
+  });
+});
+
+describe("partsForHeading (T145: an unnumbered heading loses the number, keeping the mark before it)", () => {
+  const lit = (text: string) => ({ kind: "literal", text }) as const;
+  const NUMBER = { kind: "number" } as const;
+  const TEXT = { kind: "text" } as const;
+  const ABOVE = { kind: "aboveBelow" } as const;
+
+  it("keeps every part for a numbered heading", () => {
+    const parts = [lit("§ "), NUMBER, lit(" "), TEXT];
+    expect(partsForHeading(parts, "4.3")).toEqual(parts);
+  });
+
+  it.each([
+    ["§ number text keeps the §", [lit("§ "), NUMBER, lit(" "), TEXT], [lit("§ "), TEXT]],
+    ["§number text, no space after the mark", [lit("§"), NUMBER, lit(" "), TEXT], [lit("§ "), TEXT]],
+    ["number + text", [NUMBER, lit(" "), TEXT], [TEXT]],
+    ["number. text", [NUMBER, lit(". "), TEXT], [TEXT]],
+    ["text (number) loses the brackets", [TEXT, lit(" ("), NUMBER, lit(")")], [TEXT]],
+    ["text [§ number] loses everything in the brackets", [TEXT, lit(" [§ "), NUMBER, lit("]")], [TEXT]],
+    ["a label before the number stays", [TEXT, lit(", section "), NUMBER, lit(" "), ABOVE], [TEXT, lit(", section "), ABOVE]],
+    ["no space is added where the padding had none", [TEXT, lit("–"), NUMBER, lit("–"), ABOVE], [TEXT, lit("–"), ABOVE]],
+    ["two number parts", [NUMBER, lit(" "), TEXT, lit(" "), NUMBER], [TEXT]],
+  ] as const)("%s", (_name, parts, expected) => {
+    expect(partsForHeading(parts, null)).toEqual(expected);
+  });
+
+  it("leaves nothing when the number was the only field", () => {
+    expect(partsForHeading([lit("section "), NUMBER], null)).toEqual([]);
+  });
+
+  it("keeps a format without a number part as it is", () => {
+    const parts = [TEXT, lit(" "), ABOVE];
+    expect(partsForHeading(parts, null)).toEqual(parts);
   });
 });
 

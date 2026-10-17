@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { hidesAboveBelow, offeredFormats, openingFormat, stepFormat } from "../../core/formats/cycle";
   import { previewReference } from "../../core/formats/preview";
   import { headingIdentity } from "../../core/headings/key";
   import { rankHeadings } from "../../core/matching/fuzzy-matcher";
@@ -7,11 +8,12 @@
   import type { Confirmation } from "../../core/location/types";
   import { messageText, warningFor, type ConfirmationWarning, type MessageId } from "../../core/messages";
   import FormatStrip from "./FormatStrip.svelte";
+  import { ABOVE_BELOW_HIDDEN } from "./labels";
   import MessageRegion from "./MessageRegion.svelte";
   import ResultRow from "./ResultRow.svelte";
   import type { PaletteProps } from "./types";
 
-  let { headings, format, point, insert, cancel, openSettings }: PaletteProps = $props();
+  let { headings, format, formats, point, initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
 
   const LIST_ID = "radcut-palette-list";
   const optionId = (index: number) => `radcut-option-${index}`;
@@ -20,7 +22,16 @@
 
   let input: HTMLInputElement;
   let listbox: HTMLElement;
-  let query = $state("");
+  // Read once: the palette owns the query from here on.
+  // svelte-ignore state_referenced_locally
+  let query = $state(initialQuery);
+  /** Tab and Shift+Tab move this (FR-015); a fresh palette starts on `format`. */
+  // svelte-ignore state_referenced_locally
+  let formatId = $state(format.id);
+  const all = $derived(formats ?? [format]);
+  const cycle = $derived(offeredFormats(all, point.location));
+  /** If the cursor has moved where this format cannot be shown, the next one that can (FR-016a). */
+  const current = $derived(cycle.find((f) => f.id === formatId) ?? openingFormat(all, point.location, formatId));
   /** Survives refreshes of `headings`; null = first row. */
   let selectedIdentity = $state<string | null>(null);
   /** Asked for after the first Enter; the second Enter confirms exactly this (FR-008a, FR-008b). */
@@ -38,7 +49,7 @@
     return found >= 0 ? found : 0;
   });
   const selected = $derived(rows[selectedIndex]?.heading ?? null);
-  const preview = $derived(selected ? previewReference(format.parts, selected, point).text : "");
+  const preview = $derived(selected ? previewReference(current.parts, selected, point).text : "");
   const status = $derived<MessageId | null>(warning ?? message ?? (rows.length === 0 ? "noMatches" : null));
 
   onMount(() => {
@@ -100,7 +111,7 @@
     pending = null;
     busy = true;
     try {
-      const feedback = await insert(target, confirmed);
+      const feedback = await insert(target, current, confirmed);
       if (feedback.kind === "needsConfirmation") pending = feedback.confirm;
       else if (feedback.kind === "message") message = feedback.message;
     } catch {
@@ -116,10 +127,10 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    // Only once there is a settings view to open (US2); until then Ctrl+, is left alone.
+    // Only when there is a settings view to open; otherwise Ctrl+, is left alone.
     if (openSettings && event.ctrlKey && event.key === ",") {
       event.preventDefault();
-      openSettings();
+      openSettings(query);
       return;
     }
     switch (event.key) {
@@ -136,7 +147,8 @@
         move(-pageSize());
         break;
       case "Tab":
-        // Format cycling arrives with US2; Tab never moves focus out of the palette.
+        // Tab never moves focus out of the palette (contracts/palette-ui.md).
+        formatId = stepFormat(cycle, current.id, event.shiftKey ? -1 : 1).id;
         break;
       case "Enter":
         void enter();
@@ -182,7 +194,7 @@
         tabindex="-1"
         aria-label="Settings"
         aria-keyshortcuts="Control+Comma"
-        onclick={openSettings}
+        onclick={() => openSettings(query)}
       >
         <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
           <path
@@ -221,7 +233,7 @@
   </div>
 
   <MessageRegion message={status} visuallyHidden={warning !== null} />
-  <FormatStrip label={format.label} {preview} />
+  <FormatStrip label={current.label} {preview} note={hidesAboveBelow(point.location) ? ABOVE_BELOW_HIDDEN : null} />
 </div>
 
 <style>

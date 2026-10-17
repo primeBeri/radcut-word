@@ -1,9 +1,9 @@
 import { FakeHostShell } from "../fakes/fake-host-shell";
-import { FakeSettingsStore } from "../fakes/fake-settings-store";
+import { fakeSettingsStoreHarness } from "./fake-harness";
 import { defineHostShellContract, defineSettingsStoreContract } from "./host-ports.contract";
 import { vitestApi } from "./vitest-api";
 
-defineSettingsStoreContract("FakeSettingsStore", async () => new FakeSettingsStore(), vitestApi);
+defineSettingsStoreContract("FakeSettingsStore", fakeSettingsStoreHarness, vitestApi);
 
 defineHostShellContract(
   "FakeHostShell",

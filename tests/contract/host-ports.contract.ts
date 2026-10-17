@@ -1,5 +1,6 @@
 import type { IHostShell } from "../../src/core/ports/host-shell";
 import type { ISettingsStore } from "../../src/core/ports/settings-store";
+import type { UserSettings } from "../../src/core/settings/types";
 import type { ContractTestApi } from "./test-api";
 
 /** Host-side controls a shell contract case needs: firing the actions the user would trigger. */
@@ -15,18 +16,63 @@ export interface HostShellContractHarness {
   closePaneByUser(): Promise<void>;
 }
 
-/**
- * Shared ISettingsStore contract (contracts/host-ports.md). A placeholder with no cases until
- * T061 (US2) adds them; it checks nothing yet.
- */
+/** A store with nothing in it, and a way to put raw data where it keeps settings. */
+export interface SettingsStoreContractHarness {
+  readonly store: ISettingsStore;
+  /** Store `text` as the settings value, as a damaged or future version would leave it. */
+  writeRaw(text: string): Promise<void>;
+  /** Node only: the paired FakeGateway's state, to show saving never touches the document. */
+  documentState?(): Promise<unknown>;
+}
+
+const SETTINGS: UserSettings = {
+  schemaVersion: 1,
+  defaultFormatId: "number",
+  templates: [{ id: "tpl:0d6c1f3e-0000-4000-8000-000000000001", label: "See § number", source: "see § {number}" }],
+  allowReferencesInHeadings: true,
+  showHeadingsOutsideMainText: false,
+};
+
+/** Shared ISettingsStore contract (contracts/host-ports.md, behaviours 1 and 3). */
 export function defineSettingsStoreContract(
   name: string,
-  makeStore: () => Promise<ISettingsStore>,
+  makeStore: () => Promise<SettingsStoreContractHarness>,
   api: ContractTestApi,
 ): void {
-  api.describe(`ISettingsStore contract: ${name}`, () => {
-    void makeStore;
-    api.skip("placeholder: no cases until T061 (US2)", () => undefined);
+  const { describe, it, expect } = api;
+  describe(`ISettingsStore contract: ${name}`, () => {
+    it("S1. loadSettings() returns null when nothing is stored", async () => {
+      const { store } = await makeStore();
+      expect(await store.loadSettings()).toBeNull();
+    });
+
+    it("S2. saved settings load back exactly", async () => {
+      const { store } = await makeStore();
+      await store.saveSettings(SETTINGS);
+      expect(await store.loadSettings()).toEqual(SETTINGS);
+      await store.saveSettings({ ...SETTINGS, defaultFormatId: "text", templates: [] });
+      expect(await store.loadSettings()).toEqual({ ...SETTINGS, defaultFormatId: "text", templates: [] });
+    });
+
+    it("S3. an unknown version comes back unvalidated, for the core to judge", async () => {
+      const h = await makeStore();
+      await h.writeRaw(JSON.stringify({ schemaVersion: 7, colour: "teal" }));
+      expect(await h.store.loadSettings()).toEqual({ schemaVersion: 7, colour: "teal" });
+    });
+
+    it("S4. data that is not JSON comes back as the stored text", async () => {
+      const h = await makeStore();
+      await h.writeRaw("{not json");
+      expect(await h.store.loadSettings()).toBe("{not json");
+    });
+
+    (api.environment === "node" ? it : api.skip)("S5. saving settings leaves the document untouched (Node only)", async () => {
+      const h = await makeStore();
+      if (!h.documentState) throw new Error("No paired gateway.");
+      const before = await h.documentState();
+      await h.store.saveSettings(SETTINGS);
+      expect(await h.documentState()).toEqual(before);
+    });
   });
 }
 

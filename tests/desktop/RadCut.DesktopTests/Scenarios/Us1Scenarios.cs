@@ -293,7 +293,19 @@ public sealed class Us1Scenarios : ScenarioTest
             "A quotation.", "First of two paragraphs.", "Second of two paragraphs.",
         };
         var bookmarks = new List<(string Heading, string Bookmark)>();
-        foreach (var ((heading, _), place) in others.Zip(places)) bookmarks.Add((heading, (await palette.InsertAsync(place, heading)).Bookmark));
+        foreach (var ((heading, _), place) in others.Zip(places))
+        {
+            var paragraph = WordActions.Find(document, place).Paragraphs.First;   // its text changes with the insertion
+            var inserted = await palette.InsertAsync(place, heading);
+            bookmarks.Add((heading, inserted.Bookmark));
+            // An unnumbered heading keeps the "§ " of the default format but not the number: "§ 0 …" (T145).
+            Assert.Equal((heading, heading), (heading, inserted.Fields[^1].Result));
+            string text = WordActions.ParagraphText(paragraph);
+            Assert.DoesNotContain("§ 0", text);
+            if (heading != "Heading in a footnote") continue;   // known to be unnumbered
+            Assert.Single(inserted.Fields);
+            Assert.StartsWith("§ " + heading, text);
+        }
         Assert.Empty(WordActions.UpdateFields(document));
         Assert.Empty(DocumentInspector.ErrorResults(document));
         foreach (var (heading, bookmark) in bookmarks)

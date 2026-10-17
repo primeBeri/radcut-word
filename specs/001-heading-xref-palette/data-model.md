@@ -119,7 +119,7 @@ order. Tab = next, Shift+Tab = previous, wrapping at both ends.
 | Field | Type | Rules |
 |---|---|---|
 | `text` | `string` | What the reference will display now, e.g. "§ 4.3 Fire strategy". |
-| `warnings` | `("noNumber" \| "pageUnknown" \| "positionUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered. `positionUnknown` when the format has an above/below part and the target is in a text box, header or footer (Word decides; preview shows "above/below ?"). |
+| `warnings` | `("noNumber" \| "pageUnknown" \| "positionUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered; the number and its padding are then left out of the text, as they are when inserting, while text before the number such as "§" stays (T145). `positionUnknown` when the format has an above/below part and the target is in a text box, header or footer (Word decides; preview shows "above/below ?"). |
 
 Page is shown as "page ?" because the page cannot be computed before insertion; above/below is
 computed from `InsertionPoint.precedingHeadingOrder` versus the target's `order`.

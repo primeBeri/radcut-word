@@ -39,6 +39,8 @@ const HEADINGS: Heading[] = [
   heading(10, "In the footer", { location: "footer" }),
 ];
 
+const SECTION = formatById("sectionNumberText")!;
+
 const POINT: InsertionPoint = {
   kind: "insertionPoint",
   location: "main",
@@ -169,7 +171,7 @@ describe("Palette keyboard", () => {
     const { key, insert } = setup();
     await key("ArrowDown");
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[1], null);
+    expect(insert).toHaveBeenCalledWith(HEADINGS[1], SECTION, null);
   });
 
   it("cancels on Esc", async () => {
@@ -209,7 +211,7 @@ describe("Palette selection warning (FR-008a)", () => {
     expect(insert).not.toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent(messageText("selectionWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[0], "selection");
+    expect(insert).toHaveBeenCalledWith(HEADINGS[0], SECTION, "selection");
   });
 
   it("Esc dismisses only the warning", async () => {
@@ -238,7 +240,7 @@ describe("Palette selection warning (FR-008a)", () => {
     await key("Enter");
     expect(screen.getByRole("status")).toHaveTextContent(messageText("selectionWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenLastCalledWith(HEADINGS[0], "selection");
+    expect(insert).toHaveBeenLastCalledWith(HEADINGS[0], SECTION, "selection");
   });
 
   it("shows the warning visibly under the selected row, hidden from screen readers (the live region speaks it)", async () => {
@@ -263,7 +265,7 @@ describe("Palette field warning (FR-008b)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(messageText("fieldWarning"));
     expect(screen.getByTestId("warning-popover")).toHaveTextContent(messageText("fieldWarning"));
     await key("Enter");
-    expect(insert).toHaveBeenCalledWith(HEADINGS[0], "field");
+    expect(insert).toHaveBeenCalledWith(HEADINGS[0], SECTION, "field");
   });
 
   it("shows the field warning when the gateway asks for it at Enter", async () => {
@@ -310,6 +312,22 @@ describe("Palette messages and format strip", () => {
     expect(cog).toHaveAttribute("aria-keyshortcuts", "Control+Comma");
     await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
     expect(openSettings).toHaveBeenCalledOnce();
+  });
+
+  it("hands the query to settings, so returning can restore it (FR-021b)", async () => {
+    const openSettings = vi.fn();
+    const { input, type } = setup({ openSettings });
+    await type("fire");
+    await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+    expect(openSettings).toHaveBeenCalledWith("fire");
+    await fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(openSettings).toHaveBeenLastCalledWith("fire");
+  });
+
+  it("opens with a query already typed when given one, results filtered", () => {
+    const { input, selected } = setup({ initialQuery: "fire" });
+    expect(input).toHaveValue("fire");
+    expect(selected()).toHaveAccessibleName("4.3 Fire strategy, level 2");
   });
 
   it("shows no cog and lets Ctrl+, through while there is no settings view to open", async () => {

@@ -54,7 +54,7 @@ Behaviour:
 
 ```ts
 interface ISettingsStore {
-  loadSettings(): Promise<UserSettings | null>;   // null = nothing stored yet
+  loadSettings(): Promise<unknown>;   // raw: null = nothing stored yet; else unvalidated
   saveSettings(settings: UserSettings): Promise<void>;
   loadRecents(documentId: string): Promise<string[]>;
   saveRecents(documentId: string, bookmarks: string[]): Promise<void>;
@@ -65,8 +65,10 @@ Behaviour:
 
 1. Values round-trip exactly; nothing is written to the document (FR-021).
 2. No network access (FR-023).
-3. A corrupt or unknown-version value is reported as `null` by the core's loader (the adapter
-   returns raw data; validation and migration are core logic).
+3. The adapter returns the stored value unvalidated: parsed if it is JSON, else the stored text.
+   Validation and migration are core logic (`loadUserSettings`): a corrupt or unknown-version
+   value gives the defaults, and the settings view says so (contract cases S3, S4; the store's
+   cases are S1–S5 in `tests/contract/host-ports.contract.ts`).
 4. Recents for unsaved documents never reach the store; the core keeps them in memory.
 5. `loadSettings()` returns `null` when nothing is stored; `loadRecents()` returns `[]` for an
    unknown document; recents for different documents are independent.

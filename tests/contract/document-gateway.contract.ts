@@ -557,6 +557,24 @@ export function defineDocumentGatewayContract(
       }
     });
 
+    it("9d. each built-in format writes exactly its R5 fields, and shows what the preview said", async () => {
+      for (const format of BUILT_IN_FORMATS) {
+        const h = await setup("spec-contract");
+        await h.select(BODY);
+        const point = await h.gateway.checkInsertionPoint(OFF);
+        if (point.kind !== "insertionPoint") throw new Error("expected an insertion point");
+        // No usable bookmark yet, so only this reference's fields point at the new one.
+        const target = await headingByText(h.gateway, "Fire strategy");
+        const result = await insertOk(h, "Fire strategy", { parts: format.parts });
+        const added = (await h.fields()).filter((f) => f.bookmark === result.bookmark);
+        const expected = format.parts.flatMap((p) => (p.kind === "literal" ? [] : [fieldFor(p.kind)]));
+        expect({ id: format.id, fields: added.map((f) => ({ type: f.type, switches: f.switches })) }).toEqual({ id: format.id, fields: expected });
+        const shown = await h.insertionText(result.reference);
+        if (format.id === "page") expect(shown).toMatch(/^[1-9][0-9]*$/);
+        else expect({ id: format.id, shown }).toEqual({ id: format.id, shown: previewReference(format.parts, target, point).text });
+      }
+    });
+
     describe("9b. writing with the cursor in a footnote, an endnote or a table cell", () => {
       for (const place of ["Footnote text.", "Endnote text.", "Cell text in the main table."]) {
         it(`at "${place}": the R5 fields, showing what the preview said`, async () => {

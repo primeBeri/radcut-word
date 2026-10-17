@@ -55,6 +55,22 @@ describe("InsertReference", () => {
     expect(gateway.insertionText(result.reference.id)).toBe("§ 4.3 Fire strategy");
   });
 
+  it("leaves the number out for an unnumbered heading, keeping the §, as the preview does (T145)", async () => {
+    const { gateway, deps, input } = await setup();
+    const result = await insertReference(deps, input("Heading in a footnote"));
+    if (result.kind !== "inserted") throw new Error(result.kind);
+    expect(gateway.insertionText(result.reference.id)).toBe("§ Heading in a footnote");
+  });
+
+  it("inserts nothing and says so for a number-only format and an unnumbered heading (T145)", async () => {
+    const { gateway, deps, input, shell } = await setup();
+    const before = gateway.bookmarks();
+    const result = await insertReference(deps, input("Heading in a footnote", { parts: [{ kind: "number" }] }));
+    expect(result).toEqual({ kind: "message", message: "noNumber" });
+    expect(gateway.bookmarks()).toEqual(before);
+    expect(shell.visible).toBe(true);
+  });
+
   it("maps staleTarget to a refreshed index, returning the fresh headings", async () => {
     const { gateway, index, deps, input } = await setup();
     const request = input("Fire strategy");

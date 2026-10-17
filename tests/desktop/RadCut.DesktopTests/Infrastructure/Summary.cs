@@ -88,7 +88,7 @@ public static class RunSummary
         [10] = "A physical UK keyboard: the shortcut works and no stray character is typed",
         [15] = "A visual pass over the light, dark and black themes",
         [17] = "Co-authoring on SharePoint or OneDrive with two users",
-        [25] = "The badges' colours, by eye; the settings part waits for the settings view (feature 001 US2)",
+        [25] = "The badges' colours, by eye",
     };
 
     /// <summary>

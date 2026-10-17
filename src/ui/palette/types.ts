@@ -15,12 +15,21 @@ export type PaletteFeedback =
 export interface PaletteProps {
   /** The headings to offer, already filtered, in story order. May be replaced by a refresh. */
   headings: readonly Heading[];
+  /** The format shown first. */
   format: ReferenceFormat;
+  /**
+   * Every format in cycle order (built-ins, then templates). The palette leaves out those the
+   * cursor's location cannot show (FR-016a), so a refreshed `point` keeps the cycle right.
+   * Defaults to `format` alone.
+   */
+  formats?: readonly ReferenceFormat[];
   point: InsertionPoint;
-  /** Insert a reference to `heading`; `confirmed` names the warning the second Enter confirmed, if any. */
-  insert: (heading: Heading, confirmed: Confirmation | null) => Promise<PaletteFeedback>;
+  /** The query to start with, e.g. when coming back from settings (FR-021b). */
+  initialQuery?: string;
+  /** Insert a reference to `heading` in `format`; `confirmed` names the warning the second Enter confirmed, if any. */
+  insert: (heading: Heading, format: ReferenceFormat, confirmed: Confirmation | null) => Promise<PaletteFeedback>;
   /** Esc: close with no change. */
   cancel: () => void;
-  /** Ctrl+, or the cog (FR-021a). */
-  openSettings?: () => void;
+  /** Ctrl+, or the cog (FR-021a), with the query typed so far. */
+  openSettings?: (query: string) => void;
 }

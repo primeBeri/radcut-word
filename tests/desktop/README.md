@@ -141,6 +141,14 @@ After feature 001's T143 fix (caret after the reference) and the scenario 23 cha
 117 passed, 1 failed, 6 skipped in 14 min 51 s; every scenario passes, and the one failure is the
 palette-ready time on the VM (median 1009 ms).
 
+With feature 001's US2 (format cycle, settings view, `ISettingsStore` contract), 2026-10-17: 17
+scenarios, 71 contract cases (2 skipped: 10f deferred, S5 Node only), Document and M0 all pass in
+21 min 52 s; the failures are the palette-ready time on the VM (median 1075 ms) and one harness
+self-test still expecting the old scenario 25 note, since fixed. Every harness Word shares one
+WebView2 data folder, so settings saved in one test would carry into the next: `ScenarioTest`
+clears them as each scenario starts, unless the test keeps them across its own Word restart
+(scenario 8).
+
 The earlier runs, before those fixes:
 
 Two consecutive runs, identical: 111 passed, 4 failed, 6 skipped, in 15 min 36 s and 14 min 20 s

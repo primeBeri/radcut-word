@@ -16,6 +16,7 @@ public static partial class ContractRuns
 {
     public const string GatewaySuite = "IDocumentGateway: OfficeJsGateway";
     public const string HostShellSuite = "IHostShell: OfficeHostShell";
+    public const string SettingsStoreSuite = "ISettingsStore: OfficeSettingsStore";
     public static readonly TimeSpan SuiteTimeout = TimeSpan.FromMinutes(15);
 
     private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<CaseResult>>> Results =
@@ -28,7 +29,7 @@ public static partial class ContractRuns
 
     private static async Task<IReadOnlyDictionary<string, IReadOnlyList<CaseResult>>> RunAllAsync()
     {
-        var gateway = await RunInWordAsync("spec-contract", GatewaySuite, HostShellSuite);
+        var gateway = await RunInWordAsync("spec-contract", GatewaySuite, HostShellSuite, SettingsStoreSuite);
         var merged = gateway[GatewaySuite].ToList();
         foreach (var fixture in merged.Select(c => NeedsFixture().Match(c.Error ?? "")).Where(m => m.Success)
                      .Select(m => m.Groups["fixture"].Value).Distinct().ToList())
@@ -47,6 +48,7 @@ public static partial class ContractRuns
         {
             [GatewaySuite] = merged,
             [HostShellSuite] = gateway[HostShellSuite],
+            [SettingsStoreSuite] = gateway[SettingsStoreSuite],
         };
     }
 

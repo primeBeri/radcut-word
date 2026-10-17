@@ -1,12 +1,11 @@
 /** Dev-only page: runs a registered contract suite in Word and prints pass/fail per case. */
 import { defineDocumentGatewayContract } from "../../tests/contract/document-gateway.contract";
-import { fakeGatewayHarness } from "../../tests/contract/fake-harness";
+import { fakeGatewayHarness, fakeSettingsStoreHarness } from "../../tests/contract/fake-harness";
 import {
   defineHostShellContract,
   defineSettingsStoreContract,
 } from "../../tests/contract/host-ports.contract";
 import { FakeHostShell } from "../../tests/fakes/fake-host-shell";
-import { FakeSettingsStore } from "../../tests/fakes/fake-settings-store";
 import { registerOfficeContracts } from "../adapters/office/dev-registration";
 import { registerContract, registeredContracts } from "./contract-registry";
 import { autorun } from "./contract-autorun";
@@ -21,8 +20,7 @@ registerContract({
 });
 registerContract({
   label: "ISettingsStore: FakeSettingsStore (shim check)",
-  define: (api) =>
-    defineSettingsStoreContract("FakeSettingsStore", async () => new FakeSettingsStore(), api),
+  define: (api) => defineSettingsStoreContract("FakeSettingsStore", fakeSettingsStoreHarness, api),
 });
 registerContract({
   label: "IHostShell: FakeHostShell (shim check)",

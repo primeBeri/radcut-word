@@ -1,5 +1,6 @@
 import type { Heading } from "../headings/types";
 import type { InsertionLocation, InsertionPoint } from "../location/types";
+import { partsForHeading } from "./parts";
 import type { FormatPart, PreviewWarning, ReferencePreview } from "./types";
 
 /** From the insertion point: where the cursor is, and the heading just before it. */
@@ -13,7 +14,8 @@ const CURSOR_POSITION_UNKNOWN: ReadonlySet<InsertionLocation> = new Set(["footno
 
 /**
  * What a reference will display now (FR-015). Page cannot be known before insertion; above/below
- * compares the target with the heading before the cursor.
+ * compares the target with the heading before the cursor. An unnumbered heading's number and its
+ * padding are left out, as they are when inserting (partsForHeading, T145).
  */
 export function previewReference(
   parts: readonly FormatPart[],
@@ -21,7 +23,8 @@ export function previewReference(
   context: PreviewContext,
 ): ReferencePreview {
   const warnings = new Set<PreviewWarning>();
-  const text = parts
+  if (target.number === null && parts.some((part) => part.kind === "number")) warnings.add("noNumber");
+  const text = partsForHeading(parts, target.number)
     .map((part) => {
       switch (part.kind) {
         case "literal":
@@ -29,7 +32,6 @@ export function previewReference(
         case "text":
           return target.text;
         case "number":
-          if (target.number === null) warnings.add("noNumber");
           return target.number ?? "";
         case "page":
           warnings.add("pageUnknown");

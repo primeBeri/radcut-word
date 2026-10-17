@@ -288,3 +288,39 @@ rows have no harness test in US1 (later stories).
 | 25 | Pass | Automated. By hand: the badges' colours, by eye; the settings part waits for the settings view (US2) |
 | 26 | Pass | Automated |
 | 27 | Pass | Automated |
+
+## Automated US1 and US2 run (feature 001, T071), 2026-10-17
+
+`npm run test:desktop` on the test VM (Word 2609), no person involved: every scenario with a
+harness test passes, US1 after the T143, T144 and T145 changes and US2 for the first time. Rows
+9 and 11 have no harness test yet (later stories); rows marked Human stay on this checklist.
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | Pass | Automated |
+| 2 | Pass | Automated |
+| 3 | Pass | Automated |
+| 4 | Pass | Automated |
+| 5 | Pass | Automated |
+| 6 | Pass | Automated |
+| 7 | Pass | Automated |
+| 8 | Pass | Automated |
+| 9 | Not run | No harness test in this run |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+| 11 | Not run | No harness test in this run |
+| 12 | Pass | Automated |
+| 13 | Pass | Automated |
+| 14 | Pass | Automated |
+| 15 | Human | A visual pass over the light, dark and black themes |
+| 16 | Pass | Automated |
+| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |
+| 18 | Pass | Automated |
+| 19 | Pass | Automated |
+| 20 | Pass | Automated |
+| 21 | Pass | Automated |
+| 22 | Pass | Automated |
+| 23 | Pass | Automated |
+| 24 | Pass | Automated |
+| 25 | Pass | Automated. By hand: The badges' colours, by eye |
+| 26 | Pass | Automated |
+| 27 | Pass | Automated |

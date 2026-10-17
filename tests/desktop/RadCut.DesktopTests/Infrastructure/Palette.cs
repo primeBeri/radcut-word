@@ -1,5 +1,6 @@
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
+using Microsoft.Playwright;
 
 namespace RadCut.DesktopTests.Infrastructure;
 
@@ -214,6 +215,105 @@ public sealed class Palette(PaneSession session) : IDisposable
             Press(VirtualKeyShort.ENTER);
         }
         return await WaitForInsertionAsync(before, heading);
+    }
+
+    /// <summary>The format strip: the format's name and the preview for the highlighted heading.</summary>
+    public async Task<(string Label, string Preview)> FormatAsync()
+    {
+        var strip = Pane.Page.Locator("[data-testid=format-strip]");
+        return (await strip.Locator(".label").InnerTextAsync(), await strip.Locator(".preview").InnerTextAsync());
+    }
+
+    /// <summary>The format strip's whole text, including why formats are missing (FR-016a).</summary>
+    public Task<string> FormatStripTextAsync() => Pane.Page.Locator("[data-testid=format-strip]").InnerTextAsync();
+
+    /// <summary>Waits for the format strip to show <paramref name="label"/>; its preview.</summary>
+    public async Task<string> WaitForFormatAsync(string label)
+    {
+        var preview = "";
+        await Wait.UntilAsync(
+            async () =>
+            {
+                var shown = await FormatAsync();
+                preview = shown.Preview;
+                return shown.Label == label;
+            },
+            Wait.Pane,
+            $"the format \"{label}\" in the format strip");
+        return preview;
+    }
+
+    /// <summary>Tab, or Shift+Tab when <paramref name="back"/>, with real keystrokes; waits for <paramref name="label"/> and returns its preview.</summary>
+    public Task<string> TabToAsync(string label, bool back = false)
+    {
+        if (back) keys.Chord(VirtualKeyShort.SHIFT, VirtualKeyShort.TAB);
+        else keys.Press(VirtualKeyShort.TAB);
+        return WaitForFormatAsync(label);
+    }
+
+    private const string SettingsView = "[role=region][aria-label=Settings]";
+
+    /// <summary>Whether the settings view is showing.</summary>
+    public async Task<bool> IsSettingsAsync() => await Pane.Page.Locator(SettingsView).CountAsync() == 1;
+
+    /// <summary>The settings view's text, explanations included.</summary>
+    public Task<string> SettingsTextAsync() => Pane.Page.Locator(SettingsView).InnerTextAsync();
+
+    /// <summary>Ctrl+, in the palette; waits for the settings view with keyboard focus on its first control (FR-021a).</summary>
+    public async Task OpenSettingsFromPaletteAsync()
+    {
+        keys.Chord(VirtualKeyShort.CONTROL, VirtualKeyShort.OEM_COMMA);
+        await WaitForSettingsAsync("after Ctrl+, in the palette", windowsFocus: true);
+    }
+
+    /// <summary>The ribbon's Settings button from the document; waits for the settings view with its first control focused in the page.</summary>
+    public async Task OpenSettingsFromRibbonAsync()
+    {
+        await WaitUntilHiddenAsync();
+        Ribbon.Invoke(Word, Ribbon.Settings);
+        await WaitForSettingsAsync("after the ribbon's Settings button", windowsFocus: false);
+    }
+
+    private async Task WaitForSettingsAsync(string why, bool windowsFocus)
+    {
+        await Wait.UntilAsync(
+            async () => (!windowsFocus || keys.FocusedClass() == Keys.TaskPaneHostClass) &&
+                await Pane.Page.EvaluateAsync<bool>(
+                    "() => document.activeElement?.matches(\"input[type=radio][name='radcut-default-format']:checked\") === true"),
+            Wait.Pane,
+            $"the settings view with focus on the default format {why}");
+    }
+
+    /// <summary>Changes settings with the mouse (clicks through the page), saves, and waits for "Settings saved.".</summary>
+    public async Task SaveSettingsAsync(string? defaultFormat = null, bool? allowInHeadings = null, bool? showOutsideMainText = null)
+    {
+        var view = Pane.Page.Locator(SettingsView);
+        if (defaultFormat is not null) await view.GetByRole(AriaRole.Radio, new() { Name = defaultFormat, Exact = true }).CheckAsync();
+        if (allowInHeadings is { } allow)
+        {
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Allow references in headings", Exact = true }).SetCheckedAsync(allow);
+        }
+        if (showOutsideMainText is { } show)
+        {
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Show headings outside the main text", Exact = true }).SetCheckedAsync(show);
+        }
+        await view.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await WaitForMessageAsync("Settings saved.");
+    }
+
+    /// <summary>Clicks Close in the settings view.</summary>
+    public Task CloseSettingsAsync() =>
+        Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+
+    /// <summary>Waits for the palette to have keyboard focus in its search box, holding <paramref name="query"/>.</summary>
+    public async Task WaitForPaletteFocusAsync(string query, string why)
+    {
+        await Wait.UntilAsync(
+            async () => keys.FocusedClass() == Keys.TaskPaneHostClass &&
+                (await Pane.FocusAsync()) == (true, TaskPane.SearchBoxName) &&
+                await Pane.Page.Locator($"input[aria-label='{TaskPane.SearchBoxName}']").InputValueAsync() == query,
+            Wait.Pane,
+            $"the palette's search box focused with \"{query}\" ({why})");
     }
 
     /// <summary>Waits for Word to get a new reference and for the caret to return; what it added.</summary>

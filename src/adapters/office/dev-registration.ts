@@ -18,7 +18,7 @@ import type {
   WordDesktopOps,
 } from "../../../tests/contract/document-gateway.contract";
 import { defineDocumentGatewayContract } from "../../../tests/contract/document-gateway.contract";
-import { defineHostShellContract } from "../../../tests/contract/host-ports.contract";
+import { defineHostShellContract, defineSettingsStoreContract } from "../../../tests/contract/host-ports.contract";
 import type { IDocumentGateway, InsertedReference } from "../../core/ports/document-gateway";
 import { normaliseHeadingText, startsWithNoteMark } from "../../core/headings/normalise-text";
 import { withoutLinkedCopies } from "../../core/headings/scan";
@@ -27,6 +27,7 @@ import { registerContract } from "../../dev/contract-registry";
 import { desktopBridge, type DesktopBridge } from "../../dev/desktop-bridge";
 import { runningCase, timed } from "../../dev/mini-test";
 import { OfficeHostShell } from "./office-host-shell";
+import { OfficeSettingsStore } from "./office-settings-store";
 import { OfficeJsGateway, storyBodies } from "./office-js-gateway";
 
 /**
@@ -554,4 +555,23 @@ export async function registerOfficeContracts(): Promise<void> {
         api,
       ),
   });
+
+  registerContract({
+    label: "ISettingsStore: OfficeSettingsStore",
+    define: (api) =>
+      defineSettingsStoreContract(
+        "OfficeSettingsStore",
+        async () => {
+          // A key of its own, emptied for each case, so the user's settings are never touched.
+          await OfficeRuntime.storage.removeItem(CONTRACT_SETTINGS_KEY);
+          return {
+            store: new OfficeSettingsStore(CONTRACT_SETTINGS_KEY),
+            writeRaw: (text) => OfficeRuntime.storage.setItem(CONTRACT_SETTINGS_KEY, text),
+          };
+        },
+        api,
+      ),
+  });
 }
+
+const CONTRACT_SETTINGS_KEY = "radcut.contract.settings";

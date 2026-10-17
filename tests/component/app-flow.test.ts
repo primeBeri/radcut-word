@@ -19,11 +19,19 @@ afterEach(() => {
 function start() {
   const gateway = new FakeGateway(fakeFixtures["spec-300"]());
   const shell = new FakeHostShell();
+  const settings = new FakeSettingsStore();
   const target = document.createElement("div");
   document.body.append(target);
-  app = createApp({ gateway, shell, settings: new FakeSettingsStore() }, target);
-  return { gateway, shell };
+  app = createApp({ gateway, shell, settings }, target);
+  return { gateway, shell, settings };
 }
+
+/** The settings view's radio group; waits for the view to mount. */
+async function settingsView() {
+  return waitFor(() => screen.getByRole("radiogroup", { name: "Default format" }));
+}
+
+const formatLabel = () => screen.getByTestId("format-strip").querySelector(".label")?.textContent;
 
 async function open(shell: FakeHostShell) {
   shell.pressShortcut();
@@ -286,6 +294,122 @@ describe("app flow", () => {
     shell.currentTheme = { isDark: true, background: "#1f1f1f", foreground: "#ffffff" };
     await open(shell);
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  describe("settings (FR-017, FR-021, FR-021a, FR-021b)", () => {
+    it("the ribbon Settings button opens the settings view with focus on its first control", async () => {
+      const { shell } = start();
+      shell.clickSettingsButton();
+      const group = await settingsView();
+      expect(shell.visible).toBe(true);
+      await waitFor(() => expect(within(group).getByRole("radio", { name: "§ number text" })).toHaveFocus());
+    });
+
+    it("the cog and Ctrl+, open it from the palette", async () => {
+      const { shell } = start();
+      const input = await open(shell);
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await fireEvent.click((await waitFor(() => screen.getByRole("button", { name: "Settings" }))));
+      await settingsView();
+    });
+
+    it("saving the default format persists it, and the next palette opens on it, after a restart too", async () => {
+      const { shell, settings } = start();
+      shell.clickSettingsButton();
+      const group = await settingsView();
+      await fireEvent.click(within(group).getByRole("radio", { name: "Number" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(settings.raw).toMatchObject({ schemaVersion: 1, defaultFormatId: "number" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      expect(formatLabel()).toBe("Number");
+
+      // A new app over the same store, as after restarting Word.
+      app?.destroy();
+      document.body.innerHTML = "";
+      const restarted = new FakeHostShell();
+      const target = document.createElement("div");
+      document.body.append(target);
+      app = createApp({ gateway: new FakeGateway(fakeFixtures["spec-300"]()), shell: restarted, settings }, target);
+      await open(restarted);
+      expect(formatLabel()).toBe("Number");
+    });
+
+    it("after inserting in another format, the next palette opens on the default again", async () => {
+      const { shell } = start();
+      const input = await open(shell);
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("Page");
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      expect(formatLabel()).toBe("§ number text");
+    });
+
+    it("turning on Allow references in headings lets the palette open in a heading, without listing it", async () => {
+      const { gateway, shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Allow references in headings" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      gateway.select("Fire strategy");
+      await open(shell);
+      expect(screen.queryByRole("option", { name: "4.3 Fire strategy, level 2" })).toBeNull();
+      expect(screen.getByRole("option", { name: "4.1 Means of escape, level 2" })).toBeInTheDocument();
+    });
+
+    it("turning off Show headings outside the main text hides the badged headings", async () => {
+      const { shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show headings outside the main text" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      expect(screen.queryByRole("option", { name: /in footnote$/ })).toBeNull();
+      expect(screen.queryByRole("option", { name: /in text box$/ })).toBeNull();
+    });
+
+    it("Close returns to the palette with its query restored when opened from it", async () => {
+      const { shell } = start();
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fstrat" } });
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      await fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+      const back = await waitFor(() => screen.getByRole("combobox"));
+      expect(back).toHaveValue("fstrat");
+      await waitFor(() => expect(back).toHaveFocus());
+      expect(shell.visible).toBe(true);
+    });
+
+    it("Close from the ribbon's settings hides the pane and returns focus to the document", async () => {
+      const { gateway, shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      expect(gateway.focusReturned).toEqual({ after: null });
+      expect(screen.queryByRole("radiogroup")).toBeNull();
+    });
+
+    it("settings that cannot be read give the defaults, and the settings view says so", async () => {
+      const { shell, settings } = start();
+      settings.raw = "{not json";
+      const input = await open(shell);
+      expect(formatLabel()).toBe("§ number text");
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      expect(screen.getByRole("status")).toHaveTextContent("defaults");
+    });
   });
 
   it("shows a fresh palette each time it opens", async () => {

@@ -1,4 +1,5 @@
 import { generateBookmarkName, type RandomSource } from "../bookmarks/naming";
+import { partsForHeading } from "../formats/parts";
 import type { FormatPart } from "../formats/types";
 import type { HeadingIndex } from "../headings/heading-index";
 import { headingFingerprint } from "../headings/key";
@@ -54,13 +55,16 @@ export async function insertReference(
   deps: InsertReferenceDeps,
   input: InsertReferenceInput,
 ): Promise<InsertReferenceOutcome> {
+  // Word would show "0" for an unnumbered heading's number, so it is left out, as in the preview (T145).
+  const parts = partsForHeading(input.parts, input.target.number);
+  if (parts.length === 0) return { kind: "message", message: "noNumber" };
   let result: InsertReferenceResult;
   try {
     const existing = await deps.gateway.listBookmarkNames();
     result = await deps.gateway.insertReference({
       target: input.target.key,
       expectedFingerprint: headingFingerprint(input.target),
-      parts: input.parts,
+      parts,
       newBookmarkName: generateBookmarkName(existing, deps.random),
       policy: input.policy,
       confirmed: input.confirmed,

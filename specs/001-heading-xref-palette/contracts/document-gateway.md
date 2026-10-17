@@ -117,6 +117,8 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
    created (`bookmarkCreated = false`, same name); the bookmark count rises by exactly one.
 8. The inserted content, read back, consists of the literal parts and one field per non-literal
    part, each with `\h`, pointing at the returned bookmark, with the switches in research R5.
+8a. After an insertion, `returnFocus(reference)` leaves a collapsed selection just after the
+    reference, whether it went in at a caret, replaced a selection or replaced a field (T143).
 9. After insertion, each field's displayed result equals the core's preview for that format
    (page excepted, where the result is a positive integer).
 9a. `precedingHeadingOrder` and `inHeadingOrder` index the `readHeadings` snapshot: in the main
@@ -131,6 +133,8 @@ core's `classifyLocation` and `classifySelection` (data-model.md), so the rules 
     with `allowInHeadings: true` (5b), with `inHeadingFingerprint` set. The shared header of
     linked sections, one Undo, the caret's return and the `\p` result are checked in Word only
     (spike 4 and hand checks).
+9d. Each built-in format inserted in the main text writes exactly its R5 fields and shows what
+    the preview said (page: a positive integer) (US2, T059).
 10. With a selection inside one paragraph (`selection: "inline"`), the reference replaces the
     selected text without confirmation.
 10a. With a selection spanning two paragraphs, or containing a picture, shape or content

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BUILT_IN_FORMATS } from "../../src/core/formats/built-ins";
 import { HeadingIndex } from "../../src/core/headings/heading-index";
 import { messageText } from "../../src/core/messages";
 import { openPalette, type OpenPaletteOptions } from "../../src/core/use-cases/open-palette";
@@ -46,6 +47,23 @@ describe("OpenPalette", () => {
     const { gateway, index } = setup();
     const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "tpl:deleted" });
     expect(state.kind === "open" && state.format.id).toBe("sectionNumberText");
+  });
+
+  it("opens on the default, with every built-in in the cycle, in the main text (FR-015, FR-017)", async () => {
+    const { gateway, index } = setup();
+    const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "number" });
+    if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
+    expect(state.format.id).toBe("number");
+    expect(state.formats.map((f) => f.id)).toEqual(BUILT_IN_FORMATS.map((f) => f.id));
+  });
+
+  it("in a footnote, leaves out the above/below formats and opens on the next one after an above/below default (FR-016a)", async () => {
+    const { gateway, index } = setup();
+    gateway.select("Footnote text.");
+    const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "textAboveBelow" });
+    if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
+    expect(state.formats.map((f) => f.id)).toEqual(["text", "number", "numberText", "sectionNumberText", "page"]);
+    expect(state.format.id).toBe("text");
   });
 
   it("passes the location policy, so a heading is allowed with the setting on and is not listed", async () => {

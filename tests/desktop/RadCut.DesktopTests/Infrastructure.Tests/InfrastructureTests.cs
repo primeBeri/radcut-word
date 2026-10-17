@@ -153,7 +153,7 @@ public class SummaryTests
         Assert.Contains("| 2 | Fail | The document changed: x / y |", text);
         Assert.Contains("| 3 | Not run | No harness test in this run |", text);
         Assert.Contains("| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |", text);
-        Assert.Contains("| 25 | Pass | Automated. By hand: The badges' colours, by eye;", text);
+        Assert.Contains("| 25 | Pass | Automated. By hand: The badges' colours, by eye |", text);
         Assert.DoesNotContain("| 27 |", text);
     }
 
