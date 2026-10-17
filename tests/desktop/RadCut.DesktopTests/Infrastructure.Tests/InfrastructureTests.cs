@@ -57,6 +57,14 @@ public class PreflightTests
         Preflight.RefuseIfWordRunning(name => { asked = name; return []; });
         Assert.Equal("WINWORD", asked);
     }
+
+    [Fact]
+    public void A_skip_keeps_its_reason_for_the_summary_once()
+    {
+        HarnessSkip.Remember(Preflight.NoDesktopMessage);
+        Assert.Equal(Preflight.NoDesktopMessage, HarnessSkip.Take());
+        Assert.Null(HarnessSkip.Take());
+    }
 }
 
 [Trait("Category", "Harness")]
@@ -130,6 +138,25 @@ public class SummaryTests
         Assert.Contains("- IDocumentGateway: OfficeJsGateway: 3 min 14.5 s in all; slowest: 9.4 s 7c; 120 ms 1", text);
     }
 
+    [Fact]
+    public void Formats_the_acceptance_table_from_scenario_tests_with_the_human_checks()
+    {
+        var text = RunSummary.FormatAcceptance(
+            [
+                new("RadCut.DesktopTests.Scenarios.Us1Scenarios.Scenario01_fuzzy", "Scenario", Outcome.Passed, null, null, TimeSpan.Zero),
+                new("…Scenario02_esc", "Scenario", Outcome.Failed, "The document changed: x | y", "e", TimeSpan.Zero),
+                new("…Scenario25_badges", "Scenario", Outcome.Passed, null, null, TimeSpan.Zero),
+            ],
+            scenarios: 26);
+
+        Assert.Contains("| 1 | Pass | Automated |", text);
+        Assert.Contains("| 2 | Fail | The document changed: x / y |", text);
+        Assert.Contains("| 3 | Not run | No harness test in this run |", text);
+        Assert.Contains("| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |", text);
+        Assert.Contains("| 25 | Pass | Automated. By hand: The badges' colours, by eye;", text);
+        Assert.DoesNotContain("| 27 |", text);
+    }
+
     [Theory]
     [InlineData(120, "120 ms")]
     [InlineData(9_400, "9.4 s")]
@@ -154,7 +181,7 @@ public class DevServerTests
     [Fact]
     public async Task Starts_answers_and_stops_leaving_the_port_free()
     {
-        if (DevServer.IsPortInUse(DevServer.Port)) Assert.Skip("Port 3000 is in use by another server.");
+        if (DevServer.IsPortInUse(DevServer.Port)) HarnessSkip.Because("Port 3000 is in use by another server.");
         await using (var server = await DevServer.StartAsync(DevServerMode.Normal))
         {
             using var http = new HttpClient();
@@ -184,10 +211,11 @@ public sealed class TaskpaneDocumentTests : IDisposable
     }
 
     [Fact]
-    public void Adds_a_task_pane_that_opens_the_registered_add_in()
+    public void Adds_a_task_pane_that_opens_the_add_in_from_its_store()
     {
         var scratch = ScratchFixture.Create("tracked", "t", root);
-        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, new AddinManifest("11111111-2222-3333-4444-555555555555", "1.2.3.4"));
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, new AddinManifest("11111111-2222-3333-4444-555555555555", "1.2.3.4"),
+            AddinStore.Catalogue(@"\\localhost\radcut-catalog"));
 
         using var package = Package.Open(scratch.Path, FileMode.Open, FileAccess.Read);
         var toTaskpanes = Assert.Single(package.GetRelationshipsByType(TaskpaneDocument.TaskpanesRelationship));
@@ -201,8 +229,9 @@ public sealed class TaskpaneDocumentTests : IDisposable
         var xml = extensionXml.ReadToEnd();
         Assert.Contains("id=\"11111111-2222-3333-4444-555555555555\"", xml);
         Assert.Contains("version=\"1.2.3.4\"", xml);
-        Assert.Contains("store=\"developer\"", xml);
-        Assert.Contains("storeType=\"Registry\"", xml);
+        // As Word writes it when the add-in is inserted from a shared-folder catalogue.
+        Assert.Contains("store=\"\\\\localhost\\radcut-catalog\"", xml);
+        Assert.Contains("storeType=\"Filesystem\"", xml);
     }
 
     [Fact]
@@ -210,8 +239,21 @@ public sealed class TaskpaneDocumentTests : IDisposable
     {
         var scratch = ScratchFixture.Create("tracked", "t", root);
         var manifest = AddinManifest.Load();
-        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest);
-        Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest));
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer);
+        Assert.Throws<InvalidOperationException>(() => TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, manifest, AddinStore.Developer));
+    }
+
+    [Fact]
+    public void Removing_the_task_panes_leaves_no_add_in_part_and_the_document_intact()
+    {
+        var scratch = ScratchFixture.Create("tracked", "t", root);
+        TaskpaneDocument.AddAutoOpenTaskpane(scratch.Path, AddinManifest.Load(), AddinStore.Catalogue(@"\\localhost\radcut-catalog"));
+        TaskpaneDocument.RemoveTaskpanes(scratch.Path);
+
+        using var package = Package.Open(scratch.Path, FileMode.Open, FileAccess.Read);
+        Assert.Empty(package.GetRelationshipsByType(TaskpaneDocument.TaskpanesRelationship));
+        Assert.DoesNotContain(package.GetParts(), p => p.Uri.OriginalString.Contains("webextension", StringComparison.OrdinalIgnoreCase));
+        Assert.True(package.PartExists(new Uri("/word/document.xml", UriKind.Relative)));
     }
 }
 

@@ -41,10 +41,13 @@ public sealed class DevServer : IAsyncDisposable
         if (IsPortInUse(Port)) throw new HarnessRefusedException(PortInUseMessage);
 
         Directory.CreateDirectory(HarnessPaths.TestResults);
-        var log = new StreamWriter(Path.Combine(HarnessPaths.TestResults, $"dev-server-{mode}.log"), append: false)
+        // One log per mode for the whole run (each run clears test-results first), so a failed
+        // session's requests are still there at the end.
+        var log = new StreamWriter(Path.Combine(HarnessPaths.TestResults, $"dev-server-{mode}.log"), append: true)
         {
             AutoFlush = true,
         };
+        log.WriteLine($"===== dev server started {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =====");
         // `npm run dev-server` is `vite`; the dev-pane build is `vite --mode devpane`.
         var vite = Path.Combine(HarnessPaths.RepoRoot, "node_modules", "vite", "bin", "vite.js");
         var command = mode == DevServerMode.Normal ? "vite" : "vite --mode devpane";
@@ -56,6 +59,8 @@ public sealed class DevServer : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
+        // Every request in the log (vite.config.ts), to see what Word fetched when an install fails.
+        info.Environment["RADCUT_LOG_REQUESTS"] = "1";
         info.ArgumentList.Add(vite);
         if (mode == DevServerMode.DevPane)
         {

@@ -70,7 +70,7 @@ public sealed class M0Tests : HarnessTest, IClassFixture<NormalBuildSession>
     [Fact]
     public async Task The_shortcut_focuses_the_palette_search_box()
     {
-        if (!Preflight.HasInteractiveDesktop()) Assert.Skip(Preflight.NoDesktopMessage);
+        if (!Preflight.HasInteractiveDesktop()) Preflight.SkipWithoutDesktop();
         var session = fixture.Require();
         Assert.True(session.Pane is not null, $"No route reached the task pane: {session.PaneFailure}.");
         WordActions.PutCaretIn(session.Word!.Document, "The fire strategy is described here.");

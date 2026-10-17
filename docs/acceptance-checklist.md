@@ -251,3 +251,40 @@ reads the result through Word itself:
 | 19 | Pass | A new `_RC…` bookmark (the `_Toc…` one not reused); still correct after the TOC update and F9 |
 | 20 | Pass | Bold and italic follow the surrounding text, not the heading, before and after F9 |
 | 26 | Pass | Against Word's own dialog: same field types and bookmark extent, switches differ only by design (`\w`, `\* CHARFORMAT`); B gets `_RC…`, A reuses Word's `_Ref…`; Word's bookmark and fields untouched |
+
+## Automated US1 run (feature 002, T041), 2026-10-16
+
+`npm run test:desktop`, ten consecutive full runs on the test VM (Word 2609, 16.0.20430), no
+person involved; every scenario had the same result in all ten (the Scenario category alone was
+run twice more for the locked-screen check). Rows marked Human stay on this checklist; "Not run"
+rows have no harness test in US1 (later stories).
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | Fail | Feature 001 T143: after Enter the caret stays before the inserted reference, not after it |
+| 2 | Pass | Automated |
+| 3 | Pass | Automated |
+| 4 | Pass | Automated |
+| 5 | Pass | Automated |
+| 6 | Pass | Automated |
+| 7 | Not run | No harness test yet |
+| 8 | Not run | No harness test yet |
+| 9 | Not run | No harness test yet |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+| 11 | Not run | No harness test yet |
+| 12 | Pass | Automated |
+| 13 | Pass | Automated |
+| 14 | Pass | Automated |
+| 15 | Human | A visual pass over the light, dark and black themes |
+| 16 | Not run | No harness test yet |
+| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |
+| 18 | Pass | Automated |
+| 19 | Pass | Automated |
+| 20 | Pass | Automated |
+| 21 | Pass | Automated |
+| 22 | Pass | Automated |
+| 23 | Fail | Words and multi-paragraph selections pass; with a table selected the add-in declines as the palette opens ("References can't replace a table."), while the test expects the palette and the refusal on Enter. FR-008a says only "declined with a message": the owner decides which is right |
+| 24 | Not run | No harness test yet |
+| 25 | Pass | Automated. By hand: the badges' colours, by eye; the settings part waits for the settings view (US2) |
+| 26 | Pass | Automated |
+| 27 | Pass | Automated |

@@ -50,7 +50,11 @@ public sealed class ScratchFixture
 
     /// <summary>
     /// Saves the open copy in place and copies it to a sibling folder named <paramref name="label"/>,
-    /// to reopen after this Word has closed; the path of the copy.
+    /// to reopen after this Word has closed; the path of the copy. The copy is without the harness's
+    /// task pane parts, so it opens without the add-in. With them, the add-in loaded from the
+    /// catalogue in the Word that reopened it, and quitting that Word while the add-in was still
+    /// starting crashed it in osf99.dll, leaving the next Word on the safe mode prompt (full runs on
+    /// the VM, 2026-10-16).
     /// </summary>
     public string SaveCopy(WordSession word, string label)
     {
@@ -60,6 +64,7 @@ public sealed class ScratchFixture
         Directory.CreateDirectory(folder);
         var copy = System.IO.Path.Combine(folder, Fixture + ".docx");
         File.Copy(Path, copy, overwrite: true);
+        TaskpaneDocument.RemoveTaskpanes(copy);
         return copy;
     }
 

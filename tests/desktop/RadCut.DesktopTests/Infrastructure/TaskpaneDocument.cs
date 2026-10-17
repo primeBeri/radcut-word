@@ -17,11 +17,11 @@ public sealed record AddinManifest(string Id, string Version)
 }
 
 /// <summary>
-/// Makes Word load the development add-in for a scratch document: the same webextension and
-/// taskpanes parts that office-addin-dev-settings' sideload template carries, pointing at the
-/// add-in registered for development. Without them the add-in's ribbon group never appears; with
-/// them the add-in loads but its pane stays shut, so the harness opens it from the ribbon (M0,
-/// 2026-10-15, research D5).
+/// Makes Word load the add-in for a scratch document: the same webextension and taskpanes parts
+/// that office-addin-dev-settings' sideload template carries, pointing at the add-in where
+/// <see cref="Sideload"/> made it available. Without them the add-in's ribbon group never appears;
+/// with them the add-in loads but its pane stays shut, so the harness opens it from the ribbon
+/// (M0, 2026-10-15, research D5).
 /// </summary>
 public static class TaskpaneDocument
 {
@@ -35,7 +35,7 @@ public static class TaskpaneDocument
     private static readonly XNamespace R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     /// <summary>Adds the parts to <paramref name="docxPath"/> (a scratch copy, never a fixture).</summary>
-    public static void AddAutoOpenTaskpane(string docxPath, AddinManifest manifest)
+    public static void AddAutoOpenTaskpane(string docxPath, AddinManifest manifest, AddinStore store)
     {
         using var package = Package.Open(docxPath, FileMode.Open, FileAccess.ReadWrite);
         var extensionUri = new Uri(WebExtensionPart, UriKind.Relative);
@@ -49,8 +49,8 @@ public static class TaskpaneDocument
             new XElement(We + "reference",
                 new XAttribute("id", manifest.Id),
                 new XAttribute("version", manifest.Version),
-                new XAttribute("store", "developer"),
-                new XAttribute("storeType", "Registry")),
+                new XAttribute("store", store.Store),
+                new XAttribute("storeType", store.StoreType)),
             new XElement(We + "alternateReferences"),
             new XElement(We + "properties"),
             new XElement(We + "bindings")));
@@ -68,6 +68,21 @@ public static class TaskpaneDocument
                 new XElement(Wetp + "webextensionref", new XAttribute(R + "id", link.Id)))));
 
         package.CreateRelationship(new Uri(TaskpanesPart.TrimStart('/'), UriKind.Relative), TargetMode.Internal, TaskpanesRelationship);
+    }
+
+    /// <summary>
+    /// Removes every task pane and web extension part from <paramref name="docxPath"/>, as Word
+    /// saved them (it renames webextension.xml to webextension1.xml), so the copy opens without the
+    /// add-in: the catalogue keeps offering it, unlike the developer registration the harness undoes.
+    /// </summary>
+    public static void RemoveTaskpanes(string docxPath)
+    {
+        using var package = Package.Open(docxPath, FileMode.Open, FileAccess.ReadWrite);
+        foreach (var link in package.GetRelationshipsByType(TaskpanesRelationship).ToList()) package.DeleteRelationship(link.Id);
+        var parts = package.GetParts().Select(p => p.Uri)
+            .Where(u => u.OriginalString.StartsWith("/word/webextensions/", StringComparison.OrdinalIgnoreCase)).ToList();
+        // Deleting a part deletes its relationships part too.
+        foreach (var uri in parts.Where(package.PartExists)) package.DeletePart(uri);
     }
 
     private static void Write(PackagePart part, XElement root)

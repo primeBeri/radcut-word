@@ -18,6 +18,12 @@ public static class RunSummary
 {
     private static readonly ConcurrentQueue<TestOutcome> Outcomes = new();
     private static readonly ConcurrentQueue<ContractTiming> Timings = new();
+    private static readonly ConcurrentQueue<string> Notes = new();
+
+    /// <summary>A measurement or finding for the summary's "Notes" (e.g. palette timings).</summary>
+    public static void Note(string note) => Notes.Enqueue(note);
+
+    public static IReadOnlyList<string> RecordedNotes => [.. Notes];
 
     public static void Record(TestOutcome outcome) => Outcomes.Enqueue(outcome);
 
@@ -28,7 +34,7 @@ public static class RunSummary
     public static IReadOnlyList<ContractTiming> RecordedTimings => [.. Timings];
 
     /// <summary>The Markdown summary (contracts/harness-commands.md "Outputs").</summary>
-    public static string Format(IReadOnlyList<TestOutcome> outcomes, IReadOnlyList<ContractTiming> timings)
+    public static string Format(IReadOnlyList<TestOutcome> outcomes, IReadOnlyList<ContractTiming> timings, IReadOnlyList<string>? notes = null)
     {
         var text = new StringBuilder();
         text.AppendLine("# Desktop harness run").AppendLine();
@@ -64,6 +70,62 @@ public static class RunSummary
                 text.AppendLine($"- {t.Suite}: {Duration(t.TotalMs)} in all; slowest: " +
                     string.Join("; ", t.Slowest.Select(s => $"{Duration(s.Ms)} {s.Name}")));
             }
+        }
+        if (notes is { Count: > 0 })
+        {
+            text.AppendLine().AppendLine("## Notes").AppendLine();
+            foreach (var note in notes) text.AppendLine($"- {note}");
+        }
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Scenarios that stay with a person (Constitution 1.2.0, layer 7) or are only partly automated,
+    /// with what is left; every other scenario is reported from its harness test, if one ran.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<int, string> HumanChecks = new Dictionary<int, string>
+    {
+        [10] = "A physical UK keyboard: the shortcut works and no stray character is typed",
+        [15] = "A visual pass over the light, dark and black themes",
+        [17] = "Co-authoring on SharePoint or OneDrive with two users",
+        [25] = "The badges' colours, by eye; the settings part waits for the settings view (feature 001 US2)",
+    };
+
+    /// <summary>
+    /// The acceptance table for <c>docs/acceptance-checklist.md</c> (<c>| # | Result | Notes |</c>), one row per
+    /// quickstart scenario of feature 001, from tests named <c>ScenarioNN_…</c>.
+    /// </summary>
+    public static string FormatAcceptance(IReadOnlyList<TestOutcome> outcomes, int scenarios = 27)
+    {
+        var byNumber = new Dictionary<int, List<TestOutcome>>();
+        foreach (var outcome in outcomes)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(outcome.Name, @"Scenario(\d{2})_");
+            if (!match.Success) continue;
+            var number = int.Parse(match.Groups[1].Value);
+            (byNumber.TryGetValue(number, out var list) ? list : byNumber[number] = []).Add(outcome);
+        }
+        var text = new StringBuilder();
+        text.AppendLine($"Desktop harness, {DateTime.Now:yyyy-MM-dd HH:mm}.").AppendLine();
+        text.AppendLine("| # | Result | Notes |").AppendLine("|---|---|---|");
+        for (var n = 1; n <= scenarios; n++)
+        {
+            HumanChecks.TryGetValue(n, out var human);
+            string result, note;
+            if (byNumber.TryGetValue(n, out var ran))
+            {
+                var failed = ran.FirstOrDefault(o => o.Outcome == Outcome.Failed);
+                var skipped = ran.FirstOrDefault(o => o.Outcome == Outcome.Skipped);
+                result = failed is not null ? "Fail" : skipped is not null ? "Skipped" : "Pass";
+                note = failed is not null ? OneLine(failed.Message) : skipped is not null ? OneLine(skipped.Message) : "Automated";
+                if (human is not null) note += $". By hand: {human}";
+            }
+            else
+            {
+                result = human is not null && n is 15 or 17 or 10 ? "Human" : "Not run";
+                note = human ?? "No harness test in this run";
+            }
+            text.AppendLine($"| {n} | {result} | {note.Replace("|", "/")} |");
         }
         return text.ToString();
     }
@@ -112,7 +174,11 @@ public sealed class SummaryWriter : IAsyncDisposable
             Directory.CreateDirectory(HarnessPaths.TestResults);
             File.WriteAllText(
                 Path.Combine(HarnessPaths.TestResults, "summary.md"),
-                RunSummary.Format(outcomes, RunSummary.RecordedTimings));
+                RunSummary.Format(outcomes, RunSummary.RecordedTimings, RunSummary.RecordedNotes));
+            if (outcomes.Any(o => o.Name.Contains("Scenario", StringComparison.Ordinal)))
+            {
+                File.WriteAllText(Path.Combine(HarnessPaths.TestResults, "acceptance-summary.md"), RunSummary.FormatAcceptance(outcomes));
+            }
         }
         return ValueTask.CompletedTask;
     }

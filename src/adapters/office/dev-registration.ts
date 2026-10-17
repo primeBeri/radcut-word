@@ -390,6 +390,17 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
     try {
       await selectOnce(text, selection);
     } catch (error) {
+      // After the restore Word draws a text box only once its anchor has been on screen, and
+      // refuses a selection in it until then (contract 9c on the VM, 2026-10-16): scroll there, as
+      // a person would, and try again.
+      if (desktop && (await desktop({ action: "showTextBoxes" })) !== 0) {
+        try {
+          await selectOnce(text, selection);
+          return;
+        } catch {
+          // Fall through to the fallbacks below, with the first error.
+        }
+      }
       // Word refuses a caret in the text box's first paragraph after the restore, at its start
       // and two characters in (in-Word contract runs, 2026-10-15). A plain caret request falls
       // back to those, then to selecting the first two characters: still inside the paragraph.
@@ -407,7 +418,6 @@ async function wordHarness(fixture: ContractFixture): Promise<GatewayContractHar
       // body) Word refuses a caret in the re-created text box (in-Word contract runs, 2026-10-12
       // and 2026-10-15); Word COM can, through the desktop bridge, for a caret or a selection from
       // the paragraph's start.
-      const desktop = desktopBridge();
       const plain = Object.keys(selection).every((key) => key === "caretOffset" || key === "length");
       if (desktop && plain) {
         await desktop({ action: "select", text, caretOffset: selection.caretOffset, length: selection.length });

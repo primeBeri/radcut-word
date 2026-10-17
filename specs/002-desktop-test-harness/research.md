@@ -211,6 +211,23 @@ Ctrl+Shift+Y (D6), so layer 5 runs on the normal build. Details in `tests/deskto
 - **COM from C#**: pass documents around as `object`; a `dynamic` argument makes the whole call
   dynamically bound, which rejects lambdas in it.
 
+## D15. US1 scenarios and the shared WebView2 folder (M3, 2026-10-15)
+
+- **Outlook and the add-in browser**: Office keeps one WebView2 data folder for add-ins
+  (`…\Wef\webview2\…_ADAL\2\1\EBWebView`), which Outlook's add-ins use too. While Outlook has an
+  add-in browser running there, a Word started with extra browser arguments (the debugging port)
+  cannot start its own, and shows "ADD-IN ERROR: The add-in could not be started". Route B now
+  also gives the harness's Word its own folder (`WEBVIEW2_USER_DATA_FOLDER`, that process only),
+  so runs work with Outlook open; the harness dismisses that dialog and fails fast if it appears.
+- **Foreground**: Windows may refuse to bring Word forward while another window is in front; the
+  harness retries, and on failure names the window in the way. It never types into another window.
+- **Views**: after work in a header or footer Word stays in that view, and selecting body text
+  silently fails; the harness returns to the main document first and checks where the cursor is.
+- **Focus after Enter or Esc**: with the cursor in a comment or a note, focus returns to that pane,
+  not Word's main window; "focus left the task pane" is the condition.
+- **Esc after Enter**: with the confirmation warning showing, a real Esc never reaches the pane's
+  page; without it, Esc does (feature 001 T144).
+
 ## D12. Keyboard and the interactive desktop
 
 - **Decision**: detect a locked or non-interactive desktop (input desktop not "Default", or

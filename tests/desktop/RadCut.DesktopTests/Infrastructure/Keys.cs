@@ -26,8 +26,21 @@ public sealed class Keys : IDisposable
         var handle = word.MainWindow;
         if (handle == IntPtr.Zero) throw new InvalidOperationException("Word has no main window.");
         var window = automation.FromHandle(handle).AsWindow();
-        window.SetForeground();
-        Wait.Until(() => GetForegroundWindow() == handle, Wait.Focus, "Word's window to come to the front");
+        // Windows may refuse a foreground change from a background process; ask again until it holds.
+        try
+        {
+            Wait.Until(() =>
+            {
+                if (GetForegroundWindow() != handle) window.SetForeground();
+                return GetForegroundWindow() == handle;
+            }, Wait.Pane, "Word's window to come to the front");
+        }
+        catch (TimeoutException e)
+        {
+            // The screen was locked during the test: a skip, as at the start of one (T045).
+            if (!Preflight.HasInteractiveDesktop()) Preflight.SkipWithoutDesktop();
+            throw new TimeoutException($"{e.Message} In front instead: {ForegroundDescription()}. Close it and leave the machine alone during the run.", e);
+        }
         word.Document.ActiveWindow.SetFocus();
     }
 
@@ -55,6 +68,8 @@ public sealed class Keys : IDisposable
     /// The UI Automation class of the focused element. Focus inside a task pane is reported on
     /// Office's <see cref="TaskPaneHostClass"/>, not on the element inside the WebView2 (M0
     /// diagnostic, 2026-10-15), so which element has focus inside is read from the page instead.
+    /// Null when UI Automation cannot say: on the test VM the query sometimes times out while focus
+    /// moves into the WebView2, which FlaUI throws as a <see cref="TimeoutException"/> (UIA_E_TIMEOUT).
     /// </summary>
     public string? FocusedClass()
     {
@@ -62,7 +77,7 @@ public sealed class Keys : IDisposable
         {
             return automation.FocusedElement()?.ClassName;
         }
-        catch (COMException)
+        catch (Exception e) when (e is COMException or TimeoutException)
         {
             return null;
         }
@@ -78,7 +93,7 @@ public sealed class Keys : IDisposable
             string Get(Func<string> read) { try { return read(); } catch (Exception) { return "?"; } }
             return $"name \"{Get(() => e.Name)}\", class \"{Get(() => e.ClassName)}\", framework \"{Get(() => e.FrameworkAutomationElement.FrameworkId.ValueOrDefault ?? "")}\", type {Get(() => e.ControlType.ToString())}, aria \"{Get(() => e.FrameworkAutomationElement.AriaProperties.ValueOrDefault ?? "")}\"";
         }
-        catch (COMException)
+        catch (Exception e) when (e is COMException or TimeoutException)
         {
             return "(unavailable)";
         }
@@ -86,6 +101,25 @@ public sealed class Keys : IDisposable
 
     public void Dispose() => automation.Dispose();
 
+    /// <summary>The process and title of the window in front, to say what is in the way.</summary>
+    public static string ForegroundDescription()
+    {
+        var foreground = GetForegroundWindow();
+        GetWindowThreadProcessId(foreground, out var id);
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById((int)id);
+            return $"{process.ProcessName} \"{process.MainWindowTitle}\"";
+        }
+        catch (ArgumentException)
+        {
+            return "(unknown)";
+        }
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 }

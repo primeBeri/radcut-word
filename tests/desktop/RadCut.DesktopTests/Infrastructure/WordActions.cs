@@ -66,13 +66,74 @@ public static class WordActions
         ((string)paragraph.Range.Text).Trim(' ', '\t', '\r', '\n', '\a', '\u0002', '\u0005');
 
     /// <summary>Puts the cursor <paramref name="offset"/> characters into the paragraph whose text is <paramref name="text"/>.</summary>
-    public static void PutCaretIn(dynamic document, string text, int offset = 0)
+    public static void PutCaretIn(dynamic document, string text, int offset = 0) => SelectIn(document, text, offset, 0);
+
+
+    /// <summary>
+    /// Selects <paramref name="length"/> characters from <paramref name="offset"/> into the paragraph
+    /// whose text is <paramref name="text"/>, in whichever story it is, and checks Word did.
+    /// </summary>
+    /// <returns>The story it selected in (WdStoryType).</returns>
+    public static int SelectIn(dynamic document, string text, int offset, int length)
     {
         dynamic range = Find(document, text);
+        int story = range.StoryType;
+        // After a comment was selected Word's active pane is the comments pane, which keeps its own
+        // cursor: a selection made from there is dropped when focus comes back, for the main pane's
+        // older one (scenario 12 on the VM, 2026-10-16). Work in the document's main pane.
+        if (story != WdCommentsStory)
+        {
+            dynamic panes = document.ActiveWindow.Panes;
+            if ((int)panes.Count > 1) panes[1].Activate();
+        }
+        // After working in a header or footer Word stays in that view, and selecting body text or a
+        // text box then silently leaves the cursor where it was (scenario 12, 2026-10-15).
+        if (story is WdMainTextStory or WdTextFrameStory)
+        {
+            dynamic window = document.ActiveWindow;
+            if ((int)window.View.Type == WdPrintView) window.ActivePane.View.SeekView = WdSeekMainDocument;
+            else while ((int)window.Panes.Count > 1) window.Panes[(int)window.Panes.Count].Close(); // the header or footer pane of the other views
+        }
+        // The other way round: selecting header or footer text without entering that view leaves
+        // Word half in it, and the add-in then finds the cursor back in the main text (scenario 12
+        // on the VM, 2026-10-16: it needs this as well as the main pane). Enter the view first.
+        else if (HeaderFooterViews.TryGetValue(story, out var seek))
+        {
+            dynamic window = document.ActiveWindow;
+            if ((int)window.View.Type == WdPrintView) window.ActivePane.View.SeekView = seek;
+        }
         int at = (int)range.Start + offset;
-        range.SetRange(at, at);
+        range.SetRange(at, at + length);
         range.Select();
+        dynamic selection = document.Application.Selection;
+        if ((int)selection.StoryType != story || (int)selection.Start != at || (int)selection.End != at + length)
+        {
+            throw new InvalidOperationException(
+                $"Could not select in \"{text}\": the selection is in story {(int)selection.StoryType} at [{(int)selection.Start},{(int)selection.End}], " +
+                $"not story {story} at [{at},{at + length}].");
+        }
+        return story;
     }
+
+    private const int WdMainTextStory = 1;
+    private const int WdCommentsStory = 4;
+    private const int WdTextFrameStory = 5;
+    private const int WdSeekMainDocument = 0;
+
+    /// <summary>Header and footer story types (WdStoryType) and the view (WdSeekView) that edits each.</summary>
+    private static readonly Dictionary<int, int> HeaderFooterViews = new()
+    {
+        [6] = 3,  // even pages header
+        [7] = 1,  // primary header
+        [8] = 6,  // even pages footer
+        [9] = 4,  // primary footer
+        [10] = 2, // first page header
+        [11] = 5, // first page footer
+    };
+
+    /// <summary>How long the caret's place on screen must stay the same before Ctrl+click uses it.</summary>
+    private static readonly TimeSpan CaretSettles = TimeSpan.FromMilliseconds(150);
+    private const int WdPrintView = 3;
 
     /// <summary>Select all, F9: updates every field in every story; the indexes of fields that failed, if any.</summary>
     public static List<int> UpdateFields(dynamic document)
@@ -138,27 +199,72 @@ public static class WordActions
         keys.FocusDocument();
         dynamic window = document.ActiveWindow;
         // Word.Window.GetPoint fails here ("Command failed", contract runs 2026-10-15), so put the
-        // cursor one character into the reference and click where Windows draws the caret (Word
-        // keeps a system caret for accessibility tools).
+        // cursor at the start of the reference and click just right of where Windows draws the caret
+        // (Word keeps a system caret for accessibility tools): on the first character, which is the
+        // whole result when it is one character ("0").
         window.ScrollIntoView(range, true);
-        document.Range((int)range.Start + 1, (int)range.Start + 1).Select();
-        System.Drawing.Point? point = null;
-        Wait.Until(() => (point = CaretOnScreen()) is not null, Wait.Pane, "Word's caret on screen");
+        document.Range((int)range.Start, (int)range.Start).Select();
+        var point = SettledCaret("the reference");
         string from = ParagraphText(range.Paragraphs.First);
         using (FlaUI.Core.Input.Keyboard.Pressing(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL))
         {
-            FlaUI.Core.Input.Mouse.Click(point!.Value);
+            FlaUI.Core.Input.Mouse.Click(point);
         }
         // The click itself puts the cursor in the reference; the jump then moves it to the bookmark.
         try
         {
-            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Focus,
+            // A jump into a note or a header takes Word a moment longer.
+            Wait.Until(() => ParagraphText(document.Application.Selection.Paragraphs.First) != from, Wait.Pane,
                 "the cursor to leave the reference's paragraph after Ctrl+click");
         }
         catch (TimeoutException)
         {
             // Reported by the caller: it lands where it lands.
         }
+    }
+
+    /// <summary>
+    /// Scrolls each text box's anchor into view, as a person scrolls to a text box before clicking
+    /// in it; the number of text boxes. After the contract harness's restore Word draws a text box
+    /// only once its anchor has been on screen, and until then a selection in it is shown at the
+    /// start of the main text (contract 9c on the VM, 2026-10-16).
+    /// </summary>
+    public static int ShowTextBoxes(dynamic document)
+    {
+        var shown = 0;
+        foreach (dynamic shape in document.Shapes)
+        {
+            if (shape.TextFrame.HasText == 0) continue;
+            document.ActiveWindow.ScrollIntoView(shape.Anchor, true);
+            shown++;
+        }
+        return shown;
+    }
+
+    /// <summary>
+    /// Where Windows draws Word's caret, once that has settled: Windows moves the caret after Word
+    /// does, so the first reading can still be the old place, and a click there lands elsewhere
+    /// (scenario 25 on the VM, 2026-10-16).
+    /// </summary>
+    private static System.Drawing.Point SettledCaret(string what)
+    {
+        System.Drawing.Point? point = null;
+        var settled = System.Diagnostics.Stopwatch.StartNew();
+        Wait.Until(
+            () =>
+            {
+                var now = CaretOnScreen();
+                if (now is null || now != point)
+                {
+                    point = now;
+                    settled.Restart();
+                    return false;
+                }
+                return settled.Elapsed >= CaretSettles;
+            },
+            Wait.Pane,
+            $"Word's caret to settle on {what}");
+        return point!.Value;
     }
 
     /// <summary>The foreground thread's caret in screen coordinates, or null if none is shown.</summary>

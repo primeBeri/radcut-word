@@ -42,6 +42,7 @@ public abstract class HarnessTest : IAsyncLifetime
             folder.WriteLines("harness.log", log);
         }
 
+        var skipReason = HarnessSkip.Take();
         var categories = context.Test?.Traits.TryGetValue("Category", out var values) == true ? values : [];
         RunSummary.Record(new TestOutcome(
             name,
@@ -52,7 +53,7 @@ public abstract class HarnessTest : IAsyncLifetime
                 TestResult.Failed => Outcome.Failed,
                 _ => Outcome.Skipped,
             },
-            context.TestState?.ExceptionMessages?.FirstOrDefault() ?? context.Test?.TestCase.SkipReason,
+            context.TestState?.ExceptionMessages?.FirstOrDefault() ?? context.Test?.TestCase.SkipReason ?? skipReason,
             evidence,
             DateTime.Now - started));
         GC.SuppressFinalize(this);
