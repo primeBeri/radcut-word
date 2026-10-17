@@ -13,6 +13,7 @@ public sealed class Us1Scenarios : ScenarioTest
 {
     private const string Body = "The fire strategy is described here.";
     private const string Headings = "References can't go in headings or titles.";
+    private const string TableSelected = "References can't replace a table.";
 
     private const int WdMainTextStory = 1;
     private const int WdFootnotesStory = 2;
@@ -248,14 +249,21 @@ public sealed class Us1Scenarios : ScenarioTest
         await Wait.UntilAsync(() => Task.FromResult(snapshot.FirstDifference(DocumentSnapshot.Take(document)) is null), Wait.Pane,
             "one Ctrl+Z to restore the replaced paragraphs");
 
+        // A table selected first is declined as the palette opens (owner's decision, 2026-10-17)...
         ((dynamic)document).Tables[1].Select();
-        snapshot = DocumentSnapshot.Take(document);
+        await DeclinedAsync(palette, document, TableSelected, "a table selection");
+
+        // ...and one selected while the palette is open is declined at Enter, the palette kept.
+        WordActions.PutCaretIn(document, "Definitions body.");   // the body paragraph was changed above
         await palette.OpenAsync();
         Palette.Type("Scope");
         await palette.WaitForSelectedRowAsync("Scope");
+        ((dynamic)document).Tables[1].Select();   // the person selects the table, then comes back
+        snapshot = DocumentSnapshot.Take(document);
         Palette.Press(VirtualKeyShort.ENTER);
-        await palette.WaitForMessageAsync("References can't replace a table.");
-        AssertUnchanged(snapshot, document, "Enter with a table selected");
+        await palette.WaitForMessageAsync(TableSelected);
+        Assert.True(await palette.IsPaletteAsync(), "The palette closed after the table message.");
+        AssertUnchanged(snapshot, document, "Enter after selecting a table with the palette open");
         Palette.Press(VirtualKeyShort.ESCAPE);
     }
 

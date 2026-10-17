@@ -127,8 +127,10 @@ endpoint never refused, and no Word was left. The skips are the five explicit di
 The failures:
 
 - Scenario 01: the caret after the reference, feature 001 T143.
-- Scenario 23: with a table selected the add-in declines when the palette opens; the owner decides
-  (below).
+- Scenario 23: with a table selected the add-in declines when the palette opens (below). The owner
+  has since decided that is right (2026-10-17); the test now expects it, and also that a table
+  selected while the palette is open is declined at Enter with the palette kept and the document
+  unchanged. It passed three runs in three.
 - Palette ready on spec-300: median 606 to 996 ms against the 500 ms budget, the VM's speed. In 2 of
   the 10 runs it failed instead on the harness's own focus query ("UIA Timeout"), now fixed (table
   above).

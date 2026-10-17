@@ -283,7 +283,7 @@ rows have no harness test in US1 (later stories).
 | 20 | Pass | Automated |
 | 21 | Pass | Automated |
 | 22 | Pass | Automated |
-| 23 | Fail | Words and multi-paragraph selections pass; with a table selected the add-in declines as the palette opens ("References can't replace a table."), while the test expects the palette and the refusal on Enter. FR-008a says only "declined with a message": the owner decides which is right |
+| 23 | Fail | Words and multi-paragraph selections pass; with a table selected the add-in declines as the palette opens ("References can't replace a table."), while the test expected the palette and the refusal on Enter. Owner's decision, 2026-10-17: declining at open is right; a table selected after the palette opened must be declined at Enter. The test now checks both and passes (three runs) |
 | 24 | Not run | No harness test yet |
 | 25 | Pass | Automated. By hand: the badges' colours, by eye; the settings part waits for the settings view (US2) |
 | 26 | Pass | Automated |
