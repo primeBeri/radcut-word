@@ -278,7 +278,7 @@ describe("Palette field warning (FR-008b)", () => {
   });
 });
 
-describe("Palette messages and format strip", () => {
+describe("Palette messages and preview line", () => {
   it("shows a message returned by insert in the live region and stays open", async () => {
     const insert = vi.fn<PaletteProps["insert"]>().mockResolvedValue({ kind: "message", message: "hostError" });
     const { key } = setup({ insert });
@@ -287,11 +287,11 @@ describe("Palette messages and format strip", () => {
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
-  it("shows the format label and the preview of the selected heading in a polite live region", async () => {
-    const { type } = setup();
+  it("shows the format label and the preview under the selected heading", async () => {
+    const { type, selected } = setup();
     await type("fstrat");
-    const strip = screen.getByTestId("format-strip");
-    expect(strip).toHaveAttribute("aria-live", "polite");
+    const strip = screen.getByTestId("format-preview");
+    expect(selected()).toContainElement(strip);
     expect(strip).toHaveTextContent("§ number text");
     expect(strip).toHaveTextContent("§ 4.3 Fire strategy");
   });

@@ -7,11 +7,10 @@
   import { confirmationFor } from "../../core/location/rules";
   import type { Confirmation } from "../../core/location/types";
   import { messageText, warningFor, type ConfirmationWarning, type MessageId } from "../../core/messages";
-  import FormatStrip from "./FormatStrip.svelte";
   import { ABOVE_BELOW_HIDDEN } from "./labels";
   import MessageRegion from "./MessageRegion.svelte";
   import ResultRow from "./ResultRow.svelte";
-  import type { PaletteProps } from "./types";
+  import type { PaletteProps, RowPreview } from "./types";
 
   let { headings, format, formats, point, initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
 
@@ -49,7 +48,17 @@
     return found >= 0 ? found : 0;
   });
   const selected = $derived(rows[selectedIndex]?.heading ?? null);
-  const preview = $derived(selected ? previewReference(current.parts, selected, point).text : "");
+  const preview = $derived<RowPreview | null>(
+    selected === null
+      ? null
+      : {
+          label: current.label,
+          text: previewReference(current.parts, selected, point).text,
+          note: hidesAboveBelow(point.location) ? ABOVE_BELOW_HIDDEN : null,
+        },
+  );
+  /** Spoken after Tab or Shift+Tab; arrowing is covered by the selected row's description. */
+  let announcement = $state("");
   const status = $derived<MessageId | null>(warning ?? message ?? (rows.length === 0 ? "noMatches" : null));
 
   onMount(() => {
@@ -81,7 +90,8 @@
   }
 
   function pageSize(): number {
-    const row = listbox.querySelector<HTMLElement>("[role=option]");
+    // An unselected row: the selected one is taller, with its preview line.
+    const row = listbox.querySelector<HTMLElement>("[role=option][aria-selected=false]") ?? listbox.querySelector<HTMLElement>("[role=option]");
     const rows = row && row.offsetHeight > 0 ? Math.floor(listbox.clientHeight / row.offsetHeight) : 0;
     return Math.max(1, rows || FALLBACK_PAGE);
   }
@@ -149,6 +159,7 @@
       case "Tab":
         // Tab never moves focus out of the palette (contracts/palette-ui.md).
         formatId = stepFormat(cycle, current.id, event.shiftKey ? -1 : 1).id;
+        announcement = preview ? `${preview.label}: ${preview.text}` : current.label;
         break;
       case "Enter":
         void enter();
@@ -220,6 +231,7 @@
           id={optionId(index)}
           ranked={row}
           selected={index === selectedIndex}
+          preview={index === selectedIndex ? preview : null}
           onchoose={() => choose(index)}
         />
       {/each}
@@ -233,7 +245,7 @@
   </div>
 
   <MessageRegion message={status} visuallyHidden={warning !== null} />
-  <FormatStrip label={current.label} {preview} note={hidesAboveBelow(point.location) ? ABOVE_BELOW_HIDDEN : null} />
+  <div class="announcement" data-testid="format-announcement" aria-live="polite">{announcement}</div>
 </div>
 
 <style>
@@ -302,6 +314,15 @@
     background: var(--colorStatusWarningBackground1);
     color: var(--colorStatusWarningForeground3);
     box-shadow: var(--shadow8);
+  }
+
+  .announcement {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .results {

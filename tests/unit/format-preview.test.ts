@@ -60,9 +60,9 @@ describe("previewReference", () => {
     expect(preview).toEqual({ text: "", warnings: ["noNumber"] });
   });
 
-  it("shows page as ? with pageUnknown", () => {
+  it("shows page as its placeholder, {page}, with pageUnknown", () => {
     expect(previewReference([{ kind: "page" }], fireStrategy, { precedingHeadingOrder: 20, location: "main" })).toEqual({
-      text: "?",
+      text: "{page}",
       warnings: ["pageUnknown"],
     });
   });

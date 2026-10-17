@@ -226,7 +226,7 @@ src/
 │       │                        # dev-registration (registers adapters with the dev contract pane)
 │       └── spikes/              # dev-only spike scripts and pane; excluded from release builds
 ├── ui/
-│   ├── palette/                 # Palette.svelte, ResultRow, FormatStrip, MessageRegion
+│   ├── palette/                 # Palette.svelte, ResultRow (with its preview line), MessageRegion
 │   ├── settings/                # Settings.svelte, FormatPicker, TemplateEditor, ShortcutCapture,
 │   │                            # HeadingOptions
 │   └── theme/                   # Fluent token CSS (generated), motion.css

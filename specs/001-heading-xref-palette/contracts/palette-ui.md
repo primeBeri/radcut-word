@@ -11,7 +11,7 @@ row; the manual acceptance checklist repeats the focus rows in real Word.
 | Printable keys | Edit query; results re-ranked; first row selected | FR-005, FR-007 |
 | ↑ / ↓ | Move selection, no wrap; selected row scrolled into view | FR-006 |
 | Page Up / Page Down | Move selection by one visible page | (convenience) |
-| Tab / Shift+Tab | Next / previous format, wrapping; preview updates. With the cursor in a footnote, endnote, header, footer or text box, formats with an above/below part are left out (opening on the next offered format if the default is one) and the format strip says why | FR-015, FR-016a |
+| Tab / Shift+Tab | Next / previous format, wrapping; preview updates. With the cursor in a footnote, endnote, header, footer or text box, formats with an above/below part are left out (opening on the next offered format if the default is one) and the preview line says why | FR-015, FR-016a |
 | Enter | Insert selected heading in the shown format; with an extended selection, or the cursor inside a field, the first Enter shows the warning and changes nothing, the second inserts | FR-006, FR-008a, FR-008b |
 | Esc | Close, no change, caret restored; while the selection warning is shown, dismiss the warning only | FR-006, FR-008a |
 | Ctrl+, | Open settings (same as clicking the cog) | FR-021a |
@@ -38,8 +38,12 @@ The cog button stays in the accessibility tree with its shortcut announced
   "All headings" (FR-022).
 - Highlighted characters use `<mark>` with bold weight and an underline as well as colour
   (FR-005a: not colour alone).
-- Format strip: current format name plus preview text, in a polite live region
-  (`aria-live="polite"`) so screen readers announce format changes.
+- Preview line (refined 2026-10-17): the selected row grows a second line, under its text, with
+  what Enter would insert (accent colour) and the current format's name with a Tab hint; in a
+  footnote, endnote, header, footer or text box it also says why above/below formats are missing.
+  Only the selected row has it, so moving the selection shifts just the row moved onto; the list's
+  height never changes. The line is the option's `aria-describedby` description, and Tab or
+  Shift+Tab also speaks "format: preview" in a visually hidden polite live region.
 - Messages (no headings, no matches, declined, stale, failed, selection warning): one polite live
   region; Enter is a no-op when there is no selectable row. Fixed texts:
   - Selection warning: "The selection covers more than one paragraph or a picture.
@@ -64,8 +68,8 @@ The cog button stays in the accessibility tree with its shortcut announced
 - Colours, type ramp, spacing, radii and focus ring come only from Fluent 2 tokens, light or dark
   per `HostTheme` (FR-025). No product branding.
 - Indent per heading level: one token step (`spacingHorizontalL`) per level, capped at level 6.
-- Long text truncates with an ellipsis in the row; the full text appears in the preview and the
-  row's `title`.
+- Long text truncates with an ellipsis in the row and its preview line; the full heading text
+  appears in the row's `title`.
 - Motion (FR-026): pane content fade-in and selection highlight move, each ≤ 150 ms, CSS
   transitions only, never awaited before handling input; all disabled under
   `prefers-reduced-motion: reduce` (or the settings toggle, per research R11).

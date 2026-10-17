@@ -217,17 +217,20 @@ public sealed class Palette(PaneSession session) : IDisposable
         return await WaitForInsertionAsync(before, heading);
     }
 
-    /// <summary>The format strip: the format's name and the preview for the highlighted heading.</summary>
+    /// <summary>The highlighted row's preview line: the format's name and what Enter would insert.</summary>
     public async Task<(string Label, string Preview)> FormatAsync()
     {
-        var strip = Pane.Page.Locator("[data-testid=format-strip]");
+        var strip = Pane.Page.Locator(PreviewLine);
         return (await strip.Locator(".label").InnerTextAsync(), await strip.Locator(".preview").InnerTextAsync());
     }
 
-    /// <summary>The format strip's whole text, including why formats are missing (FR-016a).</summary>
-    public Task<string> FormatStripTextAsync() => Pane.Page.Locator("[data-testid=format-strip]").InnerTextAsync();
+    /// <summary>The preview line's whole text, including why formats are missing (FR-016a).</summary>
+    public Task<string> PreviewLineTextAsync() => Pane.Page.Locator(PreviewLine).InnerTextAsync();
 
-    /// <summary>Waits for the format strip to show <paramref name="label"/>; its preview.</summary>
+    /// <summary>The preview line sits inside the selected option, so this also checks it is under the highlight.</summary>
+    private const string PreviewLine = "[role=option][aria-selected=true] [data-testid=format-preview]";
+
+    /// <summary>Waits for the preview line to show <paramref name="label"/>; its preview.</summary>
     public async Task<string> WaitForFormatAsync(string label)
     {
         var preview = "";
@@ -239,7 +242,7 @@ public sealed class Palette(PaneSession session) : IDisposable
                 return shown.Label == label;
             },
             Wait.Pane,
-            $"the format \"{label}\" in the format strip");
+            $"the format \"{label}\" under the highlighted row");
         return preview;
     }
 

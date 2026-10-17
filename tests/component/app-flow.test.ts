@@ -31,7 +31,7 @@ async function settingsView() {
   return waitFor(() => screen.getByRole("radiogroup", { name: "Default format" }));
 }
 
-const formatLabel = () => screen.getByTestId("format-strip").querySelector(".label")?.textContent;
+const formatLabel = () => screen.getByTestId("format-preview").querySelector(".label")?.textContent;
 
 async function open(shell: FakeHostShell) {
   shell.pressShortcut();

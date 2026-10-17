@@ -21,7 +21,7 @@ public sealed class Us2Scenarios : ScenarioTest
         ("Number", "4.3"),
         ("Number + text", "4.3 Fire strategy"),
         ("§ number text", "§ 4.3 Fire strategy"),
-        ("Page", "?"),
+        ("Page", "{page}"),
         ("Above/below", "above"),
         ("Text + above/below", "Fire strategy above"),
     ];
@@ -206,7 +206,7 @@ public sealed class Us2Scenarios : ScenarioTest
 
     /// <summary>FR-016a in Word (US2 acceptance scenario 2): no quickstart row of its own, so not numbered.</summary>
     [Fact]
-    public async Task FootnoteCycle_in_a_footnote_Tab_skips_the_above_below_formats_and_the_format_strip_says_why()
+    public async Task FootnoteCycle_in_a_footnote_Tab_skips_the_above_below_formats_and_the_preview_line_says_why()
     {
         var (palette, document) = await OpenAsync("spec-contract", "FootnoteCycle");
         WordActions.PutCaretIn(document, "Footnote text.");
@@ -214,7 +214,7 @@ public sealed class Us2Scenarios : ScenarioTest
         Palette.Type("Fire strategy");
         await palette.WaitForSelectedRowAsync("Fire strategy");
         Assert.Equal("§ number text", (await palette.FormatAsync()).Label);
-        Assert.Contains("No above/below formats here", await palette.FormatStripTextAsync());
+        Assert.Contains("No above/below formats here", await palette.PreviewLineTextAsync());
         // From § number text, Page wraps straight round to Text: the two above/below formats are skipped.
         foreach (var label in new[] { "Page", "Text", "Number", "Number + text", "§ number text" }) await palette.TabToAsync(label);
         Palette.Press(VirtualKeyShort.ESCAPE);

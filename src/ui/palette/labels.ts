@@ -27,5 +27,5 @@ export function accessibleName(heading: Heading): string {
   return `${fullTitle(heading)}, level ${heading.level}${where}`;
 }
 
-/** The format strip's note where Word cannot show above/below (FR-016a). */
+/** The preview line's note where Word cannot show above/below (FR-016a). */
 export const ABOVE_BELOW_HIDDEN = "No above/below formats here: Word would show the heading text instead.";

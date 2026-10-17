@@ -82,7 +82,7 @@ describe("preview of each built-in format (FR-015)", () => {
     ["number", "4.3", []],
     ["numberText", "4.3 Fire strategy", []],
     ["sectionNumberText", "§ 4.3 Fire strategy", []],
-    ["page", "?", ["pageUnknown"]],
+    ["page", "{page}", ["pageUnknown"]],
     ["aboveBelow", "above", []],
     ["textAboveBelow", "Fire strategy above", []],
   ] as const)("%s previews as %j", (id, text, warnings) => {

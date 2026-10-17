@@ -40,27 +40,45 @@ function setup(overrides: Partial<PaletteProps> = {}) {
   };
   const result = render(Palette, { props });
   const input = screen.getByRole("combobox");
-  const strip = screen.getByTestId("format-strip");
+  // Re-queried every time: the preview line moves with the selection.
+  const strip = () => screen.getByTestId("format-preview");
   const tab = (shiftKey = false) => fireEvent.keyDown(input, { key: "Tab", shiftKey });
-  const label = () => strip.querySelector(".label")?.textContent;
-  return { ...result, input, strip, tab, label, insert };
+  const label = () => strip().querySelector(".label")?.textContent;
+  const announcement = () => screen.getByTestId("format-announcement");
+  return { ...result, input, strip, tab, label, announcement, insert };
 }
 
-describe("format strip and Tab cycle (FR-015, FR-016a)", () => {
-  it("shows the opening format and the preview for the selected heading, in a polite live region", () => {
+describe("preview line and Tab cycle (FR-015, FR-016a)", () => {
+  it("shows the opening format and the preview on a second line of the selected row, as its description", () => {
     const { strip } = setup();
-    expect(strip).toHaveAttribute("aria-live", "polite");
-    expect(strip).toHaveTextContent("§ number text");
-    expect(strip).toHaveTextContent("§ 1.1 Scope");
+    const row = screen.getByRole("option", { selected: true });
+    expect(row).toContainElement(strip());
+    expect(strip()).toHaveTextContent("§ number text");
+    expect(strip()).toHaveTextContent("§ 1.1 Scope");
+    expect(row).toHaveAccessibleName("1.1 Scope, level 2");
+    expect(row).toHaveAccessibleDescription(/§ 1.1 Scope/);
   });
 
-  it("Tab moves to the next format and updates the preview; focus stays in the search box", async () => {
-    const { strip, tab, label, input } = setup();
+  it("only the selected row has a preview line, and it follows the selection", async () => {
+    const { strip, input } = setup();
+    expect(screen.getAllByTestId("format-preview")).toHaveLength(1);
+    await fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getAllByTestId("format-preview")).toHaveLength(1);
+    expect(screen.getByRole("option", { selected: true })).toContainElement(strip());
+    expect(strip()).toHaveTextContent("§ 4.3 Fire strategy");
+    expect(screen.getByRole("option", { name: "1.1 Scope, level 2" })).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("Tab moves to the next format, updates the preview and announces it politely; focus stays in the search box", async () => {
+    const { strip, tab, label, input, announcement } = setup();
+    expect(announcement()).toHaveAttribute("aria-live", "polite");
+    expect(announcement().textContent).toBe("");
     await tab();
     expect(label()).toBe("Page");
     await tab();
     expect(label()).toBe("Above/below");
-    expect(strip).toHaveTextContent("above");
+    expect(strip()).toHaveTextContent("above");
+    expect(announcement()).toHaveTextContent("Above/below: above");
     expect(input).toHaveFocus();
   });
 
@@ -70,7 +88,26 @@ describe("format strip and Tab cycle (FR-015, FR-016a)", () => {
     expect(label()).toBe("Text + above/below");
     await tab();
     expect(label()).toBe("Text");
-    expect(strip).toHaveTextContent("Scope");
+    expect(strip()).toHaveTextContent("Scope");
+  });
+
+  it("shows a page part as {page}, since Word only knows the page once the field is in", async () => {
+    const { strip, tab, label } = setup();
+    await tab();
+    expect(label()).toBe("Page");
+    expect(strip().querySelector(".preview")?.textContent).toBe("{page}");
+  });
+
+  it("starts the line with a hook arrow that screen readers skip", () => {
+    const { strip } = setup();
+    expect(strip().querySelector("svg.hook")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("option", { selected: true })).toHaveAccessibleDescription(/^§ 1.1 Scope/);
+  });
+
+  it("has no preview line when nothing matches", async () => {
+    const { input } = setup();
+    await fireEvent.input(input, { target: { value: "zzzz" } });
+    expect(screen.queryByTestId("format-preview")).not.toBeInTheDocument();
   });
 
   it("Tab never moves focus out of the palette", async () => {
@@ -92,7 +129,7 @@ describe("format strip and Tab cycle (FR-015, FR-016a)", () => {
     "with the cursor in a %s, never shows an above/below format and says why",
     async (location) => {
       const { strip, tab, label } = setup({ point: point(location) });
-      expect(strip).toHaveTextContent(ABOVE_BELOW_HIDDEN);
+      expect(strip()).toHaveTextContent(ABOVE_BELOW_HIDDEN);
       const seen = new Set<string>();
       for (let i = 0; i < 6; i++) {
         await tab();
@@ -104,7 +141,7 @@ describe("format strip and Tab cycle (FR-015, FR-016a)", () => {
 
   it("says nothing about above/below in the main text", () => {
     const { strip } = setup();
-    expect(strip).not.toHaveTextContent(ABOVE_BELOW_HIDDEN);
+    expect(strip()).not.toHaveTextContent(ABOVE_BELOW_HIDDEN);
   });
 
   it("when the cursor moves into a note while open, an above/below format gives way to the next offered one", async () => {

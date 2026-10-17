@@ -12,6 +12,14 @@ export type PaletteFeedback =
   /** Nothing inserted; show the message and stay open. */
   | { readonly kind: "message"; readonly message: MessageId };
 
+/** What Enter would insert, shown on a second line of the selected row (FR-015). */
+export interface RowPreview {
+  readonly label: string;
+  readonly text: string;
+  /** Why some formats are missing here (FR-016a), or null. */
+  readonly note: string | null;
+}
+
 export interface PaletteProps {
   /** The headings to offer, already filtered, in story order. May be replaced by a refresh. */
   headings: readonly Heading[];
