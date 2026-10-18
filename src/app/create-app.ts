@@ -9,9 +9,11 @@ import type { IDocumentGateway } from "../core/ports/document-gateway";
 import type { IHostShell } from "../core/ports/host-shell";
 import type { ISettingsStore } from "../core/ports/settings-store";
 import { DEFAULT_SETTINGS } from "../core/settings/defaults";
+import type { KeyCombo } from "../core/settings/shortcut-rules";
 import { formatsFor } from "../core/settings/templates";
 import type { UserSettings } from "../core/settings/types";
 import { loadUserSettings, type LoadedSettings } from "../core/settings/user-settings";
+import { changeShortcut, readShortcut } from "../core/use-cases/change-shortcut";
 import { insertReference } from "../core/use-cases/insert-reference";
 import { openPalette, type OpenPaletteOptions, type OpenPaletteState } from "../core/use-cases/open-palette";
 import { saveSettings, type SaveSettingsResult } from "../core/use-cases/save-settings";
@@ -218,6 +220,10 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
           settings: loaded.settings,
           notice: loaded.notice,
           save,
+          shortcut: {
+            read: () => readShortcut(shell.shortcut),
+            change: (combo: KeyCombo | null) => changeShortcut(shell.shortcut, combo),
+          },
           // Back to the palette with its query, or to the document (FR-021b).
           close: () => void (origin.from === "palette" ? open(origin.query) : close()),
         },

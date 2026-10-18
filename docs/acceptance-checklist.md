@@ -338,3 +338,25 @@ S5 Node only).
 | # | Result | Notes |
 |---|---|---|
 | 9 | Pass | Automated (`Scenario09`) |
+
+## Automated US4 run (feature 001, T088), 2026-10-17
+
+`npm run test:desktop -- --filter-class "*Us4Scenarios"` and the Contract category on the test
+VM (Word 2609, signed in), no person involved, with the UK layout made Word's input language
+for the test. Scenario 10 (first test) opens the palette from the ribbon's Cross-reference
+button with keyboard focus in the search box and inserts as after the shortcut; presses
+Ctrl+Shift+Y and checks no character is typed; records Ctrl+@ (Shift+' on UK) and sees it
+refused with its reason, then Ctrl+B and sees it reported as kept by Word (updated
+2026-10-18). Scenario 10b records Ctrl+Alt+J: Word refuses every
+`Office.actions.replaceShortcuts` call (`InvalidArgument`, research R4), so the test checks the
+settings view names the refused combination and keeps recording, that Ctrl+Shift+Y still opens
+the palette, and skips the rest with that reason. Rerun 2026-10-18 after the owner reset the
+account's shortcut and removed `npm start`'s leftover developer registration: scenario 10
+passes, 10b skips as above. The refusal's cause is Word 2609 never registering the catalogue
+copy's shortcuts (office-js#6973, research R4). Contract and Scenario categories: 95 passed,
+5 skipped, 0 failed.
+
+| # | Result | Notes |
+|---|---|---|
+| 10 | Partial | Ribbon, Ctrl+@ and UK layout pass (`Scenario10_the_ribbon_…`); a new shortcut cannot be set on this Word (`Scenario10_a_recorded_shortcut_…` skipped: replaceShortcuts refused). Recheck on a later Word build or a store install |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |

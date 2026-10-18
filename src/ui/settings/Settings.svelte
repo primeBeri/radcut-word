@@ -5,10 +5,11 @@
   import FormatPicker from "./FormatPicker.svelte";
   import HeadingOptions from "./HeadingOptions.svelte";
   import { SETTINGS_TEXT } from "./labels";
+  import ShortcutCapture from "./ShortcutCapture.svelte";
   import Templates from "./Templates.svelte";
   import type { SettingsProps } from "./types";
 
-  let { settings, notice, save, close, newId = () => crypto.randomUUID() }: SettingsProps = $props();
+  let { settings, notice, save, close, shortcut, newId = () => crypto.randomUUID() }: SettingsProps = $props();
 
   const NOTICES = { settingsReset: SETTINGS_TEXT.settingsReset, templateDropped: SETTINGS_TEXT.templateDropped } as const;
 
@@ -123,6 +124,7 @@
   <div class="body">
     <FormatPicker bind:this={picker} {formats} bind:value={draft.defaultFormatId} error={formatError} />
     <Templates templates={draft.templates} problems={templateProblems} {addError} onadd={onAdd} onupdate={onUpdate} ondelete={onDelete} />
+    <ShortcutCapture {shortcut} onannounce={(text) => (status = text)} />
     <HeadingOptions bind:allowInHeadings={draft.allowReferencesInHeadings} bind:showOutsideMainText={draft.showHeadingsOutsideMainText} />
   </div>
 

@@ -9,12 +9,17 @@ defineHostShellContract(
   "FakeHostShell",
   async () => {
     const shell = new FakeHostShell();
+    // As Word reports it (research R4).
+    shell.inUse.add("ctrl+alt+k");
     return {
       shell,
       pressShortcut: async () => shell.pressShortcut(),
       clickCrossReferenceButton: async () => shell.clickCrossReferenceButton(),
       paneVisible: async () => shell.visible,
       closePaneByUser: async () => shell.closePaneByUser(),
+      signOut: async () => {
+        shell.customisable = false;
+      },
     };
   },
   vitestApi,

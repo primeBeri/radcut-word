@@ -4,6 +4,7 @@ import { BUILT_IN_FORMATS } from "../../src/core/formats/built-ins";
 import { DEFAULT_SETTINGS } from "../../src/core/settings/defaults";
 import type { UserSettings } from "../../src/core/settings/types";
 import type { SaveSettingsResult } from "../../src/core/use-cases/save-settings";
+import { shortcutControl } from "../fakes/fake-host-shell";
 import Settings from "../../src/ui/settings/Settings.svelte";
 import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import type { SettingsProps } from "../../src/ui/settings/types";
@@ -11,7 +12,7 @@ import type { SettingsProps } from "../../src/ui/settings/types";
 function setup(overrides: Partial<SettingsProps> = {}) {
   const save = vi.fn<SettingsProps["save"]>(async (): Promise<SaveSettingsResult> => ({ ok: true }));
   const close = vi.fn();
-  const props: SettingsProps = { settings: DEFAULT_SETTINGS, notice: null, save, close, ...overrides };
+  const props: SettingsProps = { settings: DEFAULT_SETTINGS, notice: null, save, close, shortcut: shortcutControl(), ...overrides };
   const result = render(Settings, { props });
   const group = screen.getByRole("radiogroup", { name: "Default format" });
   const radio = (name: string) => within(group).getByRole("radio", { name });

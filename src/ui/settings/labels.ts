@@ -12,6 +12,12 @@ export const SETTINGS_TEXT = {
   templateHelp: "Use {number}, {text}, {page} and {abovebelow}; write {{ or }} for a brace.",
   noPreview: "The preview appears once the template is valid.",
   templateDropped: "A saved template couldn't be read, so it was left out.",
+  shortcutIntro: "Opens the palette:",
+  recordShortcut: "Record new shortcut",
+  recordingShortcut: "Press the new shortcut",
+  recordingHint:
+    "Hold Ctrl or Alt, with Shift if you like, and press a letter, digit, - or +. Word keeps many combinations for itself; Ctrl+Shift with a digit is usually free. Esc cancels.",
+  shortcutChanged: (combo: string) => `The palette now opens with ${combo}.`,
   unsavedTitle: "Unsaved changes",
   unsavedBody: "Your changes haven't been saved.",
 } as const;

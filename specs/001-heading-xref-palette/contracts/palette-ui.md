@@ -88,7 +88,13 @@ The cog button stays in the accessibility tree with its shortcut announced
   focus to the next template's name, else Add template; the default-format list follows the
   draft, so a template is listed there once its text is valid; errors appear on Save, set
   `aria-invalid`, are linked by `aria-describedby`, and go once their field is edited); Shortcut (current value,
-  "Record new shortcut" capture, reset to default; read-only with explanation when signed out);
+  "Record new shortcut" capture, reset to default; read-only with explanation when signed out;
+  refined 2026-10-17: the change applies at once, not on Save, since Office stores it; recording
+  reads the next combination with Ctrl or Alt, a refusal is shown inline as an alert and recording
+  goes on, Esc stops recording without leaving settings and Tab moves on; a change is announced
+  in the view's status line, "The palette now opens with <combination>."; refined 2026-10-18: a
+  combination Word refuses is named in the alert and recording goes on, and Ctrl or Alt released
+  with no key reaching the pane says Word kept that combination, research R4);
   Headings (two checkboxes, each with a description linked by `aria-describedby`):
   - "Allow references in headings" (off): "Not recommended. Headings feed the table of
     contents, the navigation pane and text references to that heading, so a reference inside a

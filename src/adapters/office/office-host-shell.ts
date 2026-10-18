@@ -1,4 +1,5 @@
 import type { HostShortcut, HostTheme, IHostShell } from "../../core/ports/host-shell";
+import shortcutsJson from "../../app/shortcuts.json";
 import { readOfficeTheme } from "./theme";
 
 const OPEN_PALETTE = "OpenPalette";
@@ -56,6 +57,7 @@ export class OfficeHostShell implements IHostShell {
   }
 
   readonly shortcut: HostShortcut = {
+    manifestDefault: shortcutsJson.shortcuts.find((s) => s.action === OPEN_PALETTE)?.key.default ?? "",
     async current() {
       if (!Office.context.requirements.isSetSupported("KeyboardShortcuts", "1.1")) return null;
       const shortcuts = await Office.actions.getShortcuts();
@@ -78,9 +80,18 @@ export class OfficeHostShell implements IHostShell {
       return result?.inUse ?? false;
     },
     async replace(combo) {
-      // Nothing resets the shortcut before the settings view (US4); fail loudly rather than do nothing.
-      if (combo === null) throw new Error("Resetting the shortcut is not implemented yet (T085).");
-      await Office.actions.replaceShortcuts({ [OPEN_PALETTE]: combo });
+      try {
+        // null drops the user's customisation and restores the shortcuts.json default (Microsoft's
+        // keyboard-shortcuts guide); @types/office-js does not allow null yet.
+        await Office.actions.replaceShortcuts({ [OPEN_PALETTE]: combo } as { [actionId: string]: string });
+        return "replaced";
+      } catch (error) {
+        // Word 2609 refuses some free combinations with InvalidArgument and no reason, and in the
+        // harness's Word every change, even {} (research R4); the core has already ruled out a
+        // combination Office's rules call invalid.
+        if ((error as { code?: unknown }).code === "InvalidArgument") return "refused";
+        throw error;
+      }
     },
   };
 }

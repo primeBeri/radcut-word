@@ -1,4 +1,6 @@
+import shortcutsJson from "../../src/app/shortcuts.json";
 import type { IHostShell } from "../../src/core/ports/host-shell";
+import { displayShortcut, parseCombo } from "../../src/core/settings/shortcut-rules";
 import type { ISettingsStore } from "../../src/core/ports/settings-store";
 import type { UserSettings } from "../../src/core/settings/types";
 import type { ContractTestApi } from "./test-api";
@@ -14,7 +16,15 @@ export interface HostShellContractHarness {
   paneVisible(): Promise<boolean>;
   /** Close the pane as the user does, with its × button. */
   closePaneByUser(): Promise<void>;
+  /** Node only: make the host refuse customising, as Word does when signed out. */
+  signOut?(): Promise<void>;
 }
+
+/** The manifest default (src/app/shortcuts.json), which `replace(null)` restores. */
+const MANIFEST_DEFAULT = shortcutsJson.shortcuts.find((s) => s.action === "OpenPalette")?.key.default ?? "";
+/** Taken by Word (research R4), and the next free choice after the default. */
+const WORDS_OWN = "Ctrl+Alt+K";
+const FREE = "Ctrl+Alt+J";
 
 /** A store with nothing in it, and a way to put raw data where it keeps settings. */
 export interface SettingsStoreContractHarness {
@@ -143,6 +153,55 @@ export function defineHostShellContract(
     it("prefersReducedMotion() returns a boolean", async () => {
       const { shell } = await makeShell();
       expect(typeof shell.prefersReducedMotion()).toBe("boolean");
+    });
+
+    it("K1. shortcut.current() is a combination the core can read, or null; manifestDefault is the shortcuts.json default", async () => {
+      const { shell } = await makeShell();
+      const current = await shell.shortcut.current();
+      if (current !== null) expect(parseCombo(current)).not.toBeNull();
+      expect(shell.shortcut.manifestDefault).toBe(MANIFEST_DEFAULT);
+    });
+
+    it("K2. shortcut.canCustomise() returns a boolean", async () => {
+      const { shell } = await makeShell();
+      expect(typeof (await shell.shortcut.canCustomise())).toBe("boolean");
+    });
+
+    (api.environment === "node" ? it : api.skip)("K3. canCustomise() is false when signed out (Node only)", async () => {
+      const h = await makeShell();
+      if (!h.signOut) throw new Error("No way to sign out.");
+      await h.signOut();
+      expect(await h.shell.shortcut.canCustomise()).toBe(false);
+    });
+
+    it(`K4. isInUse() is true for ${WORDS_OWN}, which Word uses, and false for ${FREE}`, async () => {
+      const { shell } = await makeShell();
+      expect(await shell.shortcut.isInUse(WORDS_OWN)).toBe(true);
+      expect(await shell.shortcut.isInUse(FREE)).toBe(false);
+    });
+
+    it(`K5. replace(combo) then current() gives it, or the host refuses and nothing changes; replace(null) restores ${MANIFEST_DEFAULT}`, async () => {
+      const { shell } = await makeShell();
+      // In Word this is the signed-in user's own setting, roaming with their account.
+      if (!(await shell.shortcut.canCustomise())) throw new Error("Sign in to Word to run this case.");
+      const shown = async () => displayShortcut((await shell.shortcut.current()) ?? "null");
+      const before = await shown();
+      try {
+        const outcome = await shell.shortcut.replace(FREE);
+        expect(await shown()).toBe(outcome === "replaced" ? FREE : before);
+      } finally {
+        await shell.shortcut.replace(null);
+      }
+      // Refused (Word 2609, research R4), the shortcut is still the one it was.
+      expect([MANIFEST_DEFAULT, before]).toContain(await shown());
+    });
+
+    (api.environment === "node" ? it : api.skip)("K6. a host that accepts changes takes the combination, and null restores the default (Node only)", async () => {
+      const { shell } = await makeShell();
+      expect(await shell.shortcut.replace(FREE)).toBe("replaced");
+      expect(displayShortcut((await shell.shortcut.current()) ?? "null")).toBe(FREE);
+      expect(await shell.shortcut.replace(null)).toBe("replaced");
+      expect(displayShortcut((await shell.shortcut.current()) ?? "null")).toBe(MANIFEST_DEFAULT);
     });
   });
 }

@@ -1,4 +1,6 @@
 import type { HostShortcut, HostTheme, IHostShell } from "../../src/core/ports/host-shell";
+import { changeShortcut, readShortcut } from "../../src/core/use-cases/change-shortcut";
+import type { ShortcutControl } from "../../src/ui/settings/types";
 
 export const DEFAULT_SHORTCUT = "Ctrl+Shift+Y";
 
@@ -11,6 +13,10 @@ export class FakeHostShell implements IHostShell {
   reducedMotion = false;
   assignedShortcut: string | null = DEFAULT_SHORTCUT;
   customisable = true;
+  /** As the harness's Word 2609 does: every replace is refused. */
+  refusesReplace = false;
+  /** Lower case; free combinations Word still refuses, with no reason (research R4). */
+  readonly refused = new Set<string>();
   readonly inUse = new Set<string>();
 
   private openPalette: (() => void) | null = null;
@@ -59,11 +65,14 @@ export class FakeHostShell implements IHostShell {
   }
 
   readonly shortcut: HostShortcut = {
+    manifestDefault: DEFAULT_SHORTCUT,
     current: async () => this.assignedShortcut,
     canCustomise: async () => this.customisable,
     isInUse: async (combo) => this.inUse.has(combo.toLowerCase()),
     replace: async (combo) => {
+      if (this.refusesReplace || (combo !== null && this.refused.has(combo.toLowerCase()))) return "refused";
       this.assignedShortcut = combo ?? DEFAULT_SHORTCUT;
+      return "replaced";
     },
   };
 
@@ -86,4 +95,9 @@ export class FakeHostShell implements IHostShell {
     if (!handler) throw new Error(`No handler registered for ${action}.`);
     handler();
   }
+}
+
+/** The settings view's shortcut control over a fake shell, as create-app wires it to the real one. */
+export function shortcutControl(shell: FakeHostShell = new FakeHostShell()): ShortcutControl {
+  return { read: () => readShortcut(shell.shortcut), change: (combo) => changeShortcut(shell.shortcut, combo) };
 }

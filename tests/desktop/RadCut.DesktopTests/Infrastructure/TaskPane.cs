@@ -95,9 +95,11 @@ public sealed class TaskPane : IAsyncDisposable
             @"() => {
                 if (globalThis.__radcutBusy !== undefined) return;
                 globalThis.__radcutBusy = 0;
+                globalThis.__radcutShows = [];
                 const track = (owner, name) => {
                     const call = owner[name].bind(owner);
                     owner[name] = (...args) => {
+                        if (name === 'showAsTaskpane') globalThis.__radcutShows.push(performance.now());
                         globalThis.__radcutBusy++;
                         let pending;
                         try { pending = call(...args); } catch (error) { globalThis.__radcutBusy--; throw error; }
@@ -137,6 +139,13 @@ public sealed class TaskPane : IAsyncDisposable
     /// <summary>The recorded visibility events, oldest first, e.g. "41230 Hidden".</summary>
     public async Task<IReadOnlyList<string>> VisibilityEventsAsync() =>
         await Page.EvaluateAsync<string[]>("() => globalThis.__radcutVisibility ?? []");
+
+    /// <summary>
+    /// How many times the add-in has asked to show the pane since <paramref name="since"/> (page clock):
+    /// every OpenPalette and settings action does, so a shortcut that did nothing adds none.
+    /// </summary>
+    public async Task<int> ShowCallsSinceAsync(long since) =>
+        await Page.EvaluateAsync<int>("since => (globalThis.__radcutShows ?? []).filter(t => t >= since).length", since);
 
     /// <summary>The page's clock (performance.now(), ms), to place an action among the visibility events.</summary>
     public async Task<long> NowAsync() => (long)await Page.EvaluateAsync<double>("() => performance.now()");

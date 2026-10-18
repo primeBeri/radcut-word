@@ -8,6 +8,7 @@ import { formatsFor } from "../../src/core/settings/templates";
 import type { UserSettings } from "../../src/core/settings/types";
 import { saveSettings } from "../../src/core/use-cases/save-settings";
 import Palette from "../../src/ui/palette/Palette.svelte";
+import { shortcutControl } from "../fakes/fake-host-shell";
 import Settings from "../../src/ui/settings/Settings.svelte";
 import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import type { SettingsProps } from "../../src/ui/settings/types";
@@ -25,6 +26,7 @@ function setup(overrides: Partial<SettingsProps> = {}) {
     notice: null,
     save,
     close: vi.fn(),
+    shortcut: shortcutControl(),
     newId: () => `id-${++next}`,
     ...overrides,
   };

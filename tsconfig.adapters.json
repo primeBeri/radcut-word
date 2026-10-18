@@ -11,6 +11,6 @@
     "rootDir": ".",
     "types": ["office-js", "office-runtime", "vite/client"]
   },
-  "include": ["src/**/*.ts", "tests/contract/**/*.ts", "tests/fakes/**/*.ts"],
+  "include": ["src/**/*.ts", "src/app/shortcuts.json", "tests/contract/**/*.ts", "tests/fakes/**/*.ts"],
   "exclude": ["tests/**/*.test.ts"]
 }

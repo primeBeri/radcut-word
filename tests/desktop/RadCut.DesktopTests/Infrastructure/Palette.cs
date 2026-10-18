@@ -24,23 +24,48 @@ public sealed class Palette(PaneSession session) : IDisposable
     /// Ctrl+Shift+Y from the document; waits for the pane to take focus, on the search box (the
     /// palette) or on Close (a message shown instead of the palette).
     /// </summary>
-    public async Task OpenAsync()
+    public Task OpenAsync() => OpenWithAsync(DefaultShortcut, VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_Y);
+
+    public const string DefaultShortcut = "Ctrl+Shift+Y";
+
+    /// <summary>As <see cref="OpenAsync"/>, with the shortcut <paramref name="name"/> pressed as <paramref name="chord"/>.</summary>
+    public async Task OpenWithAsync(string name, params VirtualKeyShort[] chord)
     {
         await WaitUntilHiddenAsync();
         keys.FocusDocument();
         pressedAt = await Pane.NowAsync();
-        keys.Shortcut();
+        pressedName = name;
+        keys.Chord(chord);
         try
         {
             await Wait.UntilAsync(
                 async () => keys.FocusedClass() == Keys.TaskPaneHostClass &&
                     ((await Pane.FocusAsync()) == (true, TaskPane.SearchBoxName) || await Pane.Page.Locator(".message-view").CountAsync() == 1),
                 Wait.Pane,
-                "the pane to take focus after Ctrl+Shift+Y");
+                $"the pane to take focus after {name}");
         }
         catch (TimeoutException e)
         {
-            throw new TimeoutException($"{e.Message} {await StateAsync()}", e);
+            throw new TimeoutException($"{e.Message} {await AssignedShortcutAsync(name)}{await StateAsync()}", e);
+        }
+    }
+
+    /// <summary>
+    /// Office keeps the shortcut per account, so one changed in the owner's own Word is the harness's
+    /// too, and the harness's Word refuses to change it back (research R4); say so when it differs.
+    /// </summary>
+    private async Task<string> AssignedShortcutAsync(string pressed)
+    {
+        try
+        {
+            string? assigned = await Pane.Page.EvaluateAsync<string?>("async () => (await Office.actions.getShortcuts()).OpenPalette ?? null");
+            return string.Equals(assigned, pressed, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : $"The palette's shortcut in this Office account is {assigned ?? "unassigned"}, not {pressed}: reset it to default in RAD·CUT's settings in your own Word. ";
+        }
+        catch (PlaywrightException)
+        {
+            return "";
         }
     }
 
@@ -65,7 +90,7 @@ public sealed class Palette(PaneSession session) : IDisposable
         string visibility;
         try
         {
-            visibility = $"Ctrl+Shift+Y at {pressedAt}, visibility events [{string.Join(", ", await Pane.VisibilityEventsAsync())}], now {await Pane.NowAsync()}";
+            visibility = $"{pressedName} at {pressedAt}, visibility events [{string.Join(", ", await Pane.VisibilityEventsAsync())}], now {await Pane.NowAsync()}";
         }
         catch (Exception e)
         {
@@ -74,8 +99,40 @@ public sealed class Palette(PaneSession session) : IDisposable
         return $"UI Automation: {keys.FocusedDescription()}; in front: {Keys.ForegroundDescription()}; {page}; {visibility}.";
     }
 
-    /// <summary>When the last Ctrl+Shift+Y was pressed, on the page's clock.</summary>
+    /// <summary>When the last shortcut was pressed, on the page's clock, and which.</summary>
     private long pressedAt;
+
+    private string pressedName = DefaultShortcut;
+
+    /// <summary>Presses the keys together in Word, wherever its keyboard focus is (document or pane).</summary>
+    public void Chord(params VirtualKeyShort[] chord) => keys.Chord(chord);
+
+    /// <summary>Presses <paramref name="chord"/> in the document, and gives the page's time just before.</summary>
+    public async Task<long> PressInDocumentAsync(params VirtualKeyShort[] chord)
+    {
+        await WaitUntilHiddenAsync();
+        keys.FocusDocument();
+        long at = await Pane.NowAsync();
+        keys.Chord(chord);
+        return at;
+    }
+
+    /// <summary>How many times the add-in has shown the pane since <paramref name="since"/> (page clock).</summary>
+    public Task<int> ShowCallsSinceAsync(long since) => Pane.ShowCallsSinceAsync(since);
+
+    /// <summary>
+    /// The ribbon's Cross-reference button from the document; waits for the palette with its search
+    /// box focused, in the page and in Windows, as after the shortcut (US4 scenario 1).
+    /// </summary>
+    public async Task OpenFromRibbonAsync()
+    {
+        await WaitUntilHiddenAsync();
+        Ribbon.Invoke(Word, Ribbon.CrossReference);
+        await Wait.UntilAsync(
+            async () => keys.FocusedClass() == Keys.TaskPaneHostClass && (await Pane.FocusAsync()) == (true, TaskPane.SearchBoxName),
+            Wait.Pane,
+            "the palette's search box focused after the ribbon's Cross-reference button");
+    }
 
     /// <summary>
     /// Waits until Office has told the page that the pane is hidden: the add-in clears itself on
@@ -352,6 +409,80 @@ public sealed class Palette(PaneSession session) : IDisposable
             Wait.Pane,
             $"\"{error}\" on the template \"{template}\", with focus on its text");
     }
+
+    private ILocator ShortcutSection =>
+        Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Region, new() { Name = "Shortcut", Exact = true });
+
+    /// <summary>The settings view's shortcut once read from Office, e.g. "Ctrl+Shift+Y" or "No shortcut assigned".</summary>
+    public async Task<string> CurrentShortcutAsync()
+    {
+        var current = ShortcutSection.GetByTestId("current-shortcut");
+        return await Wait.UntilValueAsync(
+            async () => (await current.InnerTextAsync()).Trim() is var text && text != "…" ? text : null,
+            Wait.Pane,
+            "the settings view to read the shortcut");
+    }
+
+    /// <summary>Waits for the settings view to show <paramref name="expected"/> as the shortcut.</summary>
+    public async Task WaitForShortcutAsync(string expected) =>
+        await Wait.UntilAsync(
+            async () => (await ShortcutSection.GetByTestId("current-shortcut").InnerTextAsync()).Trim() == expected,
+            Wait.Pane,
+            $"the settings view to show the shortcut {expected}");
+
+    /// <summary>Clicks Record new shortcut; waits for it to be recording with keyboard focus, in the page and in Windows.</summary>
+    public async Task StartRecordingShortcutAsync()
+    {
+        var button = ShortcutSection.Locator("button[aria-pressed]");
+        await button.ClickAsync();
+        await Wait.UntilAsync(
+            async () => keys.FocusedClass() == Keys.TaskPaneHostClass &&
+                await button.GetAttributeAsync("aria-pressed") == "true" &&
+                await button.EvaluateAsync<bool>("element => element === document.activeElement"),
+            Wait.Pane,
+            "Record new shortcut to be recording, with keyboard focus");
+    }
+
+    /// <summary>Waits for <paramref name="error"/> in the shortcut section, still recording.</summary>
+    public async Task WaitForShortcutRefusedAsync(string error)
+    {
+        var alert = ShortcutSection.GetByRole(AriaRole.Alert);
+        await Wait.UntilAsync(
+            async () => await alert.CountAsync() == 1 && await alert.InnerTextAsync() == error &&
+                await ShortcutSection.Locator("button[aria-pressed]").GetAttributeAsync("aria-pressed") == "true",
+            Wait.Pane,
+            $"\"{error}\" in the shortcut section, still recording");
+    }
+
+    /// <summary>Clicks Reset to default in the shortcut section.</summary>
+    public Task ResetShortcutAsync() =>
+        ShortcutSection.GetByRole(AriaRole.Button, new() { Name = "Reset to default", Exact = true }).ClickAsync();
+
+    /// <summary>
+    /// After a combination was recorded: waits until the section shows <paramref name="expected"/>
+    /// (false) or an alert instead (true: Word refused, or the combination was).
+    /// </summary>
+    public async Task<bool> ShortcutChangeRefusedAsync(string expected)
+    {
+        var current = ShortcutSection.GetByTestId("current-shortcut");
+        var alert = ShortcutSection.GetByRole(AriaRole.Alert);
+        return await Wait.UntilValueAsync<string>(
+            async () => (await current.InnerTextAsync()).Trim() == expected ? "changed" : await alert.CountAsync() == 1 ? "refused" : null,
+            Wait.Pane,
+            $"the settings view to show {expected} or a refusal") == "refused";
+    }
+
+    /// <summary>
+    /// Puts the palette's shortcut back to the manifest default straight through Office.js in the
+    /// page, so a failed test does not leave the user's roaming shortcut changed. A Word that refuses
+    /// changes (InvalidArgument, research R4) has changed nothing to put back.
+    /// </summary>
+    public Task RestoreDefaultShortcutAsync() =>
+        Pane.Page.EvaluateAsync(
+            @"async () => {
+                try { await Office.actions.replaceShortcuts({ OpenPalette: null }); }
+                catch (error) { if (error.code !== 'InvalidArgument') throw error; }
+            }");
 
     /// <summary>Clicks Close in the settings view.</summary>
     public Task CloseSettingsAsync() =>

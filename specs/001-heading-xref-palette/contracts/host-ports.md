@@ -27,7 +27,7 @@ interface IHostShell {
     current(): Promise<string | null>;          // null = unassigned or lost to a Word conflict
     canCustomise(): Promise<boolean>;           // false when signed out
     isInUse(combo: string): Promise<boolean>;
-    replace(combo: string | null): Promise<void>; // null = reset to manifest default
+    replace(combo: string | null): Promise<"replaced" | "refused">; // null = reset to manifest default
   };
 }
 
@@ -46,7 +46,9 @@ Behaviour:
 5. `theme()` returns `isDark`, `background` and `foreground`; `prefersReducedMotion()` returns a
    boolean.
 6. `replace(combo)` followed by `current()` returns `combo`; `replace(null)` restores the
-   manifest default.
+   manifest default. Refined 2026-10-17: a host that will not change the shortcut returns
+   `"refused"` and leaves it as it was (Word 2609 refuses every change, research R4); the
+   settings view then explains and is read-only. Contract cases K1–K6 (K3 and K6 Node only).
 7. `onPaneHidden` handlers run whenever the pane is hidden, whether by `hidePane` or by the user
    closing it with ×; the app then drops the loaded palette, so the next shortcut opens afresh.
 
