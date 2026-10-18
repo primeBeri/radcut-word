@@ -16,7 +16,7 @@ Word's built-in Cross-reference dialog is modal, mouse-heavy and lists every hea
 2. Type to fuzzy-filter the document's headings.
 3. Use **↑ ↓** to choose, **Tab** to cycle the reference format, **Enter** to insert, **Esc** to cancel.
 
-The output is standard Word: a hidden bookmark on the target heading and hyperlinked REF fields pointing at it. Anyone can update the references with F9, and the add-in is not needed to read or edit the document. The palette starts on the first format in your list, out of the box "§ number text", for example "§ 4.3 Fire strategy". In settings you can reorder the list, which is the Tab order, add other built-in formats or your own templates, and have the palette start on the format you used last.
+The output is standard Word: a hidden bookmark on the target heading and hyperlinked REF fields pointing at it. Anyone can update the references with F9, and the add-in is not needed to read or edit the document. The palette starts on the first format in your list of cross reference formats, out of the box "§ Number & Text", for example "§ 4.3 Fire strategy". In settings you can reorder the list, which is the Tab order, add other built-in formats or your own custom formats, and have the palette start on the format you used last.
 
 Requires headings that use Word's built-in Heading 1–9 styles or outline levels.
 

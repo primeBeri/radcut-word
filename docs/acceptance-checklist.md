@@ -380,3 +380,7 @@ cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, 
 | 8b | Pass | Automated (`Scenario08b`) |
 | 9 | Pass | Automated (`Scenario09`), template at the end of the list |
 | — | Human | Visual check of the settings view in Word: sections, info tooltips, previews lined up in their column, dragging a row |
+
+## Automated run after the owner's wording (feature 001, T158), 2026-10-18
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"`, then `"Category=Contract"`, on the test VM (Word 2609), no person involved, after the settings texts and built-in format names were renamed (T157). Scenario: 20 passed, 1 skipped (10b, replaceShortcuts refused, research R4), including US1 scenario 25, which failed once in the T156 run. Contract: 76 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only). The visual check of the settings view (badge, tooltips with line breaks, narrow-pane rows) was done by the owner in Word.

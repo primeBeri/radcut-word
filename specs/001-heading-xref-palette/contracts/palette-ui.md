@@ -59,7 +59,7 @@ The cog button stays in the accessibility tree with its shortcut announced
     they sit next to what the second Enter will insert; other messages stay at the foot of the
     list.
   - Declined in a heading or title: "References can't go in headings or titles. To allow them,
-    turn on “Allow references in headings” in Settings."
+    turn on “Allow cross references in headings” in Settings."
   - Self reference: "A heading can't refer to itself."
 - The heading containing the cursor is never listed (FR-001b).
 
@@ -80,27 +80,35 @@ The cog button stays in the accessibility tree with its shortcut announced
   the first control (FR-021a).
 - Refined 2026-10-18 (FR-017, FR-017a, FR-021a), replacing the Default format and Templates
   sections below:
-  - Three collapsible sections, Formats, Shortcut and Headings, each a heading holding a
-    disclosure button (`aria-expanded`, `aria-controls`). Formats is expanded on opening, the
-    others collapsed; focus starts on the Formats button. Save expands a collapsed section holding
+  - Three collapsible sections, Cross Reference Formats, Shortcut and Headings, each a heading
+    holding a disclosure button (`aria-expanded`, `aria-controls`). Cross Reference Formats is
+    expanded on opening, the others collapsed; focus starts on its button. Save expands a collapsed section holding
     an error before moving focus to it.
-  - Formats: the format list as an ordered list labelled "Formats, in Tab order", one row per
-    format laid out in columns: name, sample preview for "4.3 Fire strategy" (page 12, above),
+  - Cross Reference Formats: the format list as an ordered list labelled "Cross reference
+    formats, in 'Tab' order", one row per format laid out in columns: name (the first row's name
+    followed by a "Default" badge, drawn by CSS so the name's text stays the name), sample preview for "4.3 Fire strategy" (page 12, above),
     "Move <name> up", "Move <name> down" and "Remove <name>" buttons. Rows can also be dragged by
-    pointer. Moving announces "<name> is now <n> of <total>." in the view's status line and keeps
+    pointer. Below a list width of about 360 px each row puts its preview on a second line under
+    its name, still lined up. Moving announces "<name> is now <n> of <total>." in the view's status line and keeps
     focus on the button pressed (or on the other move button at either end). Remove is disabled on
     the last row. Removing moves focus to the next row's remove button, else the previous one.
-    Template rows also have "Edit <name>", which shows the template editor (unchanged from US3)
-    under the row; "New template" adds a template at the end with its editor open and focus in
-    its name. "Add format" is a menu button listing the built-in formats not in the list, each
+    Template (custom format) rows also have "Edit <name>", which shows the template editor under
+    the row, with the inputs "Cross reference format name" and "Cross reference format text"; a
+    template not yet named is called "New custom format". "Add Custom Format" adds a template at
+    the end with its editor open and focus in its name. "Add Default Format" is a menu button listing the built-in formats not in the list, each
     added at the end; it is hidden when there are none. The menu closes on Esc without closing
-    settings. Below the list, the checkbox "Remember the last used format" (off).
+    settings. Below the list, the checkbox "Remember last used format" (off).
   - Info buttons: a control with a longer description has a small "About <control>" button beside
     it. Hover, focus or click shows the description in a tooltip; Esc or moving away hides it; the
     description stays in the DOM and is linked to the control by `aria-describedby`. Used for the
-    format list ("The palette starts on the first format, or the last one used if you choose;
-    Tab moves down the list."), "Remember the last used format", the template text's placeholder
-    help and both Headings checkboxes.
+    format list, "Remember last used format", the template text's placeholder help and both
+    Headings checkboxes. A description may hold line breaks, which the tooltip keeps.
+  - Wording (owner, 2026-10-18): the exact texts of the view, its tooltips and messages are those
+    in `src/ui/settings/labels.ts` and the settings components; built-in format names are in
+    `src/core/formats/built-ins.ts`. Where the texts quoted below (as built before 2026-10-18)
+    differ, those files win. The heading checkboxes are "Allow cross references in headings" and
+    "Show headings outside of the main text"; the shortcut button is "Record a new keyboard
+    shortcut" and its announcement "The cross reference palette now opens with <combination>."
 - (As built before 2026-10-18.) Sections: Default format (radio list of all formats with a sample preview); Templates (list
   with add, edit, delete; editor shows live preview against a sample heading and inline
   validation errors from [format-templates.md](format-templates.md); refined 2026-10-17: each
