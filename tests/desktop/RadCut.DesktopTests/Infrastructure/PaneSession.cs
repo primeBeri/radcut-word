@@ -31,6 +31,7 @@ public sealed class PaneSession : IAsyncDisposable
     public static async Task<PaneSession> StartAsync(string fixture, DevServerMode mode, string testId)
     {
         Preflight.RefuseIfWordRunning();
+        Preflight.RefuseIfScratchAwaitsRecovery();
         Preflight.RequireTrustedCertificate();
         var session = new PaneSession(mode);
         try
@@ -218,7 +219,9 @@ public sealed class PaneSession : IAsyncDisposable
 
     private async Task CloseWordAsync()
     {
-        if (Pane is not null) await Pane.DisposeAsync();
+        // The pane's failure (a page Word closed when it reinstalled the add-in) must never keep
+        // Word running: every later test would refuse while it is open (2026-10-18).
+        if (Pane is not null) await Cleanup.QuietlyAsync(Pane.DisposeAsync);
         Pane = null;
         if (Word is not null) await Word.DisposeAsync();
         Word = null;

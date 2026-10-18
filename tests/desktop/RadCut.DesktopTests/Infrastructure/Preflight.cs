@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using Microsoft.Win32;
 
 namespace RadCut.DesktopTests.Infrastructure;
 
@@ -12,6 +14,10 @@ public static class Preflight
     public const string WordRunningMessage = "Word is running. Save your work and close Word, then run again.";
     public const string CertificateMessage = "The localhost certificate is not trusted. Run npm run certs.";
     public const string NoDesktopMessage = "SKIPPED: no interactive desktop";
+    public const string RecoveryMessage =
+        "Word will offer to recover a harness scratch document, left by a Word that was stopped, and is busy at start until that is " +
+        "dealt with (COM calls fail with 0x8001010A). Open Word once, close the scratch document in the Document Recovery pane " +
+        "without saving, close Word, then run again.";
 
     /// <summary>
     /// Throws if any Word process exists. The harness never closes, kills, reuses or attaches to a
@@ -28,6 +34,37 @@ public static class Preflight
         finally
         {
             foreach (var process in running) process.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Throws if Word holds a document recovery entry for a harness scratch document (2026-10-18):
+    /// every Word would then open it as "AutoRecovered" and refuse COM calls. Only reads the entries;
+    /// recovering or discarding is the owner's choice in Word.
+    /// </summary>
+    /// <param name="recoveryEntries">The entries' text; tests pass a stub, never the real registry.</param>
+    public static void RefuseIfScratchAwaitsRecovery(Func<IEnumerable<string>>? recoveryEntries = null)
+    {
+        var scratch = Path.Combine(HarnessPaths.DevRoot, "scratch");
+        if ((recoveryEntries ?? DocumentRecoveryEntries)().Any(entry => entry.Contains(scratch, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new HarnessRefusedException(RecoveryMessage);
+        }
+    }
+
+    /// <summary>The values under Word's Resiliency\DocumentRecovery key, decoded (they hold UTF-16 paths).</summary>
+    private static IEnumerable<string> DocumentRecoveryEntries()
+    {
+        using var root = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Office\16.0\Word\Resiliency\DocumentRecovery");
+        if (root is null) yield break;
+        foreach (var name in root.GetSubKeyNames())
+        {
+            using var entry = root.OpenSubKey(name);
+            if (entry is null) continue;
+            foreach (var value in entry.GetValueNames().Select(name => entry.GetValue(name)))
+            {
+                yield return value is byte[] bytes ? Encoding.Unicode.GetString(bytes) : value?.ToString() ?? "";
+            }
         }
     }
 

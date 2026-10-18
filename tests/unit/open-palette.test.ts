@@ -9,7 +9,7 @@ import { FakeGateway } from "../fakes/fake-gateway";
 const defaults: OpenPaletteOptions = {
   policy: { allowInHeadings: false },
   showHeadingsOutsideMainText: true,
-  defaultFormatId: "sectionNumberText",
+  startFormatId: null,
 };
 
 function setup(gateway = new FakeGateway(fakeFixtures["spec-300"]())) {
@@ -31,7 +31,7 @@ describe("OpenPalette", () => {
     expect(messageText("noHeadings")).toMatch(/Heading 1–9/);
   });
 
-  it("opens with headings in order, the default format and the preceding heading", async () => {
+  it("opens with headings in order, the first format and the preceding heading", async () => {
     const { gateway, index } = setup();
     const state = await openPalette({ gateway, index }, defaults);
     if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
@@ -43,15 +43,15 @@ describe("OpenPalette", () => {
     expect(state.point.precedingHeadingOrder).toBe(fire.order);
   });
 
-  it("falls back to § number text when the default format is unknown", async () => {
+  it("opens on the first format when the remembered one is unknown", async () => {
     const { gateway, index } = setup();
-    const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "tpl:deleted" });
+    const state = await openPalette({ gateway, index }, { ...defaults, startFormatId: "tpl:deleted" });
     expect(state.kind === "open" && state.format.id).toBe("sectionNumberText");
   });
 
-  it("opens on the default, with every built-in in the cycle, in the main text (FR-015, FR-017)", async () => {
+  it("opens on the remembered format, with every format given in the cycle, in the main text (FR-015, FR-017a)", async () => {
     const { gateway, index } = setup();
-    const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "number" });
+    const state = await openPalette({ gateway, index }, { ...defaults, startFormatId: "number", formats: BUILT_IN_FORMATS });
     if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
     expect(state.format.id).toBe("number");
     expect(state.formats.map((f) => f.id)).toEqual(BUILT_IN_FORMATS.map((f) => f.id));
@@ -60,7 +60,7 @@ describe("OpenPalette", () => {
   it("in a footnote, leaves out the above/below formats and opens on the next one after an above/below default (FR-016a)", async () => {
     const { gateway, index } = setup();
     gateway.select("Footnote text.");
-    const state = await openPalette({ gateway, index }, { ...defaults, defaultFormatId: "textAboveBelow" });
+    const state = await openPalette({ gateway, index }, { ...defaults, startFormatId: "textAboveBelow", formats: BUILT_IN_FORMATS });
     if (state.kind !== "open") throw new Error(`expected open, got ${state.kind}`);
     expect(state.formats.map((f) => f.id)).toEqual(["text", "number", "numberText", "sectionNumberText", "page"]);
     expect(state.format.id).toBe("text");

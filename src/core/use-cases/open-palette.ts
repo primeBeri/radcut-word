@@ -1,4 +1,4 @@
-import { BUILT_IN_FORMATS } from "../formats/built-ins";
+import { DEFAULT_FORMATS } from "../formats/built-ins";
 import { offeredFormats, openingFormat } from "../formats/cycle";
 import type { ReferenceFormat } from "../formats/types";
 import { filterHeadings } from "../headings/filter";
@@ -17,8 +17,9 @@ export interface OpenPaletteDeps {
 export interface OpenPaletteOptions {
   readonly policy: LocationPolicy;
   readonly showHeadingsOutsideMainText: boolean;
-  readonly defaultFormatId: string;
-  /** Every format in cycle order: the built-ins, then templates (US3). Defaults to the built-ins. */
+  /** The remembered format to open on if it is listed (FR-017a), or null for the first. */
+  readonly startFormatId: string | null;
+  /** The format list, in cycle order (FR-015). Defaults to the out-of-the-box list. */
   readonly formats?: readonly ReferenceFormat[];
 }
 
@@ -29,7 +30,7 @@ export type OpenPaletteState =
       readonly point: InsertionPoint;
       /** Filtered, in story order; from the cache when there is one. */
       readonly headings: readonly Heading[];
-      /** The format shown first: the default, unless it is not offered here (FR-016a). */
+      /** The format shown first: the first or remembered one, unless it is not offered here (FR-016a). */
       readonly format: ReferenceFormat;
       /** The Tab cycle at this cursor location (FR-015, FR-016a). */
       readonly formats: readonly ReferenceFormat[];
@@ -57,12 +58,12 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
   const headings = filter(snapshot.headings);
   if (headings.length === 0 && cached === null) return { kind: "message", message: "noHeadings" };
 
-  const all = options.formats ?? BUILT_IN_FORMATS;
+  const all = options.formats ?? DEFAULT_FORMATS;
   return {
     kind: "open",
     point,
     headings,
-    format: openingFormat(all, point.location, options.defaultFormatId),
+    format: openingFormat(all, point.location, options.startFormatId),
     formats: offeredFormats(all, point.location),
     refreshed: cached === null ? null : deps.index.refresh().then((fresh) => filter(fresh.headings)),
   };

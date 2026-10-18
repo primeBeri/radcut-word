@@ -53,7 +53,7 @@ describe("preview line and Tab cycle (FR-015, FR-016a)", () => {
     const { strip } = setup();
     const row = screen.getByRole("option", { selected: true });
     expect(row).toContainElement(strip());
-    expect(strip()).toHaveTextContent("§ number text");
+    expect(strip()).toHaveTextContent("§ Number & Text");
     expect(strip()).toHaveTextContent("§ 1.1 Scope");
     expect(row).toHaveAccessibleName("1.1 Scope, level 2");
     expect(row).toHaveAccessibleDescription(/§ 1.1 Scope/);
@@ -74,27 +74,27 @@ describe("preview line and Tab cycle (FR-015, FR-016a)", () => {
     expect(announcement()).toHaveAttribute("aria-live", "polite");
     expect(announcement().textContent).toBe("");
     await tab();
-    expect(label()).toBe("Page");
+    expect(label()).toBe("Page Number");
     await tab();
-    expect(label()).toBe("Above/below");
+    expect(label()).toBe("Above/Below");
     expect(strip()).toHaveTextContent("above");
-    expect(announcement()).toHaveTextContent("Above/below: above");
+    expect(announcement()).toHaveTextContent("Above/Below: above");
     expect(input).toHaveFocus();
   });
 
   it("Shift+Tab moves back, and both wrap at the ends", async () => {
     const { strip, tab, label } = setup({ format: formatById("text")! });
     await tab(true);
-    expect(label()).toBe("Text + above/below");
+    expect(label()).toBe("Text + Above/Below");
     await tab();
-    expect(label()).toBe("Text");
+    expect(label()).toBe("Text Only");
     expect(strip()).toHaveTextContent("Scope");
   });
 
   it("shows a page part as {page}, since Word only knows the page once the field is in", async () => {
     const { strip, tab, label } = setup();
     await tab();
-    expect(label()).toBe("Page");
+    expect(label()).toBe("Page Number");
     expect(strip().querySelector(".preview")?.textContent).toBe("{page}");
   });
 
@@ -135,7 +135,7 @@ describe("preview line and Tab cycle (FR-015, FR-016a)", () => {
         await tab();
         seen.add(label()!);
       }
-      expect([...seen].sort()).toEqual(["Number", "Number + text", "Page", "Text", "§ number text"].sort());
+      expect([...seen].sort()).toEqual(["Number Only", "Number & Text", "Page Number", "Text Only", "§ Number & Text"].sort());
     },
   );
 
@@ -146,8 +146,8 @@ describe("preview line and Tab cycle (FR-015, FR-016a)", () => {
 
   it("when the cursor moves into a note while open, an above/below format gives way to the next offered one", async () => {
     const { label, rerender } = setup({ format: formatById("aboveBelow")! });
-    expect(label()).toBe("Above/below");
+    expect(label()).toBe("Above/Below");
     await rerender({ point: point("footnote") });
-    expect(label()).toBe("Text");
+    expect(label()).toBe("Text Only");
   });
 });

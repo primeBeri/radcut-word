@@ -111,8 +111,11 @@ dropped. Each non-literal part maps to exactly one field (research R5).
 
 **Template grammar** (FR-018): see [contracts/format-templates.md](contracts/format-templates.md).
 
-**Format cycle** (FR-015, FR-016): built-ins in the order of FR-016, then templates in creation
-order. Tab = next, Shift+Tab = previous, wrapping at both ends.
+**Format cycle** (FR-015, FR-016): the formats of `UserSettings.formatOrder`, in that order
+(refined 2026-10-18; it was built-ins in FR-016 order, then templates in creation order). Tab =
+next, Shift+Tab = previous, wrapping at both ends. The palette opens on the first, or on
+`lastFormatId` when `rememberLastFormat` is on and that format is still in the list (FR-017,
+FR-017a), then FR-016a.
 
 ## ReferencePreview
 
@@ -140,11 +143,19 @@ Stored per user, outside documents (FR-021).
 
 | Field | Type | Rules |
 |---|---|---|
-| `schemaVersion` | `1` | Bumped on breaking change; older versions are migrated, unknown versions reset to defaults with a message. |
-| `defaultFormatId` | `string` | Must name an existing format; falls back to `sectionNumberText` if the template was deleted. |
-| `templates` | `{ id, label, source }[]` | `source` is the template string; validated on save and on load (a template that fails on load is left out, with the `templateDropped` notice). `label` is stored trimmed. At most 20. In the cycle after the built-ins, in this order. |
+| `schemaVersion` | `2` | Bumped on breaking change; older versions are migrated, unknown versions reset to defaults with a message. (2 since 2026-10-18.) |
+| ~~`defaultFormatId`~~ | ~~`string`~~ | ~~Must name an existing format; falls back to `sectionNumberText` if the template was deleted.~~ Version 1 only; replaced by `formatOrder` (FR-017, 2026-10-18). |
+| `formatOrder` | `string[]` | The format list: built-in ids and template ids, in cycle order (FR-015, FR-017). Not empty; each id at most once; every template is in it exactly once. Default `["sectionNumberText", "number", "text", "numberText"]` (FR-016). On load, unknown ids and repeats are dropped and a template missing from it is added at the end; if nothing is left, the default list is used. |
+| `templates` | `{ id, label, source }[]` | `source` is the template string; validated on save and on load (a template that fails on load is left out, with the `templateDropped` notice). `label` is stored trimmed. At most 20. Their place in the cycle is their place in `formatOrder`; removing a template from the list deletes it. |
+| `rememberLastFormat` | `boolean` | Default `false` (FR-017a). |
+| `lastFormatId` | `string \| null` | The format of the last inserted reference, written after each insertion while `rememberLastFormat` is on; default `null`. Not shown in the settings view and not an unsaved change. |
 | `allowReferencesInHeadings` | `boolean` | Default `false` (FR-001b). Feeds `LocationPolicy.allowInHeadings`. |
 | `showHeadingsOutsideMainText` | `boolean` | Default `true` (FR-003a). When `false`, headings whose `location` is not `main` are left out of the list. |
+
+**Migration from version 1** (2026-10-18): `formatOrder` = the old `defaultFormatId` first, then
+the seven built-ins in FR-016 order and the templates in creation order, less the default;
+`rememberLastFormat` = `false`, `lastFormatId` = `null`; the other fields unchanged. So a user who
+saved version 1 settings keeps every format they had, starting on their default.
 
 The shortcut is not part of `UserSettings`: Office stores it (research R4). The settings view
 reads and writes it through the `HostShell` port.

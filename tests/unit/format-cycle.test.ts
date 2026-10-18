@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_FORMATS } from "../../src/core/formats/built-ins";
+import { BUILT_IN_FORMATS, formatById } from "../../src/core/formats/built-ins";
 import { hidesAboveBelow, offeredFormats, openingFormat, stepFormat } from "../../src/core/formats/cycle";
 import { previewReference } from "../../src/core/formats/preview";
 import type { ReferenceFormat } from "../../src/core/formats/types";
@@ -60,18 +60,32 @@ describe("format cycle (FR-015, FR-016, FR-016a)", () => {
     expect(stepFormat(BUILT_IN_FORMATS, "tpl:gone", 1).id).toBe("text");
   });
 
-  it("opens on the default format", () => {
+  it("opens on the first format in the list (FR-017)", () => {
+    expect(openingFormat(ALL, "main", null).id).toBe(ALL[0]!.id);
+    expect(openingFormat([...ALL].reverse(), "main", null).id).toBe(ALL.at(-1)!.id);
+  });
+
+  it("opens on the remembered format when it is in the list (FR-017a)", () => {
     expect(openingFormat(ALL, "main", "number").id).toBe("number");
     expect(openingFormat(ALL, "main", "tpl:b").id).toBe("tpl:b");
   });
 
-  it("opens on § number text when the default names no format (a deleted template)", () => {
-    expect(openingFormat(ALL, "main", "tpl:deleted").id).toBe("sectionNumberText");
+  it("opens on the first format when the remembered one is no longer in the list", () => {
+    expect(openingFormat(ALL, "main", "tpl:deleted").id).toBe(ALL[0]!.id);
   });
 
-  it.each(OUTSIDE)("in a %s, a default with above/below opens on the next offered format", (location) => {
+  it.each(OUTSIDE)("in a %s, an opening format with above/below gives way to the next offered one (FR-016a)", (location) => {
     expect(openingFormat(ALL, location, "aboveBelow").id).toBe("tpl:a");
     expect(openingFormat(BUILT_IN_FORMATS, location, "textAboveBelow").id).toBe("text");
+    const aboveFirst = [formatById("aboveBelow")!, formatById("number")!];
+    expect(openingFormat(aboveFirst, location, null).id).toBe("number");
+  });
+
+  it.each(OUTSIDE)("in a %s, a list of only above/below formats offers the out-of-the-box list instead", (location) => {
+    const onlyAbove = [formatById("aboveBelow")!, formatById("textAboveBelow")!];
+    expect(offeredFormats(onlyAbove, location).map((f) => f.id)).toEqual(["sectionNumberText", "number", "text", "numberText"]);
+    expect(openingFormat(onlyAbove, location, "aboveBelow").id).toBe("sectionNumberText");
+    expect(offeredFormats(onlyAbove, "main")).toBe(onlyAbove);
   });
 });
 

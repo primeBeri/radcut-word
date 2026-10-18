@@ -1,6 +1,6 @@
-import { DEFAULT_FORMAT_ID, formatById } from "../formats/built-ins";
+import { BUILT_IN_FORMATS, DEFAULT_FORMAT_ID, formatById } from "../formats/built-ins";
 import { DEFAULT_SETTINGS } from "./defaults";
-import { formatsFor, MAX_TEMPLATES, templateProblems } from "./templates";
+import { formatsFor, MAX_TEMPLATES, templateProblems } from "./format-list";
 import type { TemplateDefinition, UserSettings } from "./types";
 
 export { MAX_TEMPLATES };
@@ -24,11 +24,6 @@ function readTemplate(value: unknown): TemplateDefinition | null {
   return { id, label, source };
 }
 
-/** Whether `id` names a built-in format or one of `templates` that parses. */
-export function formatExists(id: string, templates: readonly TemplateDefinition[]): boolean {
-  return formatById(id) !== undefined || formatsFor({ templates }).some((f) => f.id === id);
-}
-
 /** The templates that are valid each in turn: a later one repeating an earlier name is left out. */
 function usableTemplates(templates: readonly TemplateDefinition[]): TemplateDefinition[] {
   const kept: TemplateDefinition[] = [];
@@ -38,34 +33,88 @@ function usableTemplates(templates: readonly TemplateDefinition[]): TemplateDefi
   return kept;
 }
 
-/** Version 1 settings from `raw`, or null if it is not a valid version 1 value. */
-function readVersion1(raw: Record<string, unknown>): LoadedSettings | null {
-  const { defaultFormatId, templates, allowReferencesInHeadings, showHeadingsOutsideMainText } = raw;
-  if (typeof defaultFormatId !== "string" || !Array.isArray(templates) || templates.length > MAX_TEMPLATES) return null;
+/** What every version stores alike, read and checked; null if any of it is invalid. */
+function readShared(raw: Record<string, unknown>) {
+  const { templates, allowReferencesInHeadings, showHeadingsOutsideMainText } = raw;
+  if (!Array.isArray(templates) || templates.length > MAX_TEMPLATES) return null;
   if (typeof allowReferencesInHeadings !== "boolean" || typeof showHeadingsOutsideMainText !== "boolean") return null;
   const read = templates.map(readTemplate);
   if (read.some((t) => t === null)) return null;
   const valid = usableTemplates(read as TemplateDefinition[]);
-  const settings: UserSettings = {
-    schemaVersion: 1,
-    // A deleted template leaves the default pointing nowhere: fall back quietly (data-model).
-    defaultFormatId: formatExists(defaultFormatId, valid) ? defaultFormatId : DEFAULT_FORMAT_ID,
+  return {
     templates: valid,
     allowReferencesInHeadings,
     showHeadingsOutsideMainText,
+    notice: valid.length < templates.length ? ("templateDropped" as const) : null,
   };
-  return { settings, notice: valid.length < templates.length ? "templateDropped" : null };
+}
+
+const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === "string");
+
+/**
+ * `order` without unknown ids or repeats, with any template it misses at the end (every template
+ * is in the list once); the default list if nothing is left (data-model UserSettings).
+ */
+function usableOrder(order: readonly string[], templates: readonly TemplateDefinition[]): string[] {
+  const known = (id: string) => formatById(id) !== undefined || templates.some((t) => t.id === id);
+  const kept = [...new Set(order)].filter(known);
+  for (const template of templates) if (!kept.includes(template.id)) kept.push(template.id);
+  return kept.length > 0 ? kept : [...DEFAULT_SETTINGS.formatOrder];
+}
+
+function readVersion2(raw: Record<string, unknown>): LoadedSettings | null {
+  const shared = readShared(raw);
+  const { formatOrder, rememberLastFormat, lastFormatId } = raw;
+  if (!shared || !isStringList(formatOrder) || typeof rememberLastFormat !== "boolean") return null;
+  if (lastFormatId !== null && typeof lastFormatId !== "string") return null;
+  const order = usableOrder(formatOrder, shared.templates);
+  const settings: UserSettings = {
+    schemaVersion: 2,
+    formatOrder: order,
+    templates: shared.templates,
+    rememberLastFormat,
+    lastFormatId: lastFormatId !== null && order.includes(lastFormatId) ? lastFormatId : null,
+    allowReferencesInHeadings: shared.allowReferencesInHeadings,
+    showHeadingsOutsideMainText: shared.showHeadingsOutsideMainText,
+  };
+  return { settings, notice: shared.notice };
+}
+
+/**
+ * Version 1 had a default format and always every built-in (data-model "Migration from version
+ * 1"): keep every format, the default first, then the built-ins and templates in their old order.
+ */
+function migrateVersion1(raw: Record<string, unknown>): LoadedSettings | null {
+  const shared = readShared(raw);
+  const { defaultFormatId } = raw;
+  if (!shared || typeof defaultFormatId !== "string") return null;
+  const all = [...BUILT_IN_FORMATS.map((f) => f.id), ...shared.templates.map((t) => t.id)];
+  // A deleted template left the default pointing nowhere: § number text was used then too.
+  const first = formatsFor({ formatOrder: all, templates: shared.templates }).some((f) => f.id === defaultFormatId)
+    ? defaultFormatId
+    : DEFAULT_FORMAT_ID;
+  const settings: UserSettings = {
+    schemaVersion: 2,
+    formatOrder: [first, ...all.filter((id) => id !== first)],
+    templates: shared.templates,
+    rememberLastFormat: false,
+    lastFormatId: null,
+    allowReferencesInHeadings: shared.allowReferencesInHeadings,
+    showHeadingsOutsideMainText: shared.showHeadingsOutsideMainText,
+  };
+  return { settings, notice: shared.notice };
 }
 
 /**
  * The user's settings from what the store returned (FR-021, contracts/host-ports.md): validated
  * here, not in the adapter. Nothing stored gives the defaults; unreadable data or an unknown
- * version gives the defaults with a notice. Version 1 is the only version so far, so there is
- * nothing to migrate yet; an older version would be migrated here. Templates are checked as on
+ * version gives the defaults with a notice. Version 1 is migrated. Templates are checked as on
  * save, and one that fails is left out (FR-018).
  */
 export function loadUserSettings(raw: unknown): LoadedSettings {
   if (raw === null || raw === undefined) return { settings: DEFAULT_SETTINGS, notice: null };
-  const loaded = isRecord(raw) && raw.schemaVersion === 1 ? readVersion1(raw) : null;
+  let loaded: LoadedSettings | null = null;
+  if (isRecord(raw) && raw.schemaVersion === 2) loaded = readVersion2(raw);
+  else if (isRecord(raw) && raw.schemaVersion === 1) loaded = migrateVersion1(raw);
   return loaded ?? { settings: DEFAULT_SETTINGS, notice: "settingsReset" };
 }

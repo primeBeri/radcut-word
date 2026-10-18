@@ -21,7 +21,7 @@ public sealed class Us3Scenarios : ScenarioTest
         fields.Select(f => $"{f.Story} {f.Type} {f.Bookmark} {string.Join(" ", f.Switches)} = {f.Result}").ToList();
 
     [Fact]
-    public async Task Scenario09_a_template_joins_the_cycle_after_the_built_ins_inserts_as_previewed_and_survives_F9_and_num_is_rejected()
+    public async Task Scenario09_a_template_joins_the_cycle_at_the_end_of_the_list_inserts_as_previewed_and_survives_F9_and_num_is_rejected()
     {
         var (palette, document) = await OpenAsync("spec-contract", "Scenario09");
         WordActions.PutCaretIn(document, Body);
@@ -36,7 +36,7 @@ public sealed class Us3Scenarios : ScenarioTest
         await palette.CloseSettingsAsync();
         await palette.WaitForDocumentFocusAsync("after Close in settings");
 
-        // From the default, § number text, the template is four Tabs on: after the last built-in.
+        // From the first format, § Number & Text, the template is four Tabs on: at the end of the list.
         var paragraph = WordActions.Find(document, Body).Paragraphs.First;
         int start = (int)paragraph.Range.Start;
         ((dynamic)document).Range(start, start).Select();
@@ -45,10 +45,10 @@ public sealed class Us3Scenarios : ScenarioTest
         await palette.OpenAsync();
         Palette.Type("Fire strategy");
         await palette.WaitForSelectedRowAsync("Fire strategy");
-        foreach (var label in new[] { "Page", "Above/below", "Text + above/below" }) await palette.TabToAsync(label);
+        foreach (var label in new[] { "Number Only", "Text Only", "Number & Text" }) await palette.TabToAsync(label);
         Assert.Equal(HousePreview, await palette.TabToAsync(House));
-        // and Tab wraps round from it to the first built-in; Shift+Tab comes back.
-        await palette.TabToAsync("Text");
+        // and Tab wraps round from it to the first format; Shift+Tab comes back.
+        await palette.TabToAsync("§ Number & Text");
         await palette.TabToAsync(House, back: true);
         Palette.Press(VirtualKeyShort.ENTER);
         var insertion = await palette.WaitForInsertionAsync(before, "Fire strategy");

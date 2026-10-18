@@ -86,8 +86,8 @@ describe("validateTemplateLabel", () => {
   });
 
   it("rejects a name another format has, ignoring case and surrounding spaces", () => {
-    expect(validateTemplateLabel("text", builtInLabels)).toBe("A format with this name already exists.");
-    expect(validateTemplateLabel(" § NUMBER TEXT ", builtInLabels)).toBe("A format with this name already exists.");
+    expect(validateTemplateLabel("text only", builtInLabels)).toBe("A format with this name already exists.");
+    expect(validateTemplateLabel(" § NUMBER & TEXT ", builtInLabels)).toBe("A format with this name already exists.");
     expect(validateTemplateLabel("House style", [...builtInLabels, "house style"])).toBe(TEMPLATE_TEXT.duplicateLabel);
   });
 

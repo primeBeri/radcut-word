@@ -66,3 +66,6 @@ tmp/
 tests/desktop/**/bin/
 tests/desktop/**/obj/
 tests/desktop/test-results/
+
+# Local screenshots for discussion
+screenshots/

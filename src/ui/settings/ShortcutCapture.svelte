@@ -77,8 +77,7 @@
   }
 </script>
 
-<section class="section" aria-labelledby="radcut-shortcut-heading">
-  <h2 id="radcut-shortcut-heading" class="heading">Shortcut</h2>
+<div class="section">
   <p class="current" id="radcut-shortcut-current">
     {SETTINGS_TEXT.shortcutIntro}
     <span data-testid="current-shortcut">
@@ -116,20 +115,13 @@
       <p id="radcut-shortcut-error" class="error" role="alert">{error}</p>
     {/if}
   {/if}
-</section>
+</div>
 
 <style>
   .section {
     display: flex;
     flex-direction: column;
     gap: var(--spacingVerticalS);
-  }
-
-  .heading {
-    margin: 0;
-    font-size: var(--fontSizeBase300);
-    font-weight: var(--fontWeightSemibold);
-    line-height: var(--lineHeightBase300);
   }
 
   .current,

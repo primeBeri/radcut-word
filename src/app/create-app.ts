@@ -10,12 +10,13 @@ import type { IHostShell } from "../core/ports/host-shell";
 import type { ISettingsStore } from "../core/ports/settings-store";
 import { DEFAULT_SETTINGS } from "../core/settings/defaults";
 import type { KeyCombo } from "../core/settings/shortcut-rules";
-import { formatsFor } from "../core/settings/templates";
+import { formatsFor } from "../core/settings/format-list";
 import type { UserSettings } from "../core/settings/types";
 import { loadUserSettings, type LoadedSettings } from "../core/settings/user-settings";
 import { changeShortcut, readShortcut } from "../core/use-cases/change-shortcut";
 import { insertReference } from "../core/use-cases/insert-reference";
 import { openPalette, type OpenPaletteOptions, type OpenPaletteState } from "../core/use-cases/open-palette";
+import { rememberFormat, startFormatId } from "../core/use-cases/remember-format";
 import { saveSettings, type SaveSettingsResult } from "../core/use-cases/save-settings";
 import MessageView from "../ui/MessageView.svelte";
 import Palette from "../ui/palette/Palette.svelte";
@@ -44,7 +45,7 @@ function optionsFor(settings: UserSettings): OpenPaletteOptions {
   return {
     policy: { allowInHeadings: settings.allowReferencesInHeadings },
     showHeadingsOutsideMainText: settings.showHeadingsOutsideMainText,
-    defaultFormatId: settings.defaultFormatId,
+    startFormatId: startFormatId(settings),
     formats: formatsFor(settings),
   };
 }
@@ -55,7 +56,7 @@ type SettingsOrigin = { readonly from: "document" } | { readonly from: "palette"
 /**
  * The composition root: wires the ports to the use cases and views. Used by main.ts with the
  * Office adapters and by the app-flow test with the fakes. Each open mounts a fresh view, so the
- * palette starts with an empty query and the default format; the shortcut pressed while the
+ * palette starts with an empty query and its opening format; the shortcut pressed while the
  * palette is still on screen refocuses it instead, keeping its state. Settings are read from the
  * store on every open, so a change made in one document applies in the others (FR-021).
  */
@@ -134,6 +135,7 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
           case "inserted":
             // The use case has hidden the pane and put the caret after the reference.
             reset();
+            if (store) rememberFormat(store, settings, format.id).catch((error: unknown) => report("remember-format", error));
             return { kind: "closed" };
           case "needsConfirmation":
             return outcome;

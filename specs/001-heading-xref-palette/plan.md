@@ -4,6 +4,8 @@
 
 **Rescoped**: 2026-10-15 — Constitution 1.2.0 (test layers; layers 3–5 run unattended by the desktop harness from feature 002, `npm run test:desktop`). No spec change. In-Word checks of the remaining stories become harness tests written first: the Word halves of T066, T067, T085 and T093 run through the contract category; T071, T078, T088 and T095 become harness scenario tests written with each story's tests and made green by its implementation; T096, T101, T102 and T103 use the harness, leaving only the layer 7 checks (co-authoring, a physical UK keyboard, a visual theme pass, a screen-reader pass) to a person. Test tasks carry layer tags.
 
+**Propagated**: 2026-10-18 — Updated from spec.md refinement (owner's settings review): one ordered format list replaces the default-format choice and is the Tab cycle (FR-015–FR-018); "Remember the last used format" (FR-017a); collapsible settings sections, info buttons and aligned previews (FR-021a). `UserSettings` goes to schema version 2 with a migration from version 1 (data-model). Work is Phase 13 in tasks.md.
+
 **Propagated**: 2026-10-14 — Updated from spec.md refinement (Phase 10 hand checks): headers, footers and text boxes allowed as insertion points (FR-001a), confirmed first by spike 4; FR-016a may extend to them. Research R8, data model, gateway and palette contracts updated to match.
 
 **Propagated**: 2026-10-13 — Updated from spec.md refinement (Phase 9 hand checks in Word): a cursor or selection inside a plain-text content control is declined, a whole content control selected is an extended selection however Word reports it (FR-001a, FR-008a); formats with an above/below part are not offered in footnotes and endnotes (FR-016a). Research R8, data model, gateway and palette contracts updated to match.
@@ -127,7 +129,8 @@ written back into [research.md](research.md) before dependent work starts.
 6. **Palette view** (US1): combobox/listbox, highlighting, location badges, selection
    warning, messages, theme, motion.
 7. **Formats** (US2): Tab cycling, preview strip, default format, settings view shell with the
-   two heading settings.
+   two heading settings. (2026-10-18: the default format becomes the ordered format list and
+   "Remember the last used format"; settings sections collapse; Phase 13.)
 8. **Templates** (US3): grammar, editor with live preview.
 9. **Access** (US4): ribbon buttons, shortcut capture and validation, signed-out read-only.
 10. **Recents** (US5).

@@ -59,6 +59,18 @@ public class PreflightTests
     }
 
     [Fact]
+    public void Refuses_when_Word_would_offer_to_recover_a_scratch_document()
+    {
+        var scratch = Path.Combine(HarnessPaths.DevRoot, "scratch", "20261018-130425-10736", "Scenario24-B", "spec-contract.docx");
+        var error = Assert.Throws<HarnessRefusedException>(() => Preflight.RefuseIfScratchAwaitsRecovery(() => [$"\u0001{scratch}\0spec-contract.docx"]));
+        Assert.Equal(Preflight.RecoveryMessage, error.Message);
+    }
+
+    [Fact]
+    public void Leaves_the_owners_own_recovered_documents_alone() =>
+        Preflight.RefuseIfScratchAwaitsRecovery(() => [@"C:\Users\someone\Documents\Report.docx", ""]);
+
+    [Fact]
     public void A_skip_keeps_its_reason_for_the_summary_once()
     {
         HarnessSkip.Remember(Preflight.NoDesktopMessage);

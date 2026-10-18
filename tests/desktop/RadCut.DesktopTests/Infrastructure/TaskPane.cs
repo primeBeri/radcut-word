@@ -179,7 +179,9 @@ public sealed class TaskPane : IAsyncDisposable
     {
         try
         {
-            if (tracing) await context.Tracing.StopAsync();
+            // A page Word has closed cannot stop its trace; the connection is closed all the same.
+            if (tracing) await Cleanup.QuietlyAsync(async () => await context.Tracing.StopAsync());
+            tracing = false;
             // Closing a CDP connection detaches; it does not close Word's WebView2.
             await browser.CloseAsync();
         }

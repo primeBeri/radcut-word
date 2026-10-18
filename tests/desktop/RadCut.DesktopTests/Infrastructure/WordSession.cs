@@ -60,6 +60,7 @@ public sealed class WordSession : IAsyncDisposable
     public static async Task<WordSession> StartAsync(string documentPath, PaneRoute route)
     {
         Preflight.RefuseIfWordRunning();
+        Preflight.RefuseIfScratchAwaitsRecovery();
         var port = route == PaneRoute.A ? RouteAPort : FreeLoopbackPort();
         var info = new ProcessStartInfo(WordExecutable()) { UseShellExecute = false };
         info.ArgumentList.Add(documentPath);

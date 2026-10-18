@@ -1,12 +1,23 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { addTemplate, deleteTemplate, formatsFor, templateId, updateTemplate, type TemplateProblem } from "../../core/settings/templates";
+  import {
+    addableBuiltIns,
+    addBuiltIn,
+    addTemplate,
+    formatList,
+    moveFormat,
+    removeFormat,
+    templateId,
+    updateTemplate,
+    type TemplateProblem,
+  } from "../../core/settings/format-list";
   import type { TemplateDefinition, UserSettings } from "../../core/settings/types";
-  import FormatPicker from "./FormatPicker.svelte";
+  import FormatList from "./FormatList.svelte";
   import HeadingOptions from "./HeadingOptions.svelte";
+  import InfoTip from "./InfoTip.svelte";
   import { SETTINGS_TEXT } from "./labels";
+  import SettingsSection from "./SettingsSection.svelte";
   import ShortcutCapture from "./ShortcutCapture.svelte";
-  import Templates from "./Templates.svelte";
   import type { SettingsProps } from "./types";
 
   let { settings, notice, save, close, shortcut, newId = () => crypto.randomUUID() }: SettingsProps = $props();
@@ -18,34 +29,39 @@
   let draft = $state<UserSettings>({ ...settings });
   // svelte-ignore state_referenced_locally
   let kept = $state<UserSettings>(settings);
+  // The last used format is written by insertions, not edited here (data-model).
   const dirty = $derived(
-    draft.defaultFormatId !== kept.defaultFormatId ||
+    JSON.stringify(draft.formatOrder) !== JSON.stringify(kept.formatOrder) ||
+      draft.rememberLastFormat !== kept.rememberLastFormat ||
       draft.allowReferencesInHeadings !== kept.allowReferencesInHeadings ||
       draft.showHeadingsOutsideMainText !== kept.showHeadingsOutsideMainText ||
       JSON.stringify(draft.templates) !== JSON.stringify(kept.templates),
   );
-  /** The default-format list follows the draft: a template shows up there once its text is valid. */
-  const formats = $derived(formatsFor(draft));
+  const entries = $derived(formatList(draft));
+  const addable = $derived(addableBuiltIns(draft));
+
+  /** Which sections are open (FR-021a): Formats on opening. */
+  let open = $state({ formats: true, shortcut: false, headings: false });
 
   // svelte-ignore state_referenced_locally
   let status = $state<string>(notice ? NOTICES[notice] : "");
   /** A failure that belongs to no one field. */
   let failure = $state<string | null>(null);
-  let formatError = $state<string | null>(null);
+  let formatsError = $state<string | null>(null);
   let templateProblems = $state<TemplateProblem[]>([]);
   let addError = $state<string | null>(null);
   /** The in-pane "unsaved changes" prompt (never a browser confirm()). */
   let confirming = $state(false);
   let saving = false;
-  let picker: FormatPicker;
+  let formatsSection: SettingsSection;
   let region: HTMLElement;
   let keepButton = $state<HTMLButtonElement>();
   /** Where focus goes back to when the prompt is dismissed. */
   let beforePrompt: HTMLElement | null = null;
 
-  onMount(() => picker.focus());
+  onMount(() => formatsSection.focus());
 
-  function onAdd(): void {
+  function onAddTemplate(): void {
     const result = addTemplate(draft, templateId(newId()));
     addError = result.ok ? null : result.error;
     if (result.ok) draft = result.settings;
@@ -58,8 +74,8 @@
     templateProblems = templateProblems.filter((p) => p.templateId !== id || !edited.has(p.field));
   }
 
-  function onDelete(id: string): void {
-    draft = deleteTemplate(draft, id);
+  function onRemove(id: string): void {
+    draft = removeFormat(draft, id);
     templateProblems = templateProblems.filter((p) => p.templateId !== id);
     addError = null;
   }
@@ -69,7 +85,7 @@
     saving = true;
     status = "";
     failure = null;
-    formatError = null;
+    formatsError = null;
     templateProblems = [];
     const result = await save($state.snapshot(draft));
     saving = false;
@@ -84,13 +100,15 @@
       failure = SETTINGS_TEXT.saveFailed;
       return;
     }
-    formatError = result.errors.find((e) => e.field === "defaultFormatId")?.message ?? null;
+    formatsError = result.errors.find((e) => e.field === "formats")?.message ?? null;
     templateProblems = result.errors.filter((e): e is TemplateProblem => e.field === "templateLabel" || e.field === "templateSource");
     failure = result.errors.find((e) => e.field === "templates")?.message ?? null;
+    // Every field that can be wrong is in the Formats section: open it before moving focus there.
+    if (formatsError || templateProblems.length > 0) open.formats = true;
     await tick();
-    // The first error in the view's order: the default format comes before the templates.
-    if (formatError) picker.focus();
-    else region.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
+    const invalid = region.querySelector<HTMLElement>("[aria-invalid=true]");
+    if (invalid) invalid.focus();
+    else if (formatsError) formatsSection.focus();
   }
 
   async function requestClose(): Promise<void> {
@@ -122,12 +140,36 @@
 <div bind:this={region} class="settings radcut-pane" role="region" aria-label="Settings" onkeydown={onKeydown}>
   <h1 class="title">Settings</h1>
   <div class="body">
-    <FormatPicker bind:this={picker} {formats} bind:value={draft.defaultFormatId} error={formatError} />
-    <Templates templates={draft.templates} problems={templateProblems} {addError} onadd={onAdd} onupdate={onUpdate} ondelete={onDelete} />
-    <ShortcutCapture {shortcut} onannounce={(text) => (status = text)} />
-    <HeadingOptions bind:allowInHeadings={draft.allowReferencesInHeadings} bind:showOutsideMainText={draft.showHeadingsOutsideMainText} />
+    <SettingsSection bind:this={formatsSection} id="radcut-section-formats" title="Cross Reference Formats" bind:expanded={open.formats}>
+      {#snippet info()}
+        <InfoTip id="radcut-formats-info" label="cross reference formats" text={SETTINGS_TEXT.formatsInfo} />
+      {/snippet}
+      <FormatList
+        {entries}
+        {addable}
+        problems={templateProblems}
+        error={formatsError}
+        {addError}
+        onmove={(id, to) => (draft = moveFormat(draft, id, to))}
+        onremove={onRemove}
+        onaddbuiltin={(id) => (draft = addBuiltIn(draft, id))}
+        onaddtemplate={onAddTemplate}
+        onupdate={onUpdate}
+        onannounce={(text) => (status = text)}
+      />
+      <div class="option">
+        <input id="radcut-remember-format" type="checkbox" bind:checked={draft.rememberLastFormat} aria-describedby="radcut-remember-format-text" />
+        <label for="radcut-remember-format">{SETTINGS_TEXT.rememberLastFormat}</label>
+        <InfoTip id="radcut-remember-format-text" label="remembering the last used format" text={SETTINGS_TEXT.rememberLastFormatInfo} />
+      </div>
+    </SettingsSection>
+    <SettingsSection id="radcut-section-shortcut" title="Shortcut" bind:expanded={open.shortcut}>
+      <ShortcutCapture {shortcut} onannounce={(text) => (status = text)} />
+    </SettingsSection>
+    <SettingsSection id="radcut-section-headings" title="Headings" bind:expanded={open.headings}>
+      <HeadingOptions bind:allowInHeadings={draft.allowReferencesInHeadings} bind:showOutsideMainText={draft.showHeadingsOutsideMainText} />
+    </SettingsSection>
   </div>
-
   <div class="status" role="status" aria-live="polite">{status}</div>
   {#if failure}
     <p class="failure" role="alert">{failure}</p>
@@ -210,6 +252,12 @@
 
   .prompt-title {
     font-weight: var(--fontWeightSemibold);
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalS);
   }
 
   .actions {

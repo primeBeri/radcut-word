@@ -36,9 +36,11 @@ export interface SettingsStoreContractHarness {
 }
 
 const SETTINGS: UserSettings = {
-  schemaVersion: 1,
-  defaultFormatId: "number",
+  schemaVersion: 2,
+  formatOrder: ["number", "tpl:0d6c1f3e-0000-4000-8000-000000000001", "page"],
   templates: [{ id: "tpl:0d6c1f3e-0000-4000-8000-000000000001", label: "See § number", source: "see § {number}" }],
+  rememberLastFormat: true,
+  lastFormatId: "page",
   allowReferencesInHeadings: true,
   showHeadingsOutsideMainText: false,
 };
@@ -60,8 +62,9 @@ export function defineSettingsStoreContract(
       const { store } = await makeStore();
       await store.saveSettings(SETTINGS);
       expect(await store.loadSettings()).toEqual(SETTINGS);
-      await store.saveSettings({ ...SETTINGS, defaultFormatId: "text", templates: [] });
-      expect(await store.loadSettings()).toEqual({ ...SETTINGS, defaultFormatId: "text", templates: [] });
+      const other: UserSettings = { ...SETTINGS, formatOrder: ["text"], templates: [], rememberLastFormat: false, lastFormatId: null };
+      await store.saveSettings(other);
+      expect(await store.loadSettings()).toEqual(other);
     });
 
     it("S3. an unknown version comes back unvalidated, for the core to judge", async () => {

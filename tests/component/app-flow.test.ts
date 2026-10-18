@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../../src/app/create-app";
 import { messageText } from "../../src/core/messages";
+import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
 import { FakeHostShell } from "../fakes/fake-host-shell";
@@ -26,9 +27,28 @@ function start() {
   return { gateway, shell, settings };
 }
 
-/** The settings view's radio group; waits for the view to mount. */
+/** The settings view's format list; waits for the view to mount. */
 async function settingsView() {
-  return waitFor(() => screen.getByRole("radiogroup", { name: "Default format" }));
+  return waitFor(() => screen.getByRole("list", { name: SETTINGS_TEXT.formatList }));
+}
+
+/** Saves the settings view as it stands and closes it, back to the document. */
+async function saveAndClose(shell: FakeHostShell) {
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
+  await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(shell.visible).toBe(false));
+}
+
+/** A new app over the same store, as after restarting Word. */
+function restart(settings: FakeSettingsStore) {
+  app?.destroy();
+  document.body.innerHTML = "";
+  const shell = new FakeHostShell();
+  const target = document.createElement("div");
+  document.body.append(target);
+  app = createApp({ gateway: new FakeGateway(fakeFixtures["spec-300"]()), shell, settings }, target);
+  return shell;
 }
 
 const formatLabel = () => screen.getByTestId("format-preview").querySelector(".label")?.textContent;
@@ -109,7 +129,7 @@ describe("app flow", () => {
     shell.pressShortcut();
     const status = await waitFor(() => screen.getByRole("status"));
     expect(status).toHaveTextContent(messageText("headingParagraph"));
-    expect(status).toHaveTextContent("Allow references in headings");
+    expect(status).toHaveTextContent("Allow cross references in headings");
     expect(screen.queryByRole("combobox")).toBeNull();
     const close = screen.getByRole("button", { name: "Close" });
     expect(close).toHaveFocus();
@@ -296,13 +316,13 @@ describe("app flow", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  describe("settings (FR-017, FR-021, FR-021a, FR-021b)", () => {
+  describe("settings (FR-017, FR-017a, FR-021, FR-021a, FR-021b)", () => {
     it("the ribbon Settings button opens the settings view with focus on its first control", async () => {
       const { shell } = start();
       shell.clickSettingsButton();
-      const group = await settingsView();
+      await settingsView();
       expect(shell.visible).toBe(true);
-      await waitFor(() => expect(within(group).getByRole("radio", { name: "§ number text" })).toHaveFocus());
+      await waitFor(() => expect(screen.getByRole("button", { name: "Cross Reference Formats" })).toHaveFocus());
     });
 
     it("the cog and Ctrl+, open it from the palette", async () => {
@@ -315,49 +335,67 @@ describe("app flow", () => {
       await settingsView();
     });
 
-    it("saving the default format persists it, and the next palette opens on it, after a restart too", async () => {
+    it("a format moved to the top of the saved list is where the next palette opens, after a restart too", async () => {
       const { shell, settings } = start();
       shell.clickSettingsButton();
-      const group = await settingsView();
-      await fireEvent.click(within(group).getByRole("radio", { name: "Number" }));
-      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      await waitFor(() => expect(settings.raw).toMatchObject({ schemaVersion: 1, defaultFormatId: "number" }));
-      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Move Number Only up" }));
+      await saveAndClose(shell);
+      expect(settings.raw).toMatchObject({ schemaVersion: 2, formatOrder: ["number", "sectionNumberText", "text", "numberText"] });
+      const input = await open(shell);
+      expect(formatLabel()).toBe("Number Only");
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("§ Number & Text");
+      await fireEvent.keyDown(input, { key: "Escape" });
       await waitFor(() => expect(shell.visible).toBe(false));
-      await open(shell);
-      expect(formatLabel()).toBe("Number");
 
-      // A new app over the same store, as after restarting Word.
-      app?.destroy();
-      document.body.innerHTML = "";
-      const restarted = new FakeHostShell();
-      const target = document.createElement("div");
-      document.body.append(target);
-      app = createApp({ gateway: new FakeGateway(fakeFixtures["spec-300"]()), shell: restarted, settings }, target);
+      const restarted = restart(settings);
       await open(restarted);
-      expect(formatLabel()).toBe("Number");
+      expect(formatLabel()).toBe("Number Only");
     });
 
-    it("after inserting in another format, the next palette opens on the default again", async () => {
-      const { shell } = start();
+    it("after inserting in another format, the next palette opens on the first again, and nothing is written", async () => {
+      const { shell, settings } = start();
       const input = await open(shell);
       await fireEvent.keyDown(input, { key: "Tab" });
-      expect(formatLabel()).toBe("Page");
+      expect(formatLabel()).toBe("Number Only");
       await fireEvent.keyDown(input, { key: "Enter" });
       await waitFor(() => expect(shell.visible).toBe(false));
       await open(shell);
-      expect(formatLabel()).toBe("§ number text");
+      expect(formatLabel()).toBe("§ Number & Text");
+      expect(settings.raw).toBeNull();
+    });
+
+    it("with Remember the last used format on, the next palette opens on the format last inserted, after a restart too", async () => {
+      const { shell, settings } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("checkbox", { name: SETTINGS_TEXT.rememberLastFormat }));
+      await saveAndClose(shell);
+      let input = await open(shell);
+      await fireEvent.keyDown(input, { key: "Tab" });
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("Text Only");
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await waitFor(() => expect(settings.raw).toMatchObject({ rememberLastFormat: true, lastFormatId: "text" }));
+      input = await open(shell);
+      expect(formatLabel()).toBe("Text Only");
+      await fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+
+      const restarted = restart(settings);
+      await open(restarted);
+      expect(formatLabel()).toBe("Text Only");
     });
 
     it("turning on Allow references in headings lets the palette open in a heading, without listing it", async () => {
       const { gateway, shell } = start();
       shell.clickSettingsButton();
       await settingsView();
-      await fireEvent.click(screen.getByRole("checkbox", { name: "Allow references in headings" }));
-      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
-      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
-      await waitFor(() => expect(shell.visible).toBe(false));
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Allow cross references in headings" }));
+      await saveAndClose(shell);
       gateway.select("Fire strategy");
       await open(shell);
       expect(screen.queryByRole("option", { name: "4.3 Fire strategy, level 2" })).toBeNull();
@@ -368,11 +406,9 @@ describe("app flow", () => {
       const { shell } = start();
       shell.clickSettingsButton();
       await settingsView();
-      await fireEvent.click(screen.getByRole("checkbox", { name: "Show headings outside the main text" }));
-      await fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
-      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
-      await waitFor(() => expect(shell.visible).toBe(false));
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show headings outside of the main text" }));
+      await saveAndClose(shell);
       await open(shell);
       expect(screen.queryByRole("option", { name: /in footnote$/ })).toBeNull();
       expect(screen.queryByRole("option", { name: /in text box$/ })).toBeNull();
@@ -398,17 +434,17 @@ describe("app flow", () => {
       await fireEvent.click(screen.getByRole("button", { name: "Close" }));
       await waitFor(() => expect(shell.visible).toBe(false));
       expect(gateway.focusReturned).toEqual({ after: null });
-      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(screen.queryByRole("list", { name: SETTINGS_TEXT.formatList })).toBeNull();
     });
 
     it("settings that cannot be read give the defaults, and the settings view says so", async () => {
       const { shell, settings } = start();
       settings.raw = "{not json";
       const input = await open(shell);
-      expect(formatLabel()).toBe("§ number text");
+      expect(formatLabel()).toBe("§ Number & Text");
       await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
       await settingsView();
-      expect(screen.getByRole("status")).toHaveTextContent("defaults");
+      expect(screen.getByRole("status")).toHaveTextContent(SETTINGS_TEXT.settingsReset);
     });
   });
 

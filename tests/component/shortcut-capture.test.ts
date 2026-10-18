@@ -4,6 +4,7 @@ import { createApp, type App } from "../../src/app/create-app";
 import { DEFAULT_SETTINGS } from "../../src/core/settings/defaults";
 import { SHORTCUT_TEXT } from "../../src/core/settings/shortcut-rules";
 import Settings from "../../src/ui/settings/Settings.svelte";
+import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import type { SettingsProps } from "../../src/ui/settings/types";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
@@ -18,7 +19,8 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function setup(prepare: (shell: FakeHostShell) => void = () => {}) {
+/** The settings view with its Shortcut section opened. */
+async function setup(prepare: (shell: FakeHostShell) => void = () => {}) {
   const shell = new FakeHostShell();
   shell.inUse.add("ctrl+alt+k");
   prepare(shell);
@@ -31,6 +33,7 @@ function setup(prepare: (shell: FakeHostShell) => void = () => {}) {
     shortcut: shortcutControl(shell),
   };
   render(Settings, { props });
+  await fireEvent.click(screen.getByRole("button", { name: "Shortcut" }));
   const section = () => screen.getByRole("region", { name: "Shortcut" });
   const current = () => within(section()).getByTestId("current-shortcut");
   return { shell, close, section, current };
@@ -48,24 +51,24 @@ const press = (key: string, code: string, mods: { ctrlKey?: boolean; altKey?: bo
 
 describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md)", () => {
   it("shows the current shortcut, with Record new shortcut and Reset to default", async () => {
-    const { section, current } = setup();
+    const { section, current } = await setup();
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    expect(within(section()).getByRole("button", { name: "Record new shortcut" })).toBeEnabled();
+    expect(within(section()).getByRole("button", { name: "Record a new keyboard shortcut" })).toBeEnabled();
     expect(within(section()).getByRole("button", { name: "Reset to default" })).toBeEnabled();
   });
 
   it("shows No shortcut assigned when Word gave the combination to something else", async () => {
-    const { current } = setup((shell) => (shell.assignedShortcut = null));
+    const { current } = await setup((shell) => (shell.assignedShortcut = null));
     await waitFor(() => expect(current()).toHaveTextContent(SHORTCUT_TEXT.noShortcut));
   });
 
   it("Record new shortcut captures the next combination, ignoring modifiers on their own, and shows it", async () => {
-    const { shell, section, current } = setup();
+    const { shell, section, current } = await setup();
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    const button = within(section()).getByRole("button", { name: "Record new shortcut" });
+    const button = within(section()).getByRole("button", { name: "Record a new keyboard shortcut" });
     await clickRecord(button);
     expect(button).toHaveFocus();
-    expect(button).toHaveAccessibleName("Press the new shortcut");
+    expect(button).toHaveAccessibleName("Press the new keyboard shortcut");
     expect(button).toHaveAttribute("aria-pressed", "true");
     await press("Control", "ControlLeft", { ctrlKey: true });
     await press("Alt", "AltLeft", { ctrlKey: true, altKey: true });
@@ -73,14 +76,14 @@ describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md
     await press("j", "KeyJ", { ctrlKey: true, altKey: true });
     await waitFor(() => expect(current()).toHaveTextContent("Ctrl+Alt+J"));
     expect(shell.assignedShortcut).toBe("Ctrl+Alt+J");
-    expect(button).toHaveAccessibleName("Record new shortcut");
-    expect(screen.getByRole("status")).toHaveTextContent("The palette now opens with Ctrl+Alt+J.");
+    expect(button).toHaveAccessibleName("Record a new keyboard shortcut");
+    expect(screen.getByRole("status")).toHaveTextContent("The cross reference palette now opens with Ctrl+Alt+J.");
   });
 
   it("shows a refusal inline and keeps recording, so the next try needs no click", async () => {
-    const { shell, section, current } = setup();
+    const { shell, section, current } = await setup();
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    const button = within(section()).getByRole("button", { name: "Record new shortcut" });
+    const button = within(section()).getByRole("button", { name: "Record a new keyboard shortcut" });
     await clickRecord(button);
     await press("@", "Digit2", { ctrlKey: true, shiftKey: true });
     const alert = await within(section()).findByRole("alert");
@@ -96,9 +99,9 @@ describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md
   });
 
   it("Esc stops recording without leaving settings; Tab moves on and stops it too", async () => {
-    const { shell, close, section, current } = setup();
+    const { shell, close, section, current } = await setup();
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    const button = within(section()).getByRole("button", { name: "Record new shortcut" });
+    const button = within(section()).getByRole("button", { name: "Record a new keyboard shortcut" });
     await clickRecord(button);
     await press("Escape", "Escape");
     expect(button).toHaveAttribute("aria-pressed", "false");
@@ -110,18 +113,18 @@ describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md
   });
 
   it("Reset to default restores the manifest shortcut", async () => {
-    const { shell, section, current } = setup((s) => (s.assignedShortcut = "Ctrl+Alt+J"));
+    const { shell, section, current } = await setup((s) => (s.assignedShortcut = "Ctrl+Alt+J"));
     await waitFor(() => expect(current()).toHaveTextContent("Ctrl+Alt+J"));
     await fireEvent.click(within(section()).getByRole("button", { name: "Reset to default" }));
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
     expect(shell.assignedShortcut).toBe(DEFAULT_SHORTCUT);
-    expect(screen.getByRole("status")).toHaveTextContent(`The palette now opens with ${DEFAULT_SHORTCUT}.`);
+    expect(screen.getByRole("status")).toHaveTextContent(SETTINGS_TEXT.shortcutChanged(DEFAULT_SHORTCUT));
   });
 
   it("names a combination Word refuses, announced, and keeps recording for another", async () => {
-    const { shell, section, current } = setup((s) => s.refused.add("ctrl+alt+j"));
+    const { shell, section, current } = await setup((s) => s.refused.add("ctrl+alt+j"));
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    const button = within(section()).getByRole("button", { name: "Record new shortcut" });
+    const button = within(section()).getByRole("button", { name: "Record a new keyboard shortcut" });
     await clickRecord(button);
     await press("j", "KeyJ", { ctrlKey: true, altKey: true });
     await waitFor(() => expect(within(section()).getByRole("alert")).toHaveTextContent(SHORTCUT_TEXT.refused("Ctrl+Alt+J")));
@@ -133,9 +136,9 @@ describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md
   });
 
   it("says Word kept a combination when only its modifiers reached the pane, and keeps recording", async () => {
-    const { shell, section, current } = setup();
+    const { shell, section, current } = await setup();
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
-    const button = within(section()).getByRole("button", { name: "Record new shortcut" });
+    const button = within(section()).getByRole("button", { name: "Record a new keyboard shortcut" });
     await clickRecord(button);
     // Ctrl+B: Word bolds and the pane sees Ctrl down and up only.
     await press("Control", "ControlLeft", { ctrlKey: true });
@@ -153,10 +156,10 @@ describe("shortcut section of the settings view (FR-020, contracts/palette-ui.md
   });
 
   it("is read-only with the explanation when shortcuts cannot be customised", async () => {
-    const { section, current } = setup((shell) => (shell.customisable = false));
+    const { section, current } = await setup((shell) => (shell.customisable = false));
     await waitFor(() => expect(current()).toHaveTextContent(DEFAULT_SHORTCUT));
     expect(within(section()).getByText(SHORTCUT_TEXT.readOnly)).toBeInTheDocument();
-    expect(within(section()).queryByRole("button")).toBeNull();
+    expect(within(section()).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual(["Shortcut"]);
   });
 });
 

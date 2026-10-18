@@ -14,19 +14,26 @@ public sealed class Us2Scenarios : ScenarioTest
     private const string Body = "The fire strategy is described here.";
     private const string Headings = "References can't go in headings or titles.";
 
-    /// <summary>The built-in formats in cycle order (FR-016), each with its preview for "4.3 Fire strategy" just above the cursor.</summary>
+    /// <summary>
+    /// Every built-in format in the cycle once the three left out by default are added in settings
+    /// (FR-016, FR-017), each with its preview for "4.3 Fire strategy" just above the cursor.
+    /// </summary>
     private static readonly (string Label, string Preview)[] Cycle =
     [
-        ("Text", "Fire strategy"),
-        ("Number", "4.3"),
-        ("Number + text", "4.3 Fire strategy"),
-        ("§ number text", "§ 4.3 Fire strategy"),
-        ("Page", "{page}"),
-        ("Above/below", "above"),
-        ("Text + above/below", "Fire strategy above"),
+        ("§ Number & Text", "§ 4.3 Fire strategy"),
+        ("Number Only", "4.3"),
+        ("Text Only", "Fire strategy"),
+        ("Number & Text", "4.3 Fire strategy"),
+        ("Page Number", "{page}"),
+        ("Above/Below", "above"),
+        ("Text + Above/Below", "Fire strategy above"),
     ];
 
-    private const int Default = 3;
+    /// <summary>The built-ins not in the format list out of the box (FR-016).</summary>
+    private static readonly string[] Added = ["Page Number", "Above/Below", "Text + Above/Below"];
+
+    /// <summary>The palette opens on the first format in the list (FR-017).</summary>
+    private const int Default = 0;
 
     private static readonly string[] OutsideMainText =
     [
@@ -45,6 +52,14 @@ public sealed class Us2Scenarios : ScenarioTest
     {
         var (palette, document) = await OpenAsync("spec-contract", "Scenario07");
         WordActions.PutCaretIn(document, Body);
+        // Out of the box the list holds four formats; the other three built-ins are added at its end.
+        await palette.OpenSettingsFromRibbonAsync();
+        Assert.Equal(Cycle.Take(4).Select(f => f.Label), await palette.FormatListAsync());
+        foreach (var label in Added) await palette.AddFormatAsync(label);
+        Assert.Equal(Cycle.Select(f => f.Label), await palette.FormatListAsync());
+        await palette.SaveSettingsAsync();
+        await palette.CloseSettingsAsync();
+        await palette.WaitForDocumentFocusAsync("after Close in settings");
         await palette.OpenAsync();
         Palette.Type("Fire strategy");
         await palette.WaitForSelectedRowAsync("Fire strategy");
@@ -85,7 +100,7 @@ public sealed class Us2Scenarios : ScenarioTest
             string textAfter = WordActions.ParagraphText(paragraph);
             Assert.True(textAfter.EndsWith(textBefore, StringComparison.Ordinal), $"{label}: the paragraph now reads \"{textAfter}\".");
             var inserted = textAfter[..^textBefore.Length];
-            if (label == "Page") Assert.Matches(@"^[1-9][0-9]*$", inserted);
+            if (label == "Page Number") Assert.Matches(@"^[1-9][0-9]*$", inserted);
             else Assert.Equal((label, preview), (label, inserted));
         }
 
@@ -96,16 +111,18 @@ public sealed class Us2Scenarios : ScenarioTest
     }
 
     [Fact]
-    public async Task Scenario08_the_default_format_chosen_in_settings_is_where_the_palette_starts_even_after_restarting_Word()
+    public async Task Scenario08_the_format_moved_to_the_top_of_the_list_is_where_the_palette_starts_even_after_restarting_Word()
     {
         var (palette, document) = await OpenAsync("spec-contract", "Scenario08");
         WordActions.PutCaretIn(document, Body);
         await palette.OpenSettingsFromRibbonAsync();
-        await palette.SaveSettingsAsync(defaultFormat: "Number");
+        await palette.MoveFormatToTopAsync("Number Only");
+        Assert.Equal(["Number Only", "§ Number & Text", "Text Only", "Number & Text"], await palette.FormatListAsync());
+        await palette.SaveSettingsAsync();
         await palette.CloseSettingsAsync();
         await palette.WaitForDocumentFocusAsync("after Close in settings");
         await palette.OpenAsync();
-        Assert.Equal("Number", (await palette.FormatAsync()).Label);
+        Assert.Equal("Number Only", (await palette.FormatAsync()).Label);
         Palette.Press(VirtualKeyShort.ESCAPE);
         await palette.WaitForDocumentFocusAsync("after Esc");
 
@@ -114,17 +131,61 @@ public sealed class Us2Scenarios : ScenarioTest
         (palette, document) = await OpenAsync("spec-contract", "Scenario08-restarted", keepSettings: true);
         WordActions.PutCaretIn(document, Body);
         await palette.OpenAsync();
-        Assert.Equal("Number", (await palette.FormatAsync()).Label);
+        Assert.Equal("Number Only", (await palette.FormatAsync()).Label);
 
         // Inserting in another format does not change where the next palette starts (US2 scenario 5).
         Palette.Type("Scope");
         await palette.WaitForSelectedRowAsync("Scope");
-        await palette.TabToAsync("Number + text");
+        await palette.TabToAsync("§ Number & Text");
         var before = DocumentInspector.ReferenceFields(document);
         Palette.Press(VirtualKeyShort.ENTER);
         await palette.WaitForInsertionAsync(before, "Scope");
         await palette.OpenAsync();
-        Assert.Equal("Number", (await palette.FormatAsync()).Label);
+        Assert.Equal("Number Only", (await palette.FormatAsync()).Label);
+        Palette.Press(VirtualKeyShort.ESCAPE);
+        await palette.WaitForDocumentFocusAsync("after Esc");
+    }
+
+    [Fact]
+    public async Task Scenario08b_with_Remember_the_last_used_format_on_the_palette_starts_on_the_format_last_inserted_until_it_is_removed()
+    {
+        var (palette, document) = await OpenAsync("spec-contract", "Scenario08b");
+        WordActions.PutCaretIn(document, Body);
+        await palette.OpenSettingsFromRibbonAsync();
+        await palette.SaveSettingsAsync(rememberLastFormat: true);
+        await palette.CloseSettingsAsync();
+        await palette.WaitForDocumentFocusAsync("after Close in settings");
+
+        await palette.OpenAsync();
+        Assert.Equal("§ Number & Text", (await palette.FormatAsync()).Label);
+        Palette.Type("Scope");
+        await palette.WaitForSelectedRowAsync("Scope");
+        await palette.TabToAsync("Number Only");
+        var before = DocumentInspector.ReferenceFields(document);
+        Palette.Press(VirtualKeyShort.ENTER);
+        await palette.WaitForInsertionAsync(before, "Scope");
+        await palette.OpenAsync();
+        Assert.Equal("Number Only", (await palette.FormatAsync()).Label);
+        Palette.Press(VirtualKeyShort.ESCAPE);
+        await palette.WaitForDocumentFocusAsync("after Esc");
+
+        palette.Dispose();
+        await CloseAsync();
+        (palette, document) = await OpenAsync("spec-contract", "Scenario08b-restarted", keepSettings: true);
+        WordActions.PutCaretIn(document, Body);
+        await palette.OpenAsync();
+        Assert.Equal("Number Only", (await palette.FormatAsync()).Label);
+        Palette.Press(VirtualKeyShort.ESCAPE);
+        await palette.WaitForDocumentFocusAsync("after Esc");
+
+        // Removed from the list, it is forgotten: the palette starts on the first format again.
+        await palette.OpenSettingsFromRibbonAsync();
+        await palette.RemoveFormatAsync("Number Only");
+        await palette.SaveSettingsAsync();
+        await palette.CloseSettingsAsync();
+        await palette.WaitForDocumentFocusAsync("after Close in settings");
+        await palette.OpenAsync();
+        Assert.Equal("§ Number & Text", (await palette.FormatAsync()).Label);
         Palette.Press(VirtualKeyShort.ESCAPE);
         await palette.WaitForDocumentFocusAsync("after Esc");
     }
@@ -151,7 +212,7 @@ public sealed class Us2Scenarios : ScenarioTest
         var (palette, document) = await OpenAsync("spec-contract", "Scenario24");
         WordActions.PutCaretIn(document, Body);
         await palette.OpenSettingsFromRibbonAsync();
-        Assert.Contains("Not recommended.", await palette.SettingsTextAsync());
+        Assert.StartsWith("Not recommended", await palette.CheckboxDescriptionAsync("Headings", "Allow cross references in headings"));
         await palette.SaveSettingsAsync(allowInHeadings: true);
         await palette.CloseSettingsAsync();
         await palette.WaitForDocumentFocusAsync("after Close in settings");
@@ -210,13 +271,19 @@ public sealed class Us2Scenarios : ScenarioTest
     {
         var (palette, document) = await OpenAsync("spec-contract", "FootnoteCycle");
         WordActions.PutCaretIn(document, "Footnote text.");
+        // Every built-in in the list, so there are above/below formats to skip.
+        await palette.OpenSettingsFromRibbonAsync();
+        foreach (var label in Added) await palette.AddFormatAsync(label);
+        await palette.SaveSettingsAsync();
+        await palette.CloseSettingsAsync();
+        await palette.WaitForDocumentFocusAsync("after Close in settings");
         await palette.OpenAsync();
         Palette.Type("Fire strategy");
         await palette.WaitForSelectedRowAsync("Fire strategy");
-        Assert.Equal("§ number text", (await palette.FormatAsync()).Label);
+        Assert.Equal("§ Number & Text", (await palette.FormatAsync()).Label);
         Assert.Contains("No above/below formats here", await palette.PreviewLineTextAsync());
-        // From § number text, Page wraps straight round to Text: the two above/below formats are skipped.
-        foreach (var label in new[] { "Page", "Text", "Number", "Number + text", "§ number text" }) await palette.TabToAsync(label);
+        // Page Number wraps straight round to § Number & Text: the two above/below formats after it are skipped.
+        foreach (var label in new[] { "Number Only", "Text Only", "Number & Text", "Page Number", "§ Number & Text" }) await palette.TabToAsync(label);
         Palette.Press(VirtualKeyShort.ESCAPE);
         await palette.WaitForDocumentFocusAsync("after Esc");
     }

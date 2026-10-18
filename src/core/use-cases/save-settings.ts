@@ -1,11 +1,11 @@
 import type { ISettingsStore } from "../ports/settings-store";
+import { KEEP_ONE_FORMAT, templateProblems, TOO_MANY_TEMPLATES, type TemplateProblem } from "../settings/format-list";
 import type { UserSettings } from "../settings/types";
-import { templateProblems, TOO_MANY_TEMPLATES, type TemplateProblem } from "../settings/templates";
-import { formatExists, MAX_TEMPLATES } from "../settings/user-settings";
+import { MAX_TEMPLATES } from "../settings/user-settings";
 
 /** A reason a setting cannot be saved, shown next to its field (a template's name or text: `templateId` says which). */
 export type SettingsError =
-  | { readonly field: "defaultFormatId" | "templates"; readonly message: string }
+  | { readonly field: "formats" | "templates"; readonly message: string }
   | TemplateProblem;
 
 export type SaveSettingsResult =
@@ -22,8 +22,8 @@ const trimmed = (settings: UserSettings): UserSettings => ({
 /** Every reason `settings` cannot be saved, templates first in their order; empty when they can. */
 export function validateSettings(settings: UserSettings): SettingsError[] {
   const errors: SettingsError[] = templateProblems(settings.templates);
-  if (!formatExists(settings.defaultFormatId, settings.templates)) {
-    errors.push({ field: "defaultFormatId", message: "Choose a default format." });
+  if (settings.formatOrder.length === 0) {
+    errors.push({ field: "formats", message: KEEP_ONE_FORMAT });
   }
   if (settings.templates.length > MAX_TEMPLATES) {
     errors.push({ field: "templates", message: TOO_MANY_TEMPLATES });

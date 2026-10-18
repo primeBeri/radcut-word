@@ -319,6 +319,17 @@ public sealed class Palette(PaneSession session) : IDisposable
     /// <summary>The settings view's text, explanations included.</summary>
     public Task<string> SettingsTextAsync() => Pane.Page.Locator(SettingsView).InnerTextAsync();
 
+    /// <summary>
+    /// The description of the checkbox <paramref name="name"/> in section <paramref name="section"/>,
+    /// as a screen reader gets it: the text its aria-describedby names, behind an info button (FR-021a).
+    /// </summary>
+    public async Task<string> CheckboxDescriptionAsync(string section, string name)
+    {
+        await ExpandSettingsSectionAsync(section);
+        return await Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Checkbox, new() { Name = name, Exact = true }).EvaluateAsync<string>(
+            "element => element.getAttribute('aria-describedby').split(' ').map(id => document.getElementById(id)?.textContent ?? '').join(' ')");
+    }
+
     /// <summary>Ctrl+, in the palette; waits for the settings view with keyboard focus on its first control (FR-021a).</summary>
     public async Task OpenSettingsFromPaletteAsync()
     {
@@ -338,53 +349,104 @@ public sealed class Palette(PaneSession session) : IDisposable
     {
         await Wait.UntilAsync(
             async () => (!windowsFocus || keys.FocusedClass() == Keys.TaskPaneHostClass) &&
-                await Pane.Page.EvaluateAsync<bool>(
-                    "() => document.activeElement?.matches(\"input[type=radio][name='radcut-default-format']:checked\") === true"),
+                await Pane.Page.EvaluateAsync<bool>("() => document.activeElement?.id === 'radcut-section-formats-toggle'"),
             Wait.Pane,
-            $"the settings view with focus on the default format {why}");
+            $"the settings view with focus on the Formats section {why}");
+    }
+
+    /// <summary>Opens the settings section <paramref name="name"/> (Formats, Shortcut or Headings) if it is collapsed (FR-021a).</summary>
+    public async Task ExpandSettingsSectionAsync(string name)
+    {
+        var toggle = Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
+        if (await toggle.GetAttributeAsync("aria-expanded") != "true") await toggle.ClickAsync();
     }
 
     /// <summary>Changes settings with the mouse (clicks through the page), saves, and waits for "Settings saved.".</summary>
-    public async Task SaveSettingsAsync(string? defaultFormat = null, bool? allowInHeadings = null, bool? showOutsideMainText = null)
+    public async Task SaveSettingsAsync(bool? allowInHeadings = null, bool? showOutsideMainText = null, bool? rememberLastFormat = null)
     {
         var view = Pane.Page.Locator(SettingsView);
-        if (defaultFormat is not null) await view.GetByRole(AriaRole.Radio, new() { Name = defaultFormat, Exact = true }).CheckAsync();
+        if (rememberLastFormat is { } remember)
+        {
+            await ExpandSettingsSectionAsync("Cross Reference Formats");
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Remember last used format", Exact = true }).SetCheckedAsync(remember);
+        }
+        if (allowInHeadings is not null || showOutsideMainText is not null) await ExpandSettingsSectionAsync("Headings");
         if (allowInHeadings is { } allow)
         {
-            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Allow references in headings", Exact = true }).SetCheckedAsync(allow);
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Allow cross references in headings", Exact = true }).SetCheckedAsync(allow);
         }
         if (showOutsideMainText is { } show)
         {
-            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Show headings outside the main text", Exact = true }).SetCheckedAsync(show);
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Show headings outside of the main text", Exact = true }).SetCheckedAsync(show);
         }
         await view.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await WaitForMessageAsync("Settings saved.");
     }
 
-    /// <summary>A template in the settings view, by its name (its fieldset's legend).</summary>
+    private ILocator FormatList => Pane.Page.Locator(SettingsView).GetByRole(AriaRole.List, new() { Name = "Cross reference formats, in 'Tab' order", Exact = true });
+
+    private ILocator FormatButton(string name) => FormatList.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
+
+    /// <summary>The format list's names, in Tab order (FR-017).</summary>
+    public async Task<IReadOnlyList<string>> FormatListAsync() =>
+        (await FormatList.Locator(":scope > li > .name").AllInnerTextsAsync()).Select(name => name.Trim()).ToList();
+
+    /// <summary>Clicks "Move <paramref name="name"/> up" until it is first in the format list.</summary>
+    public async Task MoveFormatToTopAsync(string name)
+    {
+        await ExpandSettingsSectionAsync("Cross Reference Formats");
+        var up = FormatButton($"Move {name} up");
+        while (await up.IsEnabledAsync()) await up.ClickAsync();
+    }
+
+    /// <summary>Adds the built-in format <paramref name="name"/> from the Add format menu (FR-016).</summary>
+    public async Task AddFormatAsync(string name)
+    {
+        await ExpandSettingsSectionAsync("Cross Reference Formats");
+        var view = Pane.Page.Locator(SettingsView);
+        await view.GetByRole(AriaRole.Button, new() { Name = "Add Default Format", Exact = true }).ClickAsync();
+        await view.GetByRole(AriaRole.Menuitem).Filter(new() { Has = Pane.Page.GetByText(name, new() { Exact = true }) }).ClickAsync();
+    }
+
+    /// <summary>Clicks "Remove <paramref name="name"/>" in the format list; a template is deleted with it.</summary>
+    public async Task RemoveFormatAsync(string name)
+    {
+        await ExpandSettingsSectionAsync("Cross Reference Formats");
+        await FormatButton($"Remove {name}").ClickAsync();
+    }
+
+    /// <summary>A template's open editor, by the template's name (its fieldset's legend).</summary>
     private ILocator Template(string name) =>
         Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Group, new() { Name = name, Exact = true });
 
-    /// <summary>Clicks Add template and types the new template's name and text into its fields (FR-018).</summary>
+    /// <summary>Clicks New template and types the new template's name and text into its fields (FR-018).</summary>
     public async Task AddTemplateAsync(string name, string text)
     {
+        await ExpandSettingsSectionAsync("Cross Reference Formats");
         var view = Pane.Page.Locator(SettingsView);
-        await view.GetByRole(AriaRole.Button, new() { Name = "Add template", Exact = true }).ClickAsync();
+        await view.GetByRole(AriaRole.Button, new() { Name = "Add Custom Format", Exact = true }).ClickAsync();
         var added = view.GetByRole(AriaRole.Group).Last;
-        await added.GetByRole(AriaRole.Textbox, new() { Name = "Template name", Exact = true }).FillAsync(name);
-        await added.GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true }).FillAsync(text);
+        await added.GetByRole(AriaRole.Textbox, new() { Name = "Cross reference format name", Exact = true }).FillAsync(name);
+        await added.GetByRole(AriaRole.Textbox, new() { Name = "Cross reference format text", Exact = true }).FillAsync(text);
     }
 
-    /// <summary>Replaces the text of the template named <paramref name="name"/>.</summary>
-    public Task EditTemplateTextAsync(string name, string text) =>
-        Template(name).GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true }).FillAsync(text);
+    /// <summary>Opens the editor of the template named <paramref name="name"/> (Edit) and replaces its text.</summary>
+    public async Task EditTemplateTextAsync(string name, string text)
+    {
+        await ExpandSettingsSectionAsync("Cross Reference Formats");
+        var edit = FormatButton($"Edit {name}");
+        if (await edit.GetAttributeAsync("aria-expanded") != "true") await edit.ClickAsync();
+        await Template(name).GetByRole(AriaRole.Textbox, new() { Name = "Cross reference format text", Exact = true }).FillAsync(text);
+    }
 
-    /// <summary>The live sample preview of the template named <paramref name="name"/>.</summary>
-    public Task<string> TemplatePreviewAsync(string name) => Template(name).GetByTestId("template-preview").InnerTextAsync();
+    /// <summary>The live sample preview in the row of the template named <paramref name="name"/>.</summary>
+    public Task<string> TemplatePreviewAsync(string name) =>
+        FormatList.GetByRole(AriaRole.Listitem)
+            .Filter(new() { Has = Pane.Page.GetByRole(AriaRole.Button, new() { Name = $"Remove {name}", Exact = true }) })
+            .GetByTestId("template-preview").InnerTextAsync();
 
-    /// <summary>Clicks Delete on the template named <paramref name="name"/>.</summary>
-    public Task DeleteTemplateAsync(string name) =>
-        Template(name).GetByRole(AriaRole.Button, new() { Name = $"Delete template {name}", Exact = true }).ClickAsync();
+    /// <summary>Removes the template named <paramref name="name"/> from the format list, deleting it.</summary>
+    public Task DeleteTemplateAsync(string name) => RemoveFormatAsync(name);
 
     /// <summary>Clicks Save, saving as it stands, and waits for "Settings saved.".</summary>
     public async Task SaveSettingsAsIsAsync()
@@ -400,7 +462,7 @@ public sealed class Palette(PaneSession session) : IDisposable
     public async Task SaveSettingsRefusedAsync(string template, string error)
     {
         await Pane.Page.Locator(SettingsView).GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        var field = Template(template).GetByRole(AriaRole.Textbox, new() { Name = "Template text", Exact = true });
+        var field = Template(template).GetByRole(AriaRole.Textbox, new() { Name = "Cross reference format text", Exact = true });
         await Wait.UntilAsync(
             async () => await Template(template).GetByRole(AriaRole.Alert).CountAsync() == 1 &&
                 await Template(template).GetByRole(AriaRole.Alert).InnerTextAsync() == error &&
@@ -416,6 +478,7 @@ public sealed class Palette(PaneSession session) : IDisposable
     /// <summary>The settings view's shortcut once read from Office, e.g. "Ctrl+Shift+Y" or "No shortcut assigned".</summary>
     public async Task<string> CurrentShortcutAsync()
     {
+        await ExpandSettingsSectionAsync("Shortcut");
         var current = ShortcutSection.GetByTestId("current-shortcut");
         return await Wait.UntilValueAsync(
             async () => (await current.InnerTextAsync()).Trim() is var text && text != "…" ? text : null,
@@ -433,6 +496,7 @@ public sealed class Palette(PaneSession session) : IDisposable
     /// <summary>Clicks Record new shortcut; waits for it to be recording with keyboard focus, in the page and in Windows.</summary>
     public async Task StartRecordingShortcutAsync()
     {
+        await ExpandSettingsSectionAsync("Shortcut");
         var button = ShortcutSection.Locator("button[aria-pressed]");
         await button.ClickAsync();
         await Wait.UntilAsync(
@@ -455,8 +519,11 @@ public sealed class Palette(PaneSession session) : IDisposable
     }
 
     /// <summary>Clicks Reset to default in the shortcut section.</summary>
-    public Task ResetShortcutAsync() =>
-        ShortcutSection.GetByRole(AriaRole.Button, new() { Name = "Reset to default", Exact = true }).ClickAsync();
+    public async Task ResetShortcutAsync()
+    {
+        await ExpandSettingsSectionAsync("Shortcut");
+        await ShortcutSection.GetByRole(AriaRole.Button, new() { Name = "Reset to default", Exact = true }).ClickAsync();
+    }
 
     /// <summary>
     /// After a combination was recorded: waits until the section shows <paramref name="expected"/>

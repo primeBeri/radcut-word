@@ -292,7 +292,7 @@ describe("Palette messages and preview line", () => {
     await type("fstrat");
     const strip = screen.getByTestId("format-preview");
     expect(selected()).toContainElement(strip);
-    expect(strip).toHaveTextContent("§ number text");
+    expect(strip).toHaveTextContent("§ Number & Text");
     expect(strip).toHaveTextContent("§ 4.3 Fire strategy");
   });
 

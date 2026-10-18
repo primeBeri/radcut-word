@@ -14,7 +14,7 @@ export type MessageId =
 
 const ELSEWHERE = "Put the cursor in the main text, a footnote or endnote, a header or footer, or a text box.";
 const HEADINGS =
-  "References can't go in headings or titles. To allow them, turn on “Allow references in headings” in Settings.";
+  "References can't go in headings or titles. To allow them, turn on “Allow cross references in headings” in Settings.";
 
 const TEXTS: Record<MessageId, string> = {
   comment: `References can't go in comments. ${ELSEWHERE}`,

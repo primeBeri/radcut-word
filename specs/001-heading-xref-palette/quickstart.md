@@ -64,8 +64,9 @@ In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run "Contract suite
 | 4 | With the cursor in body text, insert a reference to heading X; then insert a second reference to the same X; check Insert → Bookmark with "Hidden bookmarks" ticked | Only one bookmark on X; the second insertion reused it | US1 8, SC-006 |
 | 5 | Insert with no selection, with a selected word, and with a confirmed two-paragraph selection; Ctrl+Z once after each; repeat with tracking on | Each time the document is exactly as before (reference, new bookmark and replaced text); more than one Undo step is a release blocker | US1 10, FR-013, SC-009 |
 | 6 | Save, sideload removed (or another PC), open, Ctrl+A, F9 | All references correct | US1 9, SC-007 |
-| 7 | Open palette, Tab through all formats, Shift+Tab back; insert each | Preview matches inserted text; all update on F9 | US2, SC-004 |
-| 8 | Settings → default "number"; restart Word; open palette | Palette starts on "number" | US2 4–5 |
+| 7 | Settings → Add format: page, above/below, text + above/below; open palette, Tab through all formats, Shift+Tab back; insert each | Cycle follows the format list; preview matches inserted text; all update on F9 | US2 1–3, 7, SC-004 |
+| 8 | Settings → move "number" to the top; restart Word; open palette; insert with another format; reopen | Palette starts on "number" each time | US2 4–5, 7 |
+| 8b | Settings → "Remember the last used format" on; insert with "number + text"; reopen; restart Word; reopen; remove "number + text" from the list; reopen | Starts on "number + text" until it is removed, then on the first format | US2 6, FR-017a |
 | 9 | Add template `see §{number} {text}, {abovebelow}`; try `{num}` | First appears in the cycle; second rejected with message | US3 |
 | 10 | Ribbon "Cross-reference"; change shortcut; try Ctrl+@; switch to UK layout | Same palette; new shortcut works, old one does not; Ctrl+@ refused; no stray character typed | US4 |
 | 11 | Insert to two headings; reopen palette with empty query | Both listed first under "Recent", most recent at top | US5 |

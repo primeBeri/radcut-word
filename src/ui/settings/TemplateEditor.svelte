@@ -1,35 +1,38 @@
 <script lang="ts">
-  import { parseTemplate } from "../../core/formats/template-parser";
   import type { TemplateDefinition } from "../../core/settings/types";
+  import InfoTip from "./InfoTip.svelte";
   import { SETTINGS_TEXT } from "./labels";
-  import { samplePreview } from "./sample";
 
-  /** One template's name and text, with a live sample preview and Delete (FR-018). Errors come from the last Save. */
+  /**
+   * One template's name and text (FR-018), shown under its row in the format list; the row shows
+   * the live preview and Remove. Errors come from the last Save.
+   */
   let {
     template,
     labelError = null,
     sourceError = null,
     onchange,
-    ondelete,
   }: {
     template: TemplateDefinition;
     labelError?: string | null;
     sourceError?: string | null;
     onchange: (change: Partial<Pick<TemplateDefinition, "label" | "source">>) => void;
-    ondelete: () => void;
   } = $props();
 
   const base = $derived(`radcut-template-${template.id.replace(/[^\w-]/g, "-")}`);
-  const parsed = $derived(parseTemplate(template.source));
-  const preview = $derived(parsed.ok ? samplePreview(parsed.parts) : null);
-  const title = $derived(template.label.trim() || "New template");
+  const title = $derived(template.label.trim() || SETTINGS_TEXT.unnamedTemplate);
   const describedBy = (...ids: (string | false)[]) => ids.filter(Boolean).join(" ") || undefined;
+
+  /** Focus the name input, as after Add Custom Format. */
+  export function focus(): void {
+    document.getElementById(`${base}-label`)?.focus();
+  }
 </script>
 
 <fieldset class="template">
   <legend class="legend">{title}</legend>
 
-  <label class="field-label" for="{base}-label">Template name</label>
+  <label class="field-label" for="{base}-label">Cross reference format name</label>
   <input
     id="{base}-label"
     class="input"
@@ -43,7 +46,10 @@
     <p id="{base}-label-error" class="error" role="alert">{labelError}</p>
   {/if}
 
-  <label class="field-label" for="{base}-source">Template text</label>
+  <span class="field-label with-info">
+    <label for="{base}-source">Cross reference format text</label>
+    <InfoTip id="{base}-help" label="cross reference format text" text={SETTINGS_TEXT.templateHelp} />
+  </span>
   <input
     id="{base}-source"
     class="input"
@@ -57,16 +63,6 @@
   {#if sourceError}
     <p id="{base}-source-error" class="error" role="alert">{sourceError}</p>
   {/if}
-  <p id="{base}-help" class="help">{SETTINGS_TEXT.templateHelp}</p>
-
-  <div class="footer">
-    <p class="preview" class:empty={preview === null} data-testid="template-preview" aria-live="polite">
-      {preview ?? SETTINGS_TEXT.noPreview}
-    </p>
-    <button type="button" class="delete" aria-label="Delete template {title === 'New template' ? 'new template' : title}" onclick={ondelete}>
-      Delete
-    </button>
-  </div>
 </fieldset>
 
 <style>
@@ -75,7 +71,7 @@
     flex-direction: column;
     gap: var(--spacingVerticalXXS);
     margin: 0;
-    padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalM) var(--spacingVerticalS);
     border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
     border-radius: var(--borderRadiusMedium);
     min-width: 0;
@@ -91,6 +87,12 @@
     color: var(--colorNeutralForeground2);
     font-size: var(--fontSizeBase200);
     line-height: var(--lineHeightBase200);
+  }
+
+  .with-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacingHorizontalXXS);
   }
 
   .input {
@@ -113,54 +115,10 @@
     border-color: var(--colorPaletteRedBorder2);
   }
 
-  .error,
-  .help,
-  .preview {
+  .error {
     margin: 0;
+    color: var(--colorPaletteRedForeground1);
     font-size: var(--fontSizeBase200);
     line-height: var(--lineHeightBase200);
-  }
-
-  .error {
-    color: var(--colorPaletteRedForeground1);
-  }
-
-  .help {
-    color: var(--colorNeutralForeground3);
-  }
-
-  .footer {
-    display: flex;
-    align-items: baseline;
-    gap: var(--spacingHorizontalS);
-    margin-top: var(--spacingVerticalXS);
-  }
-
-  .preview {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: anywhere;
-    color: var(--colorBrandForeground1);
-    font-weight: var(--fontWeightSemibold);
-  }
-
-  .preview.empty {
-    color: var(--colorNeutralForeground3);
-    font-weight: var(--fontWeightRegular);
-  }
-
-  .delete {
-    flex: none;
-    padding: var(--spacingVerticalXXS) var(--spacingHorizontalS);
-    border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
-    border-radius: var(--borderRadiusMedium);
-    background: var(--colorNeutralBackground1);
-    color: var(--colorNeutralForeground1);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .delete:hover {
-    background: var(--colorNeutralBackground1Hover);
   }
 </style>

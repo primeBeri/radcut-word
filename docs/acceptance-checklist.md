@@ -360,3 +360,23 @@ copy's shortcuts (office-js#6973, research R4). Contract and Scenario categories
 |---|---|---|
 | 10 | Partial | Ribbon, Ctrl+@ and UK layout pass (`Scenario10_the_ribbon_…`); a new shortcut cannot be set on this Word (`Scenario10_a_recorded_shortcut_…` skipped: replaceShortcuts refused). Recheck on a later Word build or a store install |
 | 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+
+## Automated run after the settings refinement (feature 001, Phase 13, T156), 2026-10-18
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"`, then `"Category=Contract"` (two
+`--filter-trait` options do not combine), on the test VM (Word 2609), no person involved. The format
+list replaces the default format: scenario 7 adds page, above/below and text + above/below in
+settings and cycles all seven in list order; scenario 8 moves Number to the top; new scenario 8b
+remembers the last used format across a restart until it is removed from the list. Contract: 76
+passed, 4 skipped (10f deferred; K3, K6 and S5 Node only). Scenario: 19 passed, 1 skipped (10b,
+replaceShortcuts refused, research R4), 1 failed: US1 scenario 25 timed out waiting for the RAD·CUT
+ribbon group and then passed 3 of 3 on its own; its evidence was cleared by the Contract run, so the
+cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, drops that group).
+
+| # | Result | Notes |
+|---|---|---|
+| 7 | Pass | Automated (`Scenario07`), all seven built-ins once added |
+| 8 | Pass | Automated (`Scenario08`), format moved to the top of the list |
+| 8b | Pass | Automated (`Scenario08b`) |
+| 9 | Pass | Automated (`Scenario09`), template at the end of the list |
+| — | Human | Visual check of the settings view in Word: sections, info tooltips, previews lined up in their column, dragging a row |
