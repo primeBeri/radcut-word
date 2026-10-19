@@ -16,6 +16,7 @@ const saved: UserSettings = {
   lastFormatId: "page",
   allowReferencesInHeadings: true,
   showHeadingsOutsideMainText: false,
+  showRecentHeadings: false,
 };
 
 describe("settings defaults (data-model UserSettings)", () => {
@@ -28,6 +29,7 @@ describe("settings defaults (data-model UserSettings)", () => {
       lastFormatId: null,
       allowReferencesInHeadings: false,
       showHeadingsOutsideMainText: true,
+      showRecentHeadings: true,
     });
   });
 });
@@ -41,6 +43,12 @@ describe("loadUserSettings", () => {
     expect(loadUserSettings(structuredClone(saved))).toEqual({ settings: saved, notice: null });
   });
 
+  it("shows recently used headings when version 2 settings were saved before the setting existed (FR-022a)", () => {
+    const older: Record<string, unknown> = { ...structuredClone(saved) };
+    delete older.showRecentHeadings;
+    expect(loadUserSettings(older)).toEqual({ settings: { ...saved, showRecentHeadings: true }, notice: null });
+  });
+
   it("resets an unknown version to the defaults with a notice", () => {
     expect(loadUserSettings({ ...saved, schemaVersion: 7 })).toEqual({ settings: DEFAULT_SETTINGS, notice: "settingsReset" });
   });
@@ -52,6 +60,7 @@ describe("loadUserSettings", () => {
     ["no version", { ...saved, schemaVersion: undefined }],
     ["a non-boolean setting", { ...saved, allowReferencesInHeadings: "yes" }],
     ["a non-boolean remember setting", { ...saved, rememberLastFormat: 1 }],
+    ["a non-boolean recents setting", { ...saved, showRecentHeadings: "no" }],
     ["a format list that is not a list", { ...saved, formatOrder: "number" }],
     ["a format list with a non-string", { ...saved, formatOrder: ["number", 4] }],
     ["a last format that is not a string", { ...saved, lastFormatId: 4 }],
@@ -101,6 +110,7 @@ describe("migrating version 1 settings (data-model, 2026-10-18)", () => {
         lastFormatId: null,
         allowReferencesInHeadings: true,
         showHeadingsOutsideMainText: false,
+        showRecentHeadings: true,
       },
       notice: null,
     });

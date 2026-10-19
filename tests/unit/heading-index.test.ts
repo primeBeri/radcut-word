@@ -96,6 +96,48 @@ describe("HeadingIndex", () => {
   });
 });
 
+describe("HeadingIndex.noteBookmark", () => {
+  it("gives the cached heading a new bookmark and its bookmark key, leaving the others", async () => {
+    const fire = heading(1, "Fire");
+    const index = new HeadingIndex(async () => snapshot(heading(0, "Scope", "_Ref1"), fire));
+    const before = await index.get();
+    index.noteBookmark(fire, "_RCnew");
+    const after = index.cached()!;
+    expect(after).not.toBe(before);
+    expect(after.headings[1]).toMatchObject({ bookmark: "_RCnew", key: { kind: "bookmark", name: "_RCnew" } });
+    expect(after.headings[0]).toBe(before.headings[0]);
+    expect(index.byKey({ kind: "bookmark", name: "_rcnew" })?.text).toBe("Fire");
+  });
+
+  it("keeps a bookmark noted while a refresh was under way, which that read may predate", async () => {
+    const fire = heading(1, "Fire");
+    let release!: () => void;
+    let gate: Promise<void> | null = null;
+    const index = new HeadingIndex(async () => {
+      await gate;
+      return snapshot(heading(0, "Scope", "_Ref1"), heading(1, "Fire"));
+    });
+    await index.get();
+    gate = new Promise((resolve) => (release = resolve));
+    const refreshing = index.refresh();
+    index.noteBookmark(fire, "_RCnew");
+    release();
+    expect((await refreshing).headings[1]).toMatchObject({ bookmark: "_RCnew" });
+    expect(index.byKey({ kind: "bookmark", name: "_RCnew" })?.text).toBe("Fire");
+    // The note was for that read only.
+    expect((await index.refresh()).headings[1]?.bookmark).toBeNull();
+  });
+
+  it("changes nothing for a heading that is not in the snapshot, or before any read", async () => {
+    const index = new HeadingIndex(async () => snapshot(heading(0, "Scope")));
+    index.noteBookmark(heading(0, "Scope"), "_RCx");
+    expect(index.cached()).toBeNull();
+    const before = await index.get();
+    index.noteBookmark(heading(0, "Elsewhere"), "_RCx");
+    expect(index.cached()).toBe(before);
+  });
+});
+
 describe("normaliseHeadingText", () => {
   it("strips a note's leading reference mark and the whitespace after it (research R7)", () => {
     expect(normaliseHeadingText("\u0002 Heading in a footnote")).toBe("Heading in a footnote");

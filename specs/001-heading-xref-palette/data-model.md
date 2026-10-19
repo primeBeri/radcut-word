@@ -151,6 +151,7 @@ Stored per user, outside documents (FR-021).
 | `lastFormatId` | `string \| null` | The format of the last inserted reference, written after each insertion while `rememberLastFormat` is on; default `null`. Not shown in the settings view and not an unsaved change. |
 | `allowReferencesInHeadings` | `boolean` | Default `false` (FR-001b). Feeds `LocationPolicy.allowInHeadings`. |
 | `showHeadingsOutsideMainText` | `boolean` | Default `true` (FR-003a). When `false`, headings whose `location` is not `main` are left out of the list. |
+| `showRecentHeadings` | `boolean` | Default `true` (FR-022a, added 2026-10-18 without a version bump). When `false`, the palette shows no Recent group and nothing is recorded; stored recents are kept. Missing from stored settings of either version (saved before it existed) reads as `true`; any other non-boolean value resets the settings, as for the other settings. |
 
 **Migration from version 1** (2026-10-18): `formatOrder` = the old `defaultFormatId` first, then
 the seven built-ins in FR-016 order and the templates in creation order, less the default;
@@ -168,8 +169,19 @@ reads and writes it through the `HostShell` port.
 | `bookmarks` | `string[]` | Most recent first, unique (case-insensitive), at most 5. |
 
 Entries whose bookmark no longer exists, or no longer sits on a heading, are dropped when the
-palette opens (spec User Story 5, scenario 3). At most 50 documents are kept; the least recently
-used is dropped.
+palette opens (spec User Story 5, scenario 3), judged against a fresh read of the document only,
+never the cached snapshot. Only the recents loaded when the palette opened are judged by that
+read: one recorded while it was under way is kept. Recording and pruning run one at a time. At most 50 documents are kept; the least recently used (the one whose
+recents were saved longest ago) is dropped. The store keeps every document's list under one key,
+`radcut.recents`, as `{ documentId, bookmarks }[]`, most recently saved first; reading and
+updating that list are core rules (`readStoredRecents`, `withDocumentRecents`) that the adapter
+and the fake both call (refined 2026-10-18). A stored list is held to the same limits when read
+(2026-10-19).
+
+The bookmark recorded is the one the insertion used (`InsertReferenceResult.bookmark`). The cached
+heading snapshot is given that bookmark straight away, so the next palette shows the heading as
+recent before the background refresh arrives, and a refresh that was already reading keeps it too
+(2026-10-19).
 
 ## State transitions
 

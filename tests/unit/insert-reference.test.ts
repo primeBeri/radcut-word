@@ -3,7 +3,9 @@ import { formatById } from "../../src/core/formats/built-ins";
 import { HeadingIndex } from "../../src/core/headings/heading-index";
 import type { Heading } from "../../src/core/headings/types";
 import { messageText } from "../../src/core/messages";
+import { RecentHeadings } from "../../src/core/recents/recent-headings";
 import { insertReference, type InsertReferenceInput } from "../../src/core/use-cases/insert-reference";
+import { FakeSettingsStore } from "../fakes/fake-settings-store";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
 import { FakeHostShell } from "../fakes/fake-host-shell";
@@ -264,6 +266,42 @@ describe("InsertReference", () => {
     const result = await insertReference(deps, input("Fire strategy"));
     if (result.kind !== "inserted") throw new Error(result.kind);
     expect(gateway.focusReturned).toEqual({ after: result.reference.id });
+  });
+
+  describe("recents (US5)", () => {
+    const docId = "https://example.invalid/spec-300.docx";
+
+    it("records the bookmark it used, most recent first", async () => {
+      const { deps, input } = await setup();
+      const store = new FakeSettingsStore();
+      const recents = new RecentHeadings(store);
+      await insertReference({ ...deps, recents }, input("Scope"));
+      await insertReference({ ...deps, recents }, input("Fire strategy"));
+      expect(await store.loadRecents(docId)).toEqual(["_RCssssssssss", "_Ref200000001"]);
+    });
+
+    it("records nothing when nothing was inserted", async () => {
+      const { gateway, deps, input } = await setup();
+      const store = new FakeSettingsStore();
+      gateway.failNextWrite();
+      await insertReference({ ...deps, recents: new RecentHeadings(store) }, input("Fire strategy"));
+      expect(await store.loadRecents(docId)).toEqual([]);
+    });
+
+    it("still reports the insert when recording fails", async () => {
+      const { deps, input } = await setup();
+      const failing = new RecentHeadings({ loadRecents: async () => [], saveRecents: () => Promise.reject(new Error("storage")) });
+      const result = await insertReference({ ...deps, recents: failing }, input("Fire strategy"));
+      expect(result.kind).toBe("inserted");
+    });
+
+    it("gives the cached snapshot the new bookmark, so the next palette knows the heading by it", async () => {
+      const { deps, index, input } = await setup();
+      await insertReference(deps, input("Fire strategy"));
+      const fire = index.cached()?.headings.find((h) => h.text === "Fire strategy");
+      expect(fire?.bookmark).toBe("_RCssssssssss");
+      expect(fire?.key).toEqual({ kind: "bookmark", name: "_RCssssssssss" });
+    });
   });
 
   it("keeps the pane open when nothing was inserted", async () => {

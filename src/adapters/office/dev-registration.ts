@@ -562,10 +562,10 @@ export async function registerOfficeContracts(): Promise<void> {
       defineSettingsStoreContract(
         "OfficeSettingsStore",
         async () => {
-          // A key of its own, emptied for each case, so the user's settings are never touched.
-          await OfficeRuntime.storage.removeItem(CONTRACT_SETTINGS_KEY);
+          // Keys of its own, emptied for each case, so the user's settings and recents are never touched.
+          await OfficeRuntime.storage.removeItems([CONTRACT_SETTINGS_KEY, CONTRACT_RECENTS_KEY]);
           return {
-            store: new OfficeSettingsStore(CONTRACT_SETTINGS_KEY),
+            store: new OfficeSettingsStore(CONTRACT_SETTINGS_KEY, CONTRACT_RECENTS_KEY),
             writeRaw: (text) => OfficeRuntime.storage.setItem(CONTRACT_SETTINGS_KEY, text),
           };
         },
@@ -575,3 +575,4 @@ export async function registerOfficeContracts(): Promise<void> {
 }
 
 const CONTRACT_SETTINGS_KEY = "radcut.contract.settings";
+const CONTRACT_RECENTS_KEY = "radcut.contract.recents";

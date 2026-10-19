@@ -24,10 +24,11 @@ function setup(overrides: Partial<SettingsProps> = {}) {
   const allow = () => screen.getByRole("checkbox", { name: "Allow cross references in headings" });
   const outside = () => screen.getByRole("checkbox", { name: "Show headings outside of the main text" });
   const remember = () => screen.getByRole("checkbox", { name: SETTINGS_TEXT.rememberLastFormat });
+  const recent = () => screen.getByRole("checkbox", { name: "Show recently used headings" });
   const saveButton = () => button("Save");
   const closeButton = () => button("Close");
   const esc = () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-  return { ...result, save, close, toggle, list, rows, names, button, allow, outside, remember, saveButton, closeButton, esc };
+  return { ...result, save, close, toggle, list, rows, names, button, allow, outside, remember, recent, saveButton, closeButton, esc };
 }
 
 describe("settings view sections (FR-021a, contracts/palette-ui.md)", () => {
@@ -170,6 +171,26 @@ describe("settings view controls and saving", () => {
     expect(allow()).toHaveAccessibleDescription(asDescription(SETTINGS_TEXT.allowReferencesInHeadings));
     expect(outside()).toHaveAccessibleDescription(asDescription(SETTINGS_TEXT.showHeadingsOutsideMainText));
     expect(SETTINGS_TEXT.allowReferencesInHeadings).toMatch(/^Not recommended /);
+  });
+
+  it("has the recently used headings checkbox, on, explained by its info button (FR-022a)", async () => {
+    const { toggle, recent } = setup();
+    await fireEvent.click(toggle("Headings"));
+    expect(recent()).toBeChecked();
+    expect(recent()).toHaveAccessibleDescription(asDescription(SETTINGS_TEXT.showRecentHeadings));
+    expect(screen.getByRole("button", { name: "About recently used headings" })).toBeInTheDocument();
+  });
+
+  it("counts turning off recently used headings as an unsaved change, and saves it", async () => {
+    const { toggle, recent, closeButton, close, saveButton, save } = setup();
+    await fireEvent.click(toggle("Headings"));
+    await fireEvent.click(recent());
+    await fireEvent.click(closeButton());
+    expect(close).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog", { name: SETTINGS_TEXT.unsavedTitle })).toBeInTheDocument();
+    await fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Keep editing" }));
+    await fireEvent.click(saveButton());
+    expect(save).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, showRecentHeadings: false });
   });
 
   it("gives every control a programmatic label", async () => {

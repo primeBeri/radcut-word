@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { BUILT_IN_FORMATS } from "../../src/core/formats/built-ins";
 import { HeadingIndex } from "../../src/core/headings/heading-index";
 import { messageText } from "../../src/core/messages";
+import { RecentHeadings } from "../../src/core/recents/recent-headings";
 import { openPalette, type OpenPaletteOptions } from "../../src/core/use-cases/open-palette";
+import { FakeSettingsStore } from "../fakes/fake-settings-store";
 import { fakeDocument, fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
 
@@ -96,5 +98,76 @@ describe("OpenPalette", () => {
     const fresh = await second.refreshed;
     expect(fresh.some((h) => h.text === "Fire safety strategy")).toBe(true);
     expect(fresh.some((h) => h.text === "Fire strategy")).toBe(false);
+  });
+
+  describe("recents (US5)", () => {
+    const docId = "https://example.invalid/spec-300.docx";
+
+    it("returns the document's recents, most recent first", async () => {
+      const { gateway, index } = setup();
+      const store = new FakeSettingsStore();
+      await store.saveRecents(docId, ["_Ref200000001"]);
+      const state = await openPalette({ gateway, index, recents: new RecentHeadings(store) }, defaults);
+      expect(state.kind === "open" && state.recents).toEqual(["_Ref200000001"]);
+    });
+
+    it("returns no recents without a RecentHeadings (the setting is off, FR-022a)", async () => {
+      const { gateway, index } = setup();
+      const state = await openPalette({ gateway, index }, defaults);
+      expect(state.kind === "open" && state.recents).toEqual([]);
+    });
+
+    it("opens with no recents when reading them fails", async () => {
+      const { gateway, index } = setup();
+      const failing = new RecentHeadings({ loadRecents: () => Promise.reject(new Error("storage")), saveRecents: async () => {} });
+      const state = await openPalette({ gateway, index, recents: failing }, defaults);
+      expect(state.kind === "open" && state.recents).toEqual([]);
+    });
+
+    it("drops recents whose heading is gone, against a fresh read only", async () => {
+      const { gateway, index } = setup();
+      const store = new FakeSettingsStore();
+      await store.saveRecents(docId, ["_RCgone", "_Ref200000001"]);
+      const recents = new RecentHeadings(store);
+      // The first open reads the document, so the list is fresh and pruned.
+      const first = await openPalette({ gateway, index, recents }, defaults);
+      if (first.kind !== "open") throw new Error(first.kind);
+      await first.pruned;
+      expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
+
+      // From the cache: a bookmark it does not know is kept until the refresh shows it gone.
+      await store.saveRecents(docId, ["_RCnew", "_Ref200000001"]);
+      const second = await openPalette({ gateway, index, recents }, defaults);
+      if (second.kind !== "open" || !second.refreshed) throw new Error("expected a refresh");
+      expect(second.recents).toEqual(["_RCnew", "_Ref200000001"]);
+      expect(await store.loadRecents(docId)).toEqual(["_RCnew", "_Ref200000001"]);
+      await second.refreshed;
+      await second.pruned;
+      expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
+    });
+
+    it("keeps a recent recorded while the background refresh was reading (an insertion before it arrived)", async () => {
+      const gateway = new FakeGateway(fakeFixtures["spec-300"]());
+      let gate: Promise<void> | null = null;
+      const index = new HeadingIndex(async () => (await gate, gateway.readHeadings()));
+      const store = new FakeSettingsStore();
+      const recents = new RecentHeadings(store);
+      const first = await openPalette({ gateway, index, recents }, defaults);
+      if (first.kind !== "open") throw new Error(first.kind);
+      await first.pruned;
+      const target = first.headings.find((h) => h.bookmark === null)!;
+
+      let release!: () => void;
+      gate = new Promise((resolve) => (release = resolve));
+      const second = await openPalette({ gateway, index, recents }, defaults);
+      if (second.kind !== "open") throw new Error(second.kind);
+      // What InsertReference does after writing a new bookmark, while the read above is under way.
+      index.noteBookmark(target, "_RCnew");
+      await recents.record(docId, "_RCnew");
+      release();
+      await second.pruned;
+      expect(await store.loadRecents(docId)).toEqual(["_RCnew"]);
+      expect(index.byKey({ kind: "bookmark", name: "_RCnew" })?.order).toBe(target.order);
+    });
   });
 });

@@ -3,7 +3,8 @@
   import { hidesAboveBelow, offeredFormats, openingFormat, stepFormat } from "../../core/formats/cycle";
   import { previewReference } from "../../core/formats/preview";
   import { headingIdentity } from "../../core/headings/key";
-  import { rankHeadings } from "../../core/matching/fuzzy-matcher";
+  import { rankHeadings, type RankedHeading } from "../../core/matching/fuzzy-matcher";
+  import { recentHeadings } from "../../core/recents/recent-headings";
   import { confirmationFor } from "../../core/location/rules";
   import type { Confirmation } from "../../core/location/types";
   import { messageText, warningFor, type ConfirmationWarning, type MessageId } from "../../core/messages";
@@ -12,9 +13,10 @@
   import ResultRow from "./ResultRow.svelte";
   import type { PaletteProps, RowPreview } from "./types";
 
-  let { headings, format, formats, point, initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
+  let { headings, format, formats, point, recents = [], initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
 
   const LIST_ID = "radcut-palette-list";
+  const NO_MATCH = { score: 0, numberRanges: [], textRanges: [] } as const;
   const optionId = (index: number) => `radcut-option-${index}`;
   /** Rows per Page Up/Down when the list has no layout (e.g. before first paint). */
   const FALLBACK_PAGE = 10;
@@ -31,8 +33,11 @@
   const cycle = $derived(offeredFormats(all, point.location));
   /** If the cursor has moved where this format cannot be shown, the next one that can (FR-016a). */
   const current = $derived(cycle.find((f) => f.id === formatId) ?? openingFormat(all, point.location, formatId));
+  /** A listed heading and the group it is listed in; a recent heading is in both (FR-022). */
+  type Row = RankedHeading & { readonly group: "recent" | "all" };
+  const rowKey = (row: Row) => `${row.group}:${headingIdentity(row.heading)}`;
   /** Survives refreshes of `headings`; null = first row. */
-  let selectedIdentity = $state<string | null>(null);
+  let selectedKey = $state<string | null>(null);
   /** Asked for after the first Enter; the second Enter confirms exactly this (FR-008a, FR-008b). */
   let pending = $state<Confirmation | null>(null);
   const warning = $derived<ConfirmationWarning | null>(pending === null ? null : warningFor(pending));
@@ -41,10 +46,16 @@
   let popoverTop = $state(0);
   let busy = false;
 
-  const rows = $derived(rankHeadings(query, headings));
+  /** With an empty query only; typing ranks by match alone (US5 scenario 2). */
+  const recentRows = $derived<Row[]>(
+    query.trim() === ""
+      ? recentHeadings(recents, headings).map((heading) => ({ heading, match: NO_MATCH, group: "recent" }))
+      : [],
+  );
+  const rows = $derived<Row[]>([...recentRows, ...rankHeadings(query, headings).map((r): Row => ({ ...r, group: "all" }))]);
   const selectedIndex = $derived.by(() => {
-    if (selectedIdentity === null) return 0;
-    const found = rows.findIndex((r) => headingIdentity(r.heading) === selectedIdentity);
+    if (selectedKey === null) return 0;
+    const found = rows.findIndex((r) => rowKey(r) === selectedKey);
     return found >= 0 ? found : 0;
   });
   const selected = $derived(rows[selectedIndex]?.heading ?? null);
@@ -86,7 +97,7 @@
 
   function select(index: number): void {
     const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
-    if (row) selectedIdentity = headingIdentity(row.heading);
+    if (row) selectedKey = rowKey(row);
   }
 
   function pageSize(): number {
@@ -104,7 +115,7 @@
   // Input handlers never await anything (FR-026): every keystroke is applied before returning.
   function onInput(): void {
     query = input.value;
-    selectedIdentity = null;
+    selectedKey = null;
     dismiss();
   }
 
@@ -180,6 +191,16 @@
   }
 </script>
 
+{#snippet result(row: Row, index: number)}
+  <ResultRow
+    id={optionId(index)}
+    ranked={row}
+    selected={index === selectedIndex}
+    preview={index === selectedIndex ? preview : null}
+    onchoose={() => choose(index)}
+  />
+{/snippet}
+
 <div class="palette radcut-pane">
   <div class="search">
     <input
@@ -226,15 +247,29 @@
       aria-label="Headings"
       onscroll={() => warning && placePopover()}
     >
-      {#each rows as row, index (headingIdentity(row.heading) + "#" + row.heading.order)}
-        <ResultRow
-          id={optionId(index)}
-          ranked={row}
-          selected={index === selectedIndex}
-          preview={index === selectedIndex ? preview : null}
-          onchoose={() => choose(index)}
-        />
-      {/each}
+      {#if recentRows.length > 0}
+        <!-- Groups only with recents (contracts/palette-ui.md); option ids number the rows across both. -->
+        <li role="presentation">
+          <ul class="group" role="group" aria-label="Recent">
+            <li class="group-label" role="presentation" aria-hidden="true">Recent</li>
+            {#each recentRows as row, index (rowKey(row))}
+              {@render result(row, index)}
+            {/each}
+          </ul>
+        </li>
+        <li role="presentation">
+          <ul class="group" role="group" aria-label="All headings">
+            <li class="group-label" role="presentation" aria-hidden="true">All headings</li>
+            {#each rows.slice(recentRows.length) as row, i (rowKey(row) + "#" + row.heading.order)}
+              {@render result(row, recentRows.length + i)}
+            {/each}
+          </ul>
+        </li>
+      {:else}
+        {#each rows as row, index (rowKey(row) + "#" + row.heading.order)}
+          {@render result(row, index)}
+        {/each}
+      {/if}
     </ul>
     {#if warning}
       <!-- Visual only: the live region below speaks the same text, once. -->
@@ -332,5 +367,19 @@
     padding: 0;
     overflow-y: auto;
     list-style: none;
+  }
+
+  .group {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .group-label {
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+    color: var(--colorNeutralForeground3);
+    font-size: var(--fontSizeBase200);
+    font-weight: var(--fontWeightSemibold);
+    line-height: var(--lineHeightBase200);
   }
 </style>

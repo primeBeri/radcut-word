@@ -35,6 +35,7 @@
       draft.rememberLastFormat !== kept.rememberLastFormat ||
       draft.allowReferencesInHeadings !== kept.allowReferencesInHeadings ||
       draft.showHeadingsOutsideMainText !== kept.showHeadingsOutsideMainText ||
+      draft.showRecentHeadings !== kept.showRecentHeadings ||
       JSON.stringify(draft.templates) !== JSON.stringify(kept.templates),
   );
   const entries = $derived(formatList(draft));
@@ -167,7 +168,11 @@
       <ShortcutCapture {shortcut} onannounce={(text) => (status = text)} />
     </SettingsSection>
     <SettingsSection id="radcut-section-headings" title="Headings" bind:expanded={open.headings}>
-      <HeadingOptions bind:allowInHeadings={draft.allowReferencesInHeadings} bind:showOutsideMainText={draft.showHeadingsOutsideMainText} />
+      <HeadingOptions
+        bind:allowInHeadings={draft.allowReferencesInHeadings}
+        bind:showOutsideMainText={draft.showHeadingsOutsideMainText}
+        bind:showRecent={draft.showRecentHeadings}
+      />
     </SettingsSection>
   </div>
   <div class="status" role="status" aria-live="polite">{status}</div>

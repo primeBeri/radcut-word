@@ -384,3 +384,13 @@ cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, 
 ## Automated run after the owner's wording (feature 001, T158), 2026-10-18
 
 `npm run test:desktop -- --filter-trait "Category=Scenario"`, then `"Category=Contract"`, on the test VM (Word 2609), no person involved, after the settings texts and built-in format names were renamed (T157). Scenario: 20 passed, 1 skipped (10b, replaceShortcuts refused, research R4), including US1 scenario 25, which failed once in the T156 run. Contract: 76 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only). The visual check of the settings view (badge, tooltips with line breaks, narrow-pane rows) was done by the owner in Word.
+
+## Automated run for US5, recently used headings (feature 001, T095), 2026-10-19
+
+`npm run test:desktop -- --filter-trait "Category=Contract"`, then `"Category=Scenario"`, on the test VM (Word 2609), no person involved. Contract: 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only), including the new recents cases R1–R4 on `OfficeRuntime.storage`. Scenario: 20 passed, 1 skipped (10b, replaceShortcuts refused, research R4), 2 failed: both new US5 scenarios, on a harness mistake (each looked up a paragraph by its whole text after an insertion had changed it). With each insertion in a paragraph of its own, `--filter-class "*Us5Scenarios"` passed 2 of 2. The scenarios were written after the implementation, so they were not seen red against the code before it.
+
+| # | Result | Notes |
+|---|---|---|
+| 11 | Pass | Automated (`Scenario11`): both under Recent, most recent first; ↓ crosses into All headings; typing removes the groups |
+| 11b | Pass | Automated (`Scenario11b`): no groups while "Show recently used headings" is off and nothing recorded; back on, the earlier recent returns |
+| — | Human | Visual check in Word of the Recent and All headings labels and the new Headings checkbox with its tooltip |

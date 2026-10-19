@@ -21,9 +21,9 @@ public abstract class ScenarioTest : HarnessTest
 
     /// <summary>
     /// Word on a scratch copy of <paramref name="fixture"/> with the palette ready; skipped without an
-    /// interactive desktop. Every harness Word shares one WebView2 data folder, so settings saved in
-    /// one test would be there in the next: they are cleared unless <paramref name="keepSettings"/>
-    /// (Word restarted within a test, quickstart scenario 8).
+    /// interactive desktop. Every harness Word shares one WebView2 data folder, so settings and
+    /// recents saved in one test would be there in the next: they are cleared unless
+    /// <paramref name="keepSettings"/> (Word restarted within a test, quickstart scenario 8).
     /// </summary>
     protected async Task<(Palette Palette, object Document)> OpenAsync(string fixture, string name, bool keepSettings = false)
     {
@@ -33,12 +33,15 @@ public abstract class ScenarioTest : HarnessTest
         // The ribbon button opened the pane to start the session; hide it again, as a person
         // starts from the document.
         await Session.Pane.Page.EvaluateAsync("() => Office.addin.hide()");
-        if (!keepSettings) await Session.Pane.Page.EvaluateAsync($"() => OfficeRuntime.storage.removeItem('{SettingsKey}')");
+        if (!keepSettings) await Session.Pane.Page.EvaluateAsync($"() => OfficeRuntime.storage.removeItems(['{SettingsKey}', '{RecentsKey}'])");
         return (new Palette(Session), Session.Word!.Document);
     }
 
     /// <summary>Where the add-in keeps the user's settings (src/adapters/office/office-settings-store.ts).</summary>
     private const string SettingsKey = "radcut.settings";
+
+    /// <summary>Where it keeps every document's recently used headings (same file).</summary>
+    private const string RecentsKey = "radcut.recents";
 
     /// <summary>Closes Word (without saving) and the dev server, and unregisters the add-in.</summary>
     protected async Task CloseAsync()

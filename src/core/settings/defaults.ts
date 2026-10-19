@@ -10,4 +10,5 @@ export const DEFAULT_SETTINGS: UserSettings = {
   lastFormatId: null,
   allowReferencesInHeadings: false,
   showHeadingsOutsideMainText: true,
+  showRecentHeadings: true,
 };

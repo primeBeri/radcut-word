@@ -74,3 +74,5 @@ Behaviour:
 4. Recents for unsaved documents never reach the store; the core keeps them in memory.
 5. `loadSettings()` returns `null` when nothing is stored; `loadRecents()` returns `[]` for an
    unknown document; recents for different documents are independent.
+6. (Added 2026-10-18.) Recents of at most 50 documents are kept: saving recents for a 51st drops
+   the document whose recents were saved longest ago. Contract cases R1–R4.

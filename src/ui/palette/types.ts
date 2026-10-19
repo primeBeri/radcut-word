@@ -32,6 +32,11 @@ export interface PaletteProps {
    */
   formats?: readonly ReferenceFormat[];
   point: InsertionPoint;
+  /**
+   * The document's recent bookmarks, most recent first (FR-022): with an empty query those on a
+   * listed heading come first under "Recent". Empty while "Show recently used headings" is off.
+   */
+  recents?: readonly string[];
   /** The query to start with, e.g. when coming back from settings (FR-021b). */
   initialQuery?: string;
   /** Insert a reference to `heading` in `format`; `confirmed` names the warning the second Enter confirmed, if any. */

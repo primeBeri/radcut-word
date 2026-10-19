@@ -205,6 +205,21 @@ describe("app flow", () => {
       expect(screen.queryByRole("status")).toBeNull();
     });
 
+    it("a palette reopened while an insertion is still finishing stays open", async () => {
+      const { gateway, shell } = start();
+      const input = await open(shell);
+      const { held, release } = hold(gateway.returnFocus.bind(gateway));
+      gateway.returnFocus = held;
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      release();
+      await waitFor(() => expect(gateway.insertions()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(shell.visible).toBe(true);
+      expect(screen.getByRole("combobox")).toBeInTheDocument();
+    });
+
     it("a background refresh that arrives after Esc changes nothing on screen", async () => {
       const { gateway, shell } = start();
       const first = await open(shell);
@@ -445,6 +460,70 @@ describe("app flow", () => {
       await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
       await settingsView();
       expect(screen.getByRole("status")).toHaveTextContent(SETTINGS_TEXT.settingsReset);
+    });
+  });
+
+  describe("recents (US5, FR-022, FR-022a)", () => {
+    const DOC = "https://example.invalid/spec-300.docx";
+
+    /** Open, type `query`, Enter, and wait for the pane to close. */
+    async function insertTo(shell: FakeHostShell, query: string) {
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: query } });
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+    }
+
+    const recentNames = () =>
+      within(screen.getByRole("group", { name: "Recent" }))
+        .getAllByRole("option")
+        .map((o) => o.getAttribute("aria-label"));
+
+    it("after inserting to two headings, an empty query lists both under Recent, most recent first", async () => {
+      const { shell, settings } = start();
+      await insertTo(shell, "scope");
+      await insertTo(shell, "fstrat");
+      await open(shell);
+      await waitFor(() => expect(recentNames()).toEqual(["4.3 Fire strategy, level 2", "1.1 Scope, level 2"]));
+      expect(screen.getByRole("group", { name: "All headings" })).toBeInTheDocument();
+      expect(await settings.loadRecents(DOC)).toHaveLength(2);
+    });
+
+    it("keeps them across a restart of Word", async () => {
+      const { shell, settings } = start();
+      // Scope's bookmark is in the fixture, so the restarted (fresh) fake document has it too.
+      await insertTo(shell, "scope");
+      const again = restart(settings);
+      await open(again);
+      await waitFor(() => expect(recentNames()).toEqual(["1.1 Scope, level 2"]));
+    });
+
+    it("with Show recently used headings off, shows no Recent group and records nothing; back on, the earlier ones return", async () => {
+      const { shell, settings } = start();
+      await insertTo(shell, "scope");
+
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show recently used headings" }));
+      await saveAndClose(shell);
+
+      await open(shell);
+      // Let the background refresh settle: the groups must stay away.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.queryByRole("group")).toBeNull();
+      await fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await insertTo(shell, "fstrat");
+      expect(await settings.loadRecents(DOC)).toEqual(["_Ref200000001"]);
+
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show recently used headings" }));
+      await saveAndClose(shell);
+      await open(shell);
+      await waitFor(() => expect(recentNames()).toEqual(["1.1 Scope, level 2"]));
     });
   });
 

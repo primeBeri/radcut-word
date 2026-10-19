@@ -3,14 +3,17 @@ import { offeredFormats, openingFormat } from "../formats/cycle";
 import type { ReferenceFormat } from "../formats/types";
 import { filterHeadings } from "../headings/filter";
 import type { HeadingIndex } from "../headings/heading-index";
-import type { Heading } from "../headings/types";
+import type { Heading, HeadingSnapshot } from "../headings/types";
 import type { InsertionPoint, LocationPolicy } from "../location/types";
 import type { MessageId } from "../messages";
 import type { IDocumentGateway } from "../ports/document-gateway";
+import type { RecentHeadings } from "../recents/recent-headings";
 
 export interface OpenPaletteDeps {
   readonly gateway: IDocumentGateway;
   readonly index: HeadingIndex;
+  /** Left out while "Show recently used headings" is off (FR-022a): no recents are read. */
+  readonly recents?: RecentHeadings | null;
 }
 
 /** From user settings. */
@@ -34,8 +37,12 @@ export type OpenPaletteState =
       readonly format: ReferenceFormat;
       /** The Tab cycle at this cursor location (FR-015, FR-016a). */
       readonly formats: readonly ReferenceFormat[];
+      /** The document's recent bookmarks, most recent first (FR-022); the palette lists those on a heading. */
+      readonly recents: readonly string[];
       /** The fresh list when `headings` came from the cache, else null. */
       readonly refreshed: Promise<Heading[]> | null;
+      /** Settles once recents no longer on a heading are dropped from the store, after a fresh read. */
+      readonly pruned: Promise<void>;
     };
 
 /**
@@ -58,6 +65,19 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
   const headings = filter(snapshot.headings);
   if (headings.length === 0 && cached === null) return { kind: "message", message: "noHeadings" };
 
+  const { recents } = deps;
+  const recentBookmarks =
+    (await recents?.load(snapshot.documentId).catch((error: unknown) => {
+      console.error("[radcut:load-recents]", error);
+      return [];
+    })) ?? [];
+  // Only a fresh read can tell that a bookmark is gone: the cache may predate it (data-model
+  // RecentHeadings). Only the recents loaded here are judged; one recorded meanwhile is kept.
+  const prune = async (fresh: HeadingSnapshot): Promise<void> => {
+    await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[radcut:prune-recents]", error));
+  };
+  const refreshing = cached === null ? null : deps.index.refresh();
+
   const all = options.formats ?? DEFAULT_FORMATS;
   return {
     kind: "open",
@@ -65,6 +85,8 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
     headings,
     format: openingFormat(all, point.location, options.startFormatId),
     formats: offeredFormats(all, point.location),
-    refreshed: cached === null ? null : deps.index.refresh().then((fresh) => filter(fresh.headings)),
+    recents: recentBookmarks,
+    refreshed: refreshing?.then((fresh) => filter(fresh.headings)) ?? null,
+    pruned: refreshing ? refreshing.then(prune, () => undefined) : prune(snapshot),
   };
 }

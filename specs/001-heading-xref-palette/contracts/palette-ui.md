@@ -35,7 +35,10 @@ The cog button stays in the accessibility tree with its shortcut announced
   (`colorPalette<Name>Background2` / `Foreground2` / `BorderActive`), so they can be told apart
   at a glance; the text still names the location.
 - Recents group (empty query only): `role="group"` labelled "Recent", then a group labelled
-  "All headings" (FR-022).
+  "All headings" (FR-022). Refined 2026-10-18: up to 5 headings, most recent first, then every
+  heading in document order, so a recent one is listed in both groups; ↑/↓ and Page Up/Down move
+  across the groups as one list. Each group's label is shown above it. With no recents, or with
+  "Show recently used headings" off (FR-022a), the list has no groups. Typing removes them.
 - Highlighted characters use `<mark>` with bold weight and an underline as well as colour
   (FR-005a: not colour alone).
 - Preview line (refined 2026-10-17): the selected row grows a second line, under its text, with
@@ -127,7 +130,8 @@ The cog button stays in the accessibility tree with its shortcut announced
   combination Word refuses is named in the alert and recording goes on, and Ctrl or Alt released
   with no key reaching the pane says Word kept that combination, research R4);
   Headings (two checkboxes, each with a description linked by `aria-describedby`; from
-  2026-10-18 behind an info button):
+  2026-10-18 behind an info button; a third from 2026-10-18, "Show recently used headings" (on),
+  FR-022a):
   - "Allow references in headings" (off): "Not recommended. Headings feed the table of
     contents, the navigation pane and text references to that heading, so a reference inside a
     heading gets copied into them and can nest or loop. A heading can never refer to itself."

@@ -20,4 +20,6 @@ export interface UserSettings {
   readonly allowReferencesInHeadings: boolean;
   /** FR-003a; when false, headings outside the main text are left out of the list. */
   readonly showHeadingsOutsideMainText: boolean;
+  /** FR-022a; when false, the palette shows no recents and none are recorded. */
+  readonly showRecentHeadings: boolean;
 }

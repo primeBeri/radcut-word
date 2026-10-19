@@ -8,6 +8,7 @@ import type { MessageId } from "../core/messages";
 import type { IDocumentGateway } from "../core/ports/document-gateway";
 import type { IHostShell } from "../core/ports/host-shell";
 import type { ISettingsStore } from "../core/ports/settings-store";
+import { RecentHeadings } from "../core/recents/recent-headings";
 import { DEFAULT_SETTINGS } from "../core/settings/defaults";
 import type { KeyCombo } from "../core/settings/shortcut-rules";
 import { formatsFor } from "../core/settings/format-list";
@@ -64,6 +65,9 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
   const { gateway, shell } = ports;
   const store = ports.settings ?? null;
   const index = new HeadingIndex(() => gateway.readHeadings());
+  const allRecents = new RecentHeadings(store);
+  /** None while "Show recently used headings" is off: nothing is read or recorded (FR-022a). */
+  const recentsFor = (settings: UserSettings) => (settings.showRecentHeadings ? allRecents : null);
   let view: Record<string, unknown> | null = null;
   /** Set while the palette (not a message) is mounted, so a second shortcut press can reuse it. */
   let palette: { props: PaletteProps; focusSearch: () => void; settings: UserSettings } | null = null;
@@ -123,18 +127,20 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
       format: state.format,
       formats: formatsFor(settings),
       point: state.point,
+      recents: state.recents,
       initialQuery,
       cancel: () => void close(),
       openSettings: (query: string) => void showSettings({ from: "palette", query }),
       insert: async (heading: Heading, format: ReferenceFormat, confirmed: Confirmation | null): Promise<PaletteFeedback> => {
         const outcome = await insertReference(
-          { gateway, index, shell },
+          { gateway, index, shell, recents: recentsFor(settings) },
           { target: heading, parts: format.parts, policy, confirmed },
         );
         switch (outcome.kind) {
           case "inserted":
-            // The use case has hidden the pane and put the caret after the reference.
-            reset();
+            // The use case has hidden the pane and put the caret after the reference. Once hidden, the
+            // user may already be opening the palette again: only clear the pane if nothing has since.
+            if (mine === generation) reset();
             if (store) rememberFormat(store, settings, format.id).catch((error: unknown) => report("remember-format", error));
             return { kind: "closed" };
           case "needsConfirmation":
@@ -174,10 +180,11 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
     const mine = generation;
     await shell.showPane();
     open.focusSearch();
-    const state = await openPalette({ gateway, index }, optionsFor(open.settings));
+    const state = await openPalette({ gateway, index, recents: recentsFor(open.settings) }, optionsFor(open.settings));
     // A now-disallowed cursor is reported at Enter, where it is checked again anyway.
     if (mine !== generation || state.kind !== "open") return;
     open.props.point = state.point;
+    open.props.recents = state.recents;
     open.props.headings = state.headings;
     const fresh = await state.refreshed;
     if (fresh && mine === generation) open.props.headings = fresh;
@@ -197,7 +204,7 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
       await shell.showPane();
       applyTheme(shell.theme());
       const { settings } = await loadSettings();
-      const state = await openPalette({ gateway, index }, optionsFor(settings));
+      const state = await openPalette({ gateway, index, recents: recentsFor(settings) }, optionsFor(settings));
       if (mine !== generation) return;
       if (state.kind === "message") showMessage(state.message);
       else showPalette(state, mine, settings, initialQuery);

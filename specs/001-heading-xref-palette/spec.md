@@ -229,6 +229,9 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 2. **Given** the user types a query, **Then** ranking is by match quality only and recents get no
    boost.
 3. **Given** a recently used heading has since been deleted, **Then** it no longer appears.
+4. **Given** the user has turned off "Show recently used headings" in settings, **When** they open
+   the palette with an empty query, **Then** only the full list in document order is shown, and
+   insertions made while it is off are not remembered as recent. (Added 2026-10-18.)
 
 ---
 
@@ -459,7 +462,7 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   or the system MUST be refused with an explanation.
 - **FR-021**: Settings (the format list with its templates, "Remember last used format" and
   the last used format, shortcut, "Allow cross references in headings",
-  "Show headings outside of the main text") MUST persist per user across
+  "Show headings outside of the main text", "Show recently used headings") MUST persist per user across
   documents and Word restarts, and MUST NOT be stored in the documents themselves.
 - **FR-021a**: Settings MUST be edited in a dedicated settings view in the add-in pane, separate
   from the palette. The settings view MUST be reachable from the ribbon and from a cog icon in a
@@ -479,7 +482,12 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 
 - **FR-022**: With an empty query, the palette COULD list up to 5 headings most recently
   referenced in the current document first, most recent first; recents MUST NOT affect ranking
-  once a query is typed.
+  once a query is typed. The full list in document order MUST follow the recents, complete, so a
+  recent heading is listed twice. (Refined 2026-10-18.)
+- **FR-022a**: A per-user setting "Show recently used headings", on by default, MUST turn the
+  recents off: while it is off the palette MUST NOT show them and insertions MUST NOT be recorded
+  as recent. Recents recorded before it was turned off MUST be kept and shown again once it is
+  turned back on. (Added 2026-10-18.)
 
 **Privacy and feedback**
 
@@ -513,7 +521,8 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   template — combining literal text with number, text, page and above/below parts.
 - **User Settings**: per-user preferences — the format list (built-in formats and templates, in
   cycle order), remember the last used format, shortcut, allow references in headings, show
-  headings outside the main text — edited in the settings view; also the last used format.
+  headings outside the main text, show recently used headings — edited in the settings view;
+  also the last used format.
 - **Recent Headings**: per-document list of the headings most recently referenced, in recency
   order.
 

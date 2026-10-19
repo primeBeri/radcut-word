@@ -204,6 +204,42 @@ public sealed class Palette(PaneSession session) : IDisposable
     /// <summary>The texts of the listed rows.</summary>
     public Task<IReadOnlyList<string>> RowsAsync() => Pane.Page.Locator("[role=option]").AllInnerTextsAsync();
 
+    /// <summary>
+    /// The accessible names ("4.3 Fire strategy, level 2") of the rows in the list's group
+    /// <paramref name="name"/> ("Recent" or "All headings", FR-022); empty when the list has no such group.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GroupRowsAsync(string name)
+    {
+        var rows = Pane.Page.GetByRole(AriaRole.Group, new() { Name = name, Exact = true }).Locator("[role=option]");
+        var names = new List<string>();
+        foreach (var row in await rows.AllAsync()) names.Add(await row.GetAttributeAsync("aria-label") ?? "");
+        return names;
+    }
+
+    /// <summary>Waits for the "Recent" group to list exactly <paramref name="expected"/>, in order.</summary>
+    public async Task WaitForRecentAsync(params string[] expected)
+    {
+        IReadOnlyList<string> seen = [];
+        await Wait.UntilAsync(
+            async () => (seen = await GroupRowsAsync("Recent")).SequenceEqual(expected),
+            Wait.Pane,
+            $"the Recent group to be [{string.Join(", ", expected)}] (now: [{string.Join(", ", seen)}])");
+    }
+
+    /// <summary>The highlighted row's group ("" when the list has none) and accessible name.</summary>
+    public async Task<(string Group, string Name)> SelectedInGroupAsync()
+    {
+        var found = await Pane.Page.EvaluateAsync<string[]>(
+            @"() => {
+                const row = document.querySelector('[role=option][aria-selected=true]');
+                return [row?.closest('[role=group]')?.getAttribute('aria-label') ?? '', row?.getAttribute('aria-label') ?? ''];
+            }");
+        return (found[0], found[1]);
+    }
+
+    /// <summary>Whether the list is grouped (Recent, All headings) at all.</summary>
+    public async Task<bool> HasGroupsAsync() => await Pane.Page.Locator("[role=listbox] [role=group]").CountAsync() > 0;
+
     /// <summary>The badge's location ("tableCell", "footnote", …) on the row for <paramref name="heading"/>, or null.</summary>
     public async Task<string?> BadgeOfAsync(string heading)
     {
@@ -362,7 +398,11 @@ public sealed class Palette(PaneSession session) : IDisposable
     }
 
     /// <summary>Changes settings with the mouse (clicks through the page), saves, and waits for "Settings saved.".</summary>
-    public async Task SaveSettingsAsync(bool? allowInHeadings = null, bool? showOutsideMainText = null, bool? rememberLastFormat = null)
+    public async Task SaveSettingsAsync(
+        bool? allowInHeadings = null,
+        bool? showOutsideMainText = null,
+        bool? rememberLastFormat = null,
+        bool? showRecentHeadings = null)
     {
         var view = Pane.Page.Locator(SettingsView);
         if (rememberLastFormat is { } remember)
@@ -370,7 +410,7 @@ public sealed class Palette(PaneSession session) : IDisposable
             await ExpandSettingsSectionAsync("Cross Reference Formats");
             await view.GetByRole(AriaRole.Checkbox, new() { Name = "Remember last used format", Exact = true }).SetCheckedAsync(remember);
         }
-        if (allowInHeadings is not null || showOutsideMainText is not null) await ExpandSettingsSectionAsync("Headings");
+        if (allowInHeadings is not null || showOutsideMainText is not null || showRecentHeadings is not null) await ExpandSettingsSectionAsync("Headings");
         if (allowInHeadings is { } allow)
         {
             await view.GetByRole(AriaRole.Checkbox, new() { Name = "Allow cross references in headings", Exact = true }).SetCheckedAsync(allow);
@@ -378,6 +418,10 @@ public sealed class Palette(PaneSession session) : IDisposable
         if (showOutsideMainText is { } show)
         {
             await view.GetByRole(AriaRole.Checkbox, new() { Name = "Show headings outside of the main text", Exact = true }).SetCheckedAsync(show);
+        }
+        if (showRecentHeadings is { } recent)
+        {
+            await view.GetByRole(AriaRole.Checkbox, new() { Name = "Show recently used headings", Exact = true }).SetCheckedAsync(recent);
         }
         await view.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await WaitForMessageAsync("Settings saved.");

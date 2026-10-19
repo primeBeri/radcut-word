@@ -4,6 +4,8 @@ export const SETTINGS_TEXT = {
     "Not recommended (Disabled as default). Headings feed the 'table of contents', the 'navigation pane' and 'text references' to that heading, so the inserted cross reference would also be added to these elements which is generally not a desired behaviour.\n\nInserting a cross reference inside a heading also risks creating broken circular references",
   showHeadingsOutsideMainText:
     "When enabled (Enabled as default), headings outside of the main text will also be listed as potential cross references.\n\nThis includes headings located in 'tables', 'text boxes', 'footnotes', 'endnotes', 'headers' and 'footers'. A badge will be shown next to these headings in the palette indicating their location.",
+  showRecentHeadings:
+    "When enabled (Enabled as default), the palette lists the headings you referenced most recently in this document, up to 5, at the top under 'Recent' while the search box is empty.\n\nWhen disabled, they are not shown and new cross references are not remembered; the ones remembered before are kept for when you enable it again.",
   saved: "Settings saved.",
   saveFailed: "The settings couldn't be saved. Try again.",
   settingsReset: "Your saved settings couldn't be read, and have been restored to default values. Save to keep the new settings.",

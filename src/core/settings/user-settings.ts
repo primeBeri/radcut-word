@@ -33,11 +33,15 @@ function usableTemplates(templates: readonly TemplateDefinition[]): TemplateDefi
   return kept;
 }
 
-/** What every version stores alike, read and checked; null if any of it is invalid. */
+/**
+ * What every version stores alike, read and checked; null if any of it is invalid.
+ * `showRecentHeadings` came later without a version bump (FR-022a), so missing means its default.
+ */
 function readShared(raw: Record<string, unknown>) {
-  const { templates, allowReferencesInHeadings, showHeadingsOutsideMainText } = raw;
+  const { templates, allowReferencesInHeadings, showHeadingsOutsideMainText, showRecentHeadings = DEFAULT_SETTINGS.showRecentHeadings } = raw;
   if (!Array.isArray(templates) || templates.length > MAX_TEMPLATES) return null;
   if (typeof allowReferencesInHeadings !== "boolean" || typeof showHeadingsOutsideMainText !== "boolean") return null;
+  if (typeof showRecentHeadings !== "boolean") return null;
   const read = templates.map(readTemplate);
   if (read.some((t) => t === null)) return null;
   const valid = usableTemplates(read as TemplateDefinition[]);
@@ -45,6 +49,7 @@ function readShared(raw: Record<string, unknown>) {
     templates: valid,
     allowReferencesInHeadings,
     showHeadingsOutsideMainText,
+    showRecentHeadings,
     notice: valid.length < templates.length ? ("templateDropped" as const) : null,
   };
 }
@@ -76,6 +81,7 @@ function readVersion2(raw: Record<string, unknown>): LoadedSettings | null {
     lastFormatId: lastFormatId !== null && order.includes(lastFormatId) ? lastFormatId : null,
     allowReferencesInHeadings: shared.allowReferencesInHeadings,
     showHeadingsOutsideMainText: shared.showHeadingsOutsideMainText,
+    showRecentHeadings: shared.showRecentHeadings,
   };
   return { settings, notice: shared.notice };
 }
@@ -101,6 +107,7 @@ function migrateVersion1(raw: Record<string, unknown>): LoadedSettings | null {
     lastFormatId: null,
     allowReferencesInHeadings: shared.allowReferencesInHeadings,
     showHeadingsOutsideMainText: shared.showHeadingsOutsideMainText,
+    showRecentHeadings: shared.showRecentHeadings,
   };
   return { settings, notice: shared.notice };
 }
