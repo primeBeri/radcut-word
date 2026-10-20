@@ -394,3 +394,7 @@ cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, 
 | 11 | Pass | Automated (`Scenario11`): both under Recent, most recent first; ↓ crosses into All headings; typing removes the groups |
 | 11b | Pass | Automated (`Scenario11b`): no groups while "Show recently used headings" is off and nothing recorded; back on, the earlier recent returns |
 | — | Human | Visual check in Word of the Recent and All headings labels and the new Headings checkbox with its tooltip |
+
+## Automated rerun after the US5 review fixes (feature 001), 2026-10-19
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"` on the test VM (Word 2609), no person involved, after commit 7970600 (prune race, stored recents held to the limits, recents writes one at a time). Scenario: 21 passed, 2 failed, including both US5 scenarios 11 and 11b. The two failures, US1 scenario 2 and US4 scenario 10b, each timed out after 60 s waiting for the RAD·CUT ribbon group, before the palette was reached (the add-in not loading on this Word, as in the T156 run). Run on their own, `--filter-method "*Scenario02_*"` passed 1 of 1 and `"*Scenario10_*"` gave 1 passed, 1 skipped (10b, replaceShortcuts refused, research R4).
