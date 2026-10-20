@@ -51,6 +51,18 @@ function optionsFor(settings: UserSettings): OpenPaletteOptions {
   };
 }
 
+/**
+ * How long after the palette is on screen the background heading refresh starts. Word runs the
+ * read on the thread that gives the pane keyboard focus, so starting it at once delayed the
+ * palette being ready (T098, docs/performance.md).
+ */
+export const REFRESH_DELAY_MS = 1000;
+
+export interface AppOptions {
+  /** Calls `go` when the background refresh may start: by default `REFRESH_DELAY_MS` later. The app-flow tests choose when. */
+  readonly delayRefresh?: (go: () => void) => void;
+}
+
 /** Where the settings view was opened from, so leaving it goes back there (FR-021b). */
 type SettingsOrigin = { readonly from: "document" } | { readonly from: "palette"; readonly query: string };
 
@@ -61,8 +73,9 @@ type SettingsOrigin = { readonly from: "document" } | { readonly from: "palette"
  * palette is still on screen refocuses it instead, keeping its state. Settings are read from the
  * store on every open, so a change made in one document applies in the others (FR-021).
  */
-export function createApp(ports: AppPorts, target: HTMLElement): App {
+export function createApp(ports: AppPorts, target: HTMLElement, options: AppOptions = {}): App {
   const { gateway, shell } = ports;
+  const delayRefresh = options.delayRefresh ?? ((go: () => void) => void setTimeout(go, REFRESH_DELAY_MS));
   const store = ports.settings ?? null;
   const index = new HeadingIndex(() => gateway.readHeadings());
   const allRecents = new RecentHeadings(store);
@@ -73,6 +86,19 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
   let palette: { props: PaletteProps; focusSearch: () => void; settings: UserSettings } | null = null;
   /** Bumped on every open and close, so a slow open that was overtaken does nothing. */
   let generation = 0;
+
+  /**
+   * The background refresh's go-ahead for open `mine`: a delay after `start()`, and only if that
+   * open is still the current one. Once the palette has closed (Esc, insertion, another open),
+   * Word is left alone: a palette that stays open for the delay refreshes instead.
+   */
+  function refreshWhenSettled(mine: number): { readonly settled: () => Promise<boolean>; start(): void } {
+    let start!: () => void;
+    const settled = new Promise<boolean>((resolve) => {
+      start = () => delayRefresh(() => resolve(mine === generation));
+    });
+    return { settled: () => settled, start };
+  }
 
   function clear(): void {
     if (view) void unmount(view);
@@ -164,9 +190,9 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
     view = mounted;
     palette = { props, focusSearch: () => mounted.focusSearch(), settings };
     // A failed background refresh keeps the cached list on screen.
-    state.refreshed?.then(
+    state.refreshed.then(
       (fresh) => {
-        if (mine === generation) props.headings = fresh;
+        if (fresh && mine === generation) props.headings = fresh;
       },
       (error: unknown) => report("refresh", error),
     );
@@ -180,7 +206,12 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
     const mine = generation;
     await shell.showPane();
     open.focusSearch();
-    const state = await openPalette({ gateway, index, recents: recentsFor(open.settings) }, optionsFor(open.settings));
+    const later = refreshWhenSettled(mine);
+    later.start();
+    const state = await openPalette(
+      { gateway, index, recents: recentsFor(open.settings), mayRefresh: later.settled },
+      optionsFor(open.settings),
+    );
     // A now-disallowed cursor is reported at Enter, where it is checked again anyway.
     if (mine !== generation || state.kind !== "open") return;
     open.props.point = state.point;
@@ -200,17 +231,21 @@ export function createApp(ports: AppPorts, target: HTMLElement): App {
       return refocus(palette).catch((error: unknown) => report("refocus", error));
     }
     const mine = ++generation;
+    // The refresh waits until the palette is on screen (or this open has gone no further).
+    const later = refreshWhenSettled(mine);
     try {
       await shell.showPane();
       applyTheme(shell.theme());
       const { settings } = await loadSettings();
-      const state = await openPalette({ gateway, index, recents: recentsFor(settings) }, optionsFor(settings));
+      const state = await openPalette({ gateway, index, recents: recentsFor(settings), mayRefresh: later.settled }, optionsFor(settings));
       if (mine !== generation) return;
       if (state.kind === "message") showMessage(state.message);
       else showPalette(state, mine, settings, initialQuery);
     } catch (error) {
       report("open", error);
       if (mine === generation) showMessage("hostError");
+    } finally {
+      later.start();
     }
   }
 

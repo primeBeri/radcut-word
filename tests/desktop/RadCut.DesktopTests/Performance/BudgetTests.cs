@@ -41,9 +41,11 @@ public sealed class BudgetTests : ScenarioTest
             if (run > 0) times.Add(elapsed); // the first open warms the cache (research R12)
             Palette.Press(VirtualKeyShort.ESCAPE);
             await palette.WaitForDocumentFocusAsync("after Esc");
+            if (run == 0) await pane.EvaluateAsync("() => window.__radcutPerf?.clear()");
         }
 
         Report("Shortcut to palette ready, spec-300", times);
+        await ReportPerfRunnerAsync(pane, "spec-300 opens");
         Assert.True(Median(times) < 500, $"Median {Median(times):0} ms over {Runs} opens (budget 500 ms).");
     }
 
@@ -72,7 +74,35 @@ public sealed class BudgetTests : ScenarioTest
             "the list to update after the keystrokes");
 
         Report("Keystroke to list updated, guide-500", times);
+        await ReportPerfRunnerAsync(Session.Pane.Page, "guide-500 open and typing");
         Assert.True(Median(times) < 50, $"Median {Median(times):0} ms per keystroke (budget 50 ms).");
+    }
+
+    /// <summary>
+    /// The in-page breakdown from feature 001's performance runner (T096, <c>src/dev/perf-pane.ts</c>):
+    /// handler to ready, each port call before ready, and main-thread tasks over 50 ms. Reported, not
+    /// asserted: the budgets above are what a person meets, so a failure here is noted rather than
+    /// taking the place of the budget's result.
+    /// </summary>
+    private static async Task ReportPerfRunnerAsync(Microsoft.Playwright.IPage page, string what)
+    {
+        try
+        {
+            var json = await page.EvaluateAsync<string?>("() => window.__radcutPerf ? JSON.stringify(window.__radcutPerf.results()) : null");
+            if (json is null)
+            {
+                RunSummary.Note($"Performance runner ({what}): not loaded");
+                return;
+            }
+            // Every open's timeline in full, for working out where the time goes (T098).
+            File.WriteAllText(Path.Combine(HarnessPaths.TestResults, $"perf-{what.Replace(' ', '-')}.json"), json);
+            using var results = System.Text.Json.JsonDocument.Parse(json);
+            RunSummary.Note($"Performance runner ({what}): {results.RootElement.GetProperty("summary").GetRawText()}");
+        }
+        catch (Exception error)
+        {
+            RunSummary.Note($"Performance runner ({what}): could not be read: {error.GetType().Name}: {error.Message}");
+        }
     }
 
     private static double Median(IReadOnlyList<double> times)

@@ -49,10 +49,12 @@ Open a fixture document. The ribbon shows the RAD·CUT group with "Cross-referen
 npm run start:dev-pane                 # dev build including the test pane (never shipped)
 ```
 
-In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run "Contract suite" then
-"Performance". Expected: every contract test in
-[contracts/document-gateway.md](contracts/document-gateway.md) passes; palette ready < 500 ms on
-`spec-300.docx`; filter < 50 ms per keystroke; no task over 100 ms on `guide-500.docx`.
+In Word, open the "RAD·CUT Dev" pane, choose a fixture, and run the contract suite. Expected:
+every contract test in [contracts/document-gateway.md](contracts/document-gateway.md) passes. The
+desktop harness runs the same suites unattended (`npm run test:desktop -- --filter-trait
+"Category=Contract"`), and times the palette with the performance runner the dev server loads
+(`--filter-trait "Category=Performance"`, docs/performance.md). Expected: palette ready < 500 ms
+on `spec-300.docx`; filter < 50 ms per keystroke and no task over 100 ms on `guide-500.docx`.
 
 ## Manual acceptance scenarios
 

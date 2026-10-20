@@ -1,7 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
-import { createApp, type App } from "../../src/app/create-app";
+import { createApp, type App, type AppOptions } from "../../src/app/create-app";
 import { messageText } from "../../src/core/messages";
+import { paletteReady } from "../../src/dev/perf-pane";
 import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
@@ -17,14 +18,38 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-function start() {
+/** The app on the fakes; the background refresh starts at once unless `delayRefresh` holds it. */
+function start(delayRefresh: AppOptions["delayRefresh"] = (go) => void setTimeout(go, 0)) {
   const gateway = new FakeGateway(fakeFixtures["spec-300"]());
   const shell = new FakeHostShell();
   const settings = new FakeSettingsStore();
   const target = document.createElement("div");
   document.body.append(target);
-  app = createApp({ gateway, shell, settings }, target);
-  return { gateway, shell, settings };
+  app = createApp({ gateway, shell, settings }, target, { delayRefresh });
+  return { gateway, shell, settings, target };
+}
+
+/** Background refreshes held until `elapse()`, as if the delay had passed for every open so far. */
+function heldRefreshes() {
+  const waiting: (() => void)[] = [];
+  return {
+    delay: (go: () => void) => void waiting.push(go),
+    elapse: async () => {
+      for (const go of waiting.splice(0)) go();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
+/** Counts the gateway's full heading reads from now on. */
+function countReads(gateway: FakeGateway): () => number {
+  let reads = 0;
+  const read = gateway.readHeadings.bind(gateway);
+  gateway.readHeadings = () => {
+    reads++;
+    return read();
+  };
+  return () => reads;
 }
 
 /** The settings view's format list; waits for the view to mount. */
@@ -56,6 +81,17 @@ const formatLabel = () => screen.getByTestId("format-preview").querySelector(".l
 async function open(shell: FakeHostShell) {
   shell.pressShortcut();
   return waitFor(() => screen.getByRole("combobox"));
+}
+
+/** Opens the palette and closes it with Esc, so the heading list is cached. */
+async function openAndEscape(shell: FakeHostShell) {
+  await fireEvent.keyDown(await open(shell), { key: "Escape" });
+  await waitFor(() => expect(shell.visible).toBe(false));
+}
+
+/** The first row's accessible name, once the list shows `name` first. */
+async function firstRowBecomes(name: string) {
+  await waitFor(() => expect(within(screen.getByRole("listbox")).getAllByRole("option")[0]).toHaveAccessibleName(name));
 }
 
 describe("app flow", () => {
@@ -165,17 +201,12 @@ describe("app flow", () => {
   it("a heading edited after opening: says so, shows the fresh list after one read, and inserts on the next try", async () => {
     const { gateway, shell } = start();
     const input = await open(shell);
-    let reads = 0;
-    const readHeadings = gateway.readHeadings.bind(gateway);
-    gateway.readHeadings = () => {
-      reads++;
-      return readHeadings();
-    };
+    const reads = countReads(gateway);
     gateway.setParagraphText("Fire strategy", "Fire safety strategy");
     await fireEvent.input(input, { target: { value: "fstrat" } });
     await fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(messageText("staleTarget")));
-    expect(reads).toBe(1);
+    expect(reads()).toBe(1);
     expect(within(screen.getByRole("listbox")).getAllByRole("option")[0]).toHaveAccessibleName(
       "4.3 Fire safety strategy, level 2",
     );
@@ -221,19 +252,108 @@ describe("app flow", () => {
     });
 
     it("a background refresh that arrives after Esc changes nothing on screen", async () => {
-      const { gateway, shell } = start();
-      const first = await open(shell);
-      await fireEvent.keyDown(first, { key: "Escape" });
-      await waitFor(() => expect(shell.visible).toBe(false));
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
       const { held, release } = hold(gateway.readHeadings.bind(gateway));
-      gateway.readHeadings = held;
+      let started = false;
+      gateway.readHeadings = () => ((started = true), held());
       const input = await open(shell);
+      await refreshes.elapse();
+      expect(started).toBe(true); // under way when Esc comes
       await fireEvent.keyDown(input, { key: "Escape" });
       await waitFor(() => expect(shell.visible).toBe(false));
       release();
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(screen.queryByRole("combobox")).toBeNull();
     });
+  });
+
+  describe("the background refresh (T098: a read begun at once held up Word's focus change)", () => {
+    it("starts only once the palette has been on screen for the delay, and shows the fresh list", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      gateway.setParagraphText("Fire strategy", "Fire safety strategy");
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fire safety" } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(reads()).toBe(0);
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      await firstRowBecomes("4.3 Fire safety strategy, level 2");
+    });
+
+    it("is skipped when the palette closes with Esc first", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await openAndEscape(shell);
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+
+    it("is skipped when an insertion closes the palette first", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await fireEvent.keyDown(await open(shell), { key: "Enter" });
+      await waitFor(() => expect(gateway.insertions()).toHaveLength(1));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+
+    it("closed and reopened within the delay: only the open still on screen refreshes, once", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await openAndEscape(shell);
+      gateway.setParagraphText("Fire strategy", "Fire safety strategy");
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fire safety" } });
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      await firstRowBecomes("4.3 Fire safety strategy, level 2");
+      expect(screen.getByRole("combobox")).toBe(input);
+    });
+
+    it("a second shortcut press within the delay shares one read with the open's own refresh", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      const input = await open(shell);
+      shell.pressShortcut();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      expect(screen.getByRole("combobox")).toBe(input);
+    });
+
+    it("a second shortcut press and then Esc within the delay: neither refreshes", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      const input = await open(shell);
+      shell.pressShortcut();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+  });
+
+  it("the palette's search box and rows are what the performance runner waits for (T096)", async () => {
+    const { shell, target } = start();
+    await open(shell);
+    expect(paletteReady(target)).toBe(true);
   });
 
   describe("when Word fails", () => {

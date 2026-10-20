@@ -1,14 +1,73 @@
-# Manual acceptance checklist
+# Acceptance checklist
 
-Per-release checks on Word for Windows desktop. The full list from quickstart scenarios 1–27 is
-added by T101; items below were added by earlier tasks.
+Per-release checks on Word for Windows desktop, from quickstart scenarios 1–27
+(`specs/001-heading-xref-palette/quickstart.md`). Copy the two parts below into a new dated
+section for each release and fill them in; the run log after them records earlier runs.
 
-## Co-authoring (spike 3, research R9)
+## Per-release checklist
 
-- [ ] With the document open by two users on SharePoint or OneDrive, user A inserts a reference
-      while user B edits elsewhere. After both save and sync: the reference shows the right
-      number and text, F9 updates it, Ctrl+click jumps, and user B sees the same. Record the
-      outcome in `docs/known-behaviours.md`.
+### Part 1: automated (desktop harness)
+
+Save and close Word, leave the keyboard and mouse alone, then:
+
+```powershell
+npm test; npm run lint; npm run typecheck; npm run build; npm run bench
+npm run test:desktop        # every category: Contract, Document, Scenario, Performance, M0, Harness
+```
+
+Paste `tests/desktop/test-results/summary.md` and `acceptance-summary.md` into the release's
+section. Every scenario below must pass; a skip needs its reason written next to it.
+
+| # | Scenario | Harness test |
+|---|---|---|
+| 1 | fuzzy query, Enter inserts, caret after | `Us1Scenarios.Scenario01_…` |
+| 2 | Esc changes nothing | `Us1Scenarios.Scenario02_…` |
+| 3 | moved heading: F9 renumbers, Ctrl+click jumps | `DocumentVerificationTests.Scenario03_…` |
+| 4 | second reference reuses the bookmark | `DocumentVerificationTests.Scenario04_…` |
+| 5 | one Ctrl+Z per insertion, with and without tracking | `Us1Scenarios.Scenario05_…` |
+| 6 | references work without the add-in | `DocumentVerificationTests.Scenario06_…` |
+| 7 | every format cycles, inserts as previewed, survives F9 | `Us2Scenarios.Scenario07_…`, `FootnoteCycle_…` |
+| 8, 8b | format order and "Remember the last used format", across a restart | `Us2Scenarios.Scenario08_…`, `Scenario08b_…` |
+| 9 | custom format joins the cycle; `{num}` rejected | `Us3Scenarios.Scenario09_…` |
+| 10 | ribbon opens the same palette; Ctrl+@ refused; UK layout types nothing; recorded shortcut works | `Us4Scenarios.Scenario10_…` (both; 10b skips while Word refuses every change, research R4) |
+| 11, 11b | recently used headings, and the setting that hides them | `Us5Scenarios.Scenario11_…`, `Scenario11b_…` |
+| 12 | declined places say why; header, footer and text box insert | `Us1Scenarios.Scenario12_…` |
+| 13 | caption, quote, table cell, footnote | `Us1Scenarios.Scenario13_…` |
+| 14 | tracked insertion: accept and reject | `DocumentVerificationTests.Scenario14_…` |
+| 16 | Ctrl+, opens settings, Esc returns | `Us2Scenarios.Scenario16_…` |
+| 18 | no network requests leave localhost after load | `Us1Scenarios.Scenario18_…` |
+| 19 | table of contents bookmark not reused | `DocumentVerificationTests.Scenario19_…` |
+| 20 | reference takes the surrounding formatting | `DocumentVerificationTests.Scenario20_…` |
+| 21 | Enter inserts where the cursor is then | `Us1Scenarios.Scenario21_…` |
+| 22 | tracked-deleted heading; leftover bookmark reused | `Us1Scenarios.Scenario22_…` |
+| 23 | selections: words, two paragraphs, table | `Us1Scenarios.Scenario23_…` |
+| 24 | references in headings allowed and declined | `Us2Scenarios.Scenario24_…` |
+| 25 | other stories: badges, references resolve and jump; hide setting | `Us1Scenarios.Scenario25_…`, `Us2Scenarios.Scenario25_…` |
+| 26 | output matches Word's own Cross-reference dialog | `DocumentVerificationTests.Scenario26_…` |
+| 27 | inside an existing reference: confirm, replace, one Ctrl+Z | `Us1Scenarios.Scenario27_…` |
+| — | palette ready < 500 ms on spec-300; keystroke < 50 ms on guide-500 (docs/performance.md) | `BudgetTests` (Performance) |
+| — | `FuzzyMatcher` < 5 ms per query over 500 headings | `npm run bench` |
+| — | release bundle under 150 KB gzip, no dev page or harness hook in `dist/` | `npm run build` |
+
+### Part 2: human (layer 7 only)
+
+- [ ] **Scenario 17, co-authoring.** With the document open by two users on SharePoint or
+      OneDrive, user A inserts a reference while user B edits elsewhere. After both save and
+      sync: the reference shows the right number and text, F9 updates it, Ctrl+click jumps, and
+      user B sees the same. Record the outcome in `docs/known-behaviours.md`.
+- [ ] **Scenario 10 on a physical UK keyboard.** Ctrl+Shift+Y and a changed shortcut open the
+      palette; AltGr combinations type their characters and do not open it.
+- [ ] **Scenario 15, visual pass over the themes.** Office Colorful, Dark Grey, Black and White
+      with Windows light and dark mode: the palette, its preview line, the story badges, the
+      Recent group and the settings view are legible and follow the theme; with Windows
+      "Animation effects" off, nothing moves.
+- [ ] **Narrator pass.** Palette: the search box, each option with its preview line, the groups,
+      Tab's format announcement and every warning are read. Settings: each section, the format
+      list's rows and buttons, the info buttons' descriptions and the shortcut recorder.
+- [ ] **Speed by hand (SC-001).** Ten practised runs from the shortcut to the inserted
+      reference; median under 3 s.
+
+# Run log
 
 ## US1 run (T055), 2026-10-11
 
@@ -398,3 +457,37 @@ cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, 
 ## Automated rerun after the US5 review fixes (feature 001), 2026-10-19
 
 `npm run test:desktop -- --filter-trait "Category=Scenario"` on the test VM (Word 2609), no person involved, after commit 7970600 (prune race, stored recents held to the limits, recents writes one at a time). Scenario: 21 passed, 2 failed, including both US5 scenarios 11 and 11b. The two failures, US1 scenario 2 and US4 scenario 10b, each timed out after 60 s waiting for the RAD·CUT ribbon group, before the palette was reached (the add-in not loading on this Word, as in the T156 run). Run on their own, `--filter-method "*Scenario02_*"` passed 1 of 1 and `"*Scenario10_*"` gave 1 passed, 1 skipped (10b, replaceShortcuts refused, research R4).
+
+## Polish run on the test VM (feature 001, Phase 8: T096–T098, T102), 2026-10-20
+
+Release build (T102): `npm run build` passes; the task pane bundle is 41,247 of 153,600 bytes
+gzip; `dist/` holds no `src/dev/**` or spike page, and the release check now also refuses the
+performance runner's `__radcutPerf` hook. Quickstart 18 (no request leaves localhost after load) is
+harness `Scenario18`, which passed in the full run below.
+
+Full harness run after the first optimisation (refresh deferred by 1 s): 144 passed, 1 failed, 12
+skipped (the 5 below and the explicit diagnostics, which run only on request) in 23 min 5 s. Contract 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only);
+Document 7; M0 5; Scenario 22 passed, 1 skipped (10b: Word refuses every shortcut change in the
+harness, research R4). The failure was the spec-300 timing test: the deferred read began after
+Esc and was still running 12.7 s later. Fixed (the refresh is skipped once the palette has
+closed, app-flow test seen red first), then:
+
+- Performance, two full runs: spec-300 ready median 836 and 818 ms (in-page 595 ms; Word slow
+  after `showAsTaskpane` in full runs, docs/performance.md); guide-500 keystroke median 16 to 25 ms over the runs (longest task 97 to
+  118 ms: the 100 ms budget is not met on the VM).
+- spec-300 timing alone, two runs: median **447 and 475 ms** (budget 500 ms).
+- Scenario and Document: 28 passed, 1 skipped (10b), 1 failed: scenario 11b timed out waiting for
+  the RAD·CUT ribbon group before its first step (the T156 flake), then passed 2 of 2 alone.
+- `npm test` 652 passed, 4 skipped; lint and typecheck clean; `npm run bench` within budget.
+
+The budget is to be confirmed on the owner's desktop in the release run (T103).
+
+After the Phase 8 review fixes (refresh go-ahead injectable for tests, `mayRefresh`, the performance
+runner's ready check tied to its open and failed calls counted apart), same day:
+
+- Performance category: spec-300 ready median 796 ms (in-page 586 ms, `checkInsertionPoint` 484 ms:
+  Word slow after `showAsTaskpane`, as in the earlier full runs); guide-500 keystroke median 26 ms,
+  longest task 118 ms (over the 100 ms budget on the VM, docs/performance.md).
+- spec-300 timing alone: median **416 ms** (in-page 180 ms); passed.
+- `npm test` 661 passed, 4 skipped; lint, typecheck, release build (41,263 bytes gzip) and the
+  harness build clean.

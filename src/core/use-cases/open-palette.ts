@@ -14,6 +14,13 @@ export interface OpenPaletteDeps {
   readonly index: HeadingIndex;
   /** Left out while "Show recently used headings" is off (FR-022a): no recents are read. */
   readonly recents?: RecentHeadings | null;
+  /**
+   * Asked only when the list came from the cache: settles true when the background refresh may
+   * start, or false to skip it (the palette has gone by then). Word runs Office.js reads on the
+   * thread that moves focus into the pane, so a full read begun at once holds up the palette
+   * (T098). Default: at once.
+   */
+  readonly mayRefresh?: () => Promise<boolean>;
 }
 
 /** From user settings. */
@@ -39,8 +46,8 @@ export type OpenPaletteState =
       readonly formats: readonly ReferenceFormat[];
       /** The document's recent bookmarks, most recent first (FR-022); the palette lists those on a heading. */
       readonly recents: readonly string[];
-      /** The fresh list when `headings` came from the cache, else null. */
-      readonly refreshed: Promise<Heading[]> | null;
+      /** The fresh list, when `headings` came from the cache and the refresh was allowed; else null. */
+      readonly refreshed: Promise<Heading[] | null>;
       /** Settles once recents no longer on a heading are dropped from the store, after a fresh read. */
       readonly pruned: Promise<void>;
     };
@@ -73,10 +80,12 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
     })) ?? [];
   // Only a fresh read can tell that a bookmark is gone: the cache may predate it (data-model
   // RecentHeadings). Only the recents loaded here are judged; one recorded meanwhile is kept.
-  const prune = async (fresh: HeadingSnapshot): Promise<void> => {
-    await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[radcut:prune-recents]", error));
+  // A skipped refresh (null) prunes nothing.
+  const prune = async (fresh: HeadingSnapshot | null): Promise<void> => {
+    if (fresh) await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[radcut:prune-recents]", error));
   };
-  const refreshing = cached === null ? null : deps.index.refresh();
+  const mayRefresh = deps.mayRefresh ?? (async () => true);
+  const refreshing = cached === null ? null : mayRefresh().then((go) => (go ? deps.index.refresh() : null));
 
   const all = options.formats ?? DEFAULT_FORMATS;
   return {
@@ -86,7 +95,7 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
     format: openingFormat(all, point.location, options.startFormatId),
     formats: offeredFormats(all, point.location),
     recents: recentBookmarks,
-    refreshed: refreshing?.then((fresh) => filter(fresh.headings)) ?? null,
+    refreshed: refreshing ? refreshing.then((fresh) => fresh && filter(fresh.headings)) : Promise.resolve(null),
     pruned: refreshing ? refreshing.then(prune, () => undefined) : prune(snapshot),
   };
 }

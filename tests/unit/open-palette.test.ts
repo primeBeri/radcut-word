@@ -18,6 +18,26 @@ function setup(gateway = new FakeGateway(fakeFixtures["spec-300"]())) {
   return { gateway, index: new HeadingIndex(() => gateway.readHeadings()) };
 }
 
+/** An index over `gateway` that counts its reads, with the cache already filled. */
+async function countedIndex(gateway: FakeGateway) {
+  let reads = 0;
+  const index = new HeadingIndex(() => {
+    reads++;
+    return gateway.readHeadings();
+  });
+  await index.get();
+  return { index, reads: () => reads };
+}
+
+/** A go-ahead the test settles. */
+function goAhead() {
+  let settle!: (go: boolean) => void;
+  const settled = new Promise<boolean>((resolve) => (settle = resolve));
+  return { mayRefresh: () => settled, settle };
+}
+
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("OpenPalette", () => {
   it("returns a message and loads no headings when the location is declined", async () => {
     const { gateway, index } = setup();
@@ -89,15 +109,42 @@ describe("OpenPalette", () => {
   it("shows the cached index at once, then refreshes it", async () => {
     const { gateway, index } = setup();
     const first = await openPalette({ gateway, index }, defaults);
-    expect(first.kind === "open" && first.refreshed).toBeNull();
+    if (first.kind !== "open") throw new Error(first.kind);
+    expect(await first.refreshed).toBeNull();
 
     gateway.setParagraphText("Fire strategy", "Fire safety strategy");
     const second = await openPalette({ gateway, index }, defaults);
-    if (second.kind !== "open" || !second.refreshed) throw new Error("expected open with a refresh");
+    if (second.kind !== "open") throw new Error(second.kind);
     expect(second.headings.some((h) => h.text === "Fire strategy")).toBe(true);
-    const fresh = await second.refreshed;
+    const fresh = (await second.refreshed) ?? [];
     expect(fresh.some((h) => h.text === "Fire safety strategy")).toBe(true);
     expect(fresh.some((h) => h.text === "Fire strategy")).toBe(false);
+  });
+
+  it("starts the background refresh only once allowed (T098: the read would hold up Word)", async () => {
+    const gateway = new FakeGateway(fakeFixtures["spec-300"]());
+    const { index, reads } = await countedIndex(gateway);
+    const { mayRefresh, settle } = goAhead();
+
+    const state = await openPalette({ gateway, index, mayRefresh }, defaults);
+    if (state.kind !== "open") throw new Error(state.kind);
+    await nextTask();
+    expect(reads()).toBe(1);
+
+    settle(true);
+    expect(await state.refreshed).not.toBeNull();
+    expect(reads()).toBe(2);
+  });
+
+  it("skips the background refresh when it is not allowed (the palette has gone, T098)", async () => {
+    const gateway = new FakeGateway(fakeFixtures["spec-300"]());
+    const { index, reads } = await countedIndex(gateway);
+
+    const state = await openPalette({ gateway, index, mayRefresh: async () => false }, defaults);
+    if (state.kind !== "open") throw new Error(state.kind);
+    expect(await state.refreshed).toBeNull();
+    await state.pruned;
+    expect(reads()).toBe(1);
   });
 
   describe("recents (US5)", () => {
@@ -138,11 +185,33 @@ describe("OpenPalette", () => {
       // From the cache: a bookmark it does not know is kept until the refresh shows it gone.
       await store.saveRecents(docId, ["_RCnew", "_Ref200000001"]);
       const second = await openPalette({ gateway, index, recents }, defaults);
-      if (second.kind !== "open" || !second.refreshed) throw new Error("expected a refresh");
+      if (second.kind !== "open") throw new Error(second.kind);
       expect(second.recents).toEqual(["_RCnew", "_Ref200000001"]);
       expect(await store.loadRecents(docId)).toEqual(["_RCnew", "_Ref200000001"]);
       await second.refreshed;
       await second.pruned;
+      expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
+    });
+
+    it("prunes once the refresh is allowed, and not at all when it is skipped (T098)", async () => {
+      const gateway = new FakeGateway(fakeFixtures["spec-300"]());
+      const { index } = await countedIndex(gateway);
+      const store = new FakeSettingsStore();
+      const recents = new RecentHeadings(store);
+
+      await store.saveRecents(docId, ["_RCgone", "_Ref200000001"]);
+      const skipped = await openPalette({ gateway, index, recents, mayRefresh: async () => false }, defaults);
+      if (skipped.kind !== "open") throw new Error(skipped.kind);
+      await skipped.pruned;
+      expect(await store.loadRecents(docId)).toEqual(["_RCgone", "_Ref200000001"]);
+
+      const { mayRefresh, settle } = goAhead();
+      const allowed = await openPalette({ gateway, index, recents, mayRefresh }, defaults);
+      if (allowed.kind !== "open") throw new Error(allowed.kind);
+      await nextTask();
+      expect(await store.loadRecents(docId)).toEqual(["_RCgone", "_Ref200000001"]);
+      settle(true);
+      await allowed.pruned;
       expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
     });
 
