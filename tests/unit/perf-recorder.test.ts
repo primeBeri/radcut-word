@@ -122,6 +122,26 @@ describe("PerfRecorder", () => {
     expect(recorder.results().opens.map((o) => o.ready)).toEqual([null, 50]);
   });
 
+  it("places opens and marks on the page clock, to line them up with long tasks outside an open", () => {
+    const c = clock();
+    const recorder = new PerfRecorder(c.now);
+    c.advance(1000);
+    recorder.beginOpen();
+    c.advance(200);
+    recorder.markReady(recorder.waitingOpen()!);
+    c.advance(300);
+    recorder.mark("keydown n");
+    recorder.longTask(c.now(), 150, "cross-origin-descendant iframe");
+
+    const { opens, marks, otherLongTasks } = recorder.results();
+    expect(opens[0]?.at).toBe(1000);
+    expect(marks).toEqual([{ name: "keydown n", at: 1500 }]);
+    expect(otherLongTasks).toEqual([{ start: 1500, duration: 150, source: "cross-origin-descendant iframe" }]);
+
+    recorder.clear();
+    expect(recorder.results().marks).toEqual([]);
+  });
+
   it("says when long tasks could not be observed, so none is not read as none over 50 ms", () => {
     const recorder = new PerfRecorder(() => 0);
     recorder.longTasksUnavailable();

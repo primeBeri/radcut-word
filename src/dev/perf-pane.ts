@@ -37,11 +37,18 @@ export function installPerfRecorder(ports: AppPorts, target: HTMLElement): AppPo
   };
   new MutationObserver(check).observe(target, { childList: true, subtree: true });
   document.addEventListener("focusin", check);
+  // Keystrokes on the page clock, so a long task after ready can be told from typing (T103).
+  document.addEventListener("keydown", (event) => recorder.mark(`keydown ${event.key}`), true);
 
   if (!PerformanceObserver.supportedEntryTypes.includes("longtask")) recorder.longTasksUnavailable();
   try {
     new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) recorder.longTask(entry.startTime, entry.duration);
+      for (const entry of list.getEntries()) {
+        // `PerformanceLongTaskTiming` is not in TypeScript's DOM library: this page, or another frame in its process.
+        const blamed = (entry as { attribution?: readonly { name: string; containerType: string; containerSrc: string }[] }).attribution?.[0];
+        const source = blamed ? `${blamed.name} ${blamed.containerType} ${blamed.containerSrc}`.trim() : undefined;
+        recorder.longTask(entry.startTime, entry.duration, source);
+      }
     }).observe({ type: "longtask", buffered: true });
   } catch (error) {
     recorder.longTasksUnavailable();

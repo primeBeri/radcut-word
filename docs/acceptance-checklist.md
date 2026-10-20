@@ -491,3 +491,40 @@ runner's ready check tied to its open and failed calls counted apart), same day:
 - spec-300 timing alone: median **416 ms** (in-page 180 ms); passed.
 - `npm test` 661 passed, 4 skipped; lint, typecheck, release build (41,263 bytes gzip) and the
   harness build clean.
+
+## Release run on the desktop (feature 001, T103, automated part), 2026-10-20
+
+On the owner's desktop (AMD Ryzen 7 9800X3D, Word 2609, build 16.0.20430.20146), commit ea20f0f
+plus the performance runner's page-clock marks and long-task attribution (dev only), no person
+involved. The trusted catalogue `\\localhost\radcut-catalog` was set up on this machine first;
+Ctrl+Shift+Y worked in every harness Word.
+
+- `npm test` 661 passed, 4 skipped (662 with the runner's new test); lint and typecheck clean;
+  `npm run bench` within budget (0.19 to 0.23 ms per 20-character query); release build 41,263
+  bytes gzip, unchanged, with no dev page.
+- Performance at 5120×1440 and 1920×1080: spec-300 ready median **141 to 166 ms** over 7 runs
+  (budget 500 ms), alone and in category and full runs; guide-500 keystroke median 12 to 22 ms
+  over 8;
+  longest task 143 to 181 ms, over the 100 ms budget, but placed after ready, at the second
+  keystroke, with the pane handling keystrokes throughout and the browser blaming `unknown`
+  rather than the page (docs/performance.md). The first mount of 500 rows is 51 ms. The owner
+  accepted the long task for this release: only just perceptible, not worth the effort now.
+- Two Performance runs straight after changing the display resolution failed with the pane stuck
+  at 120×11 pixels; after a restart the same runs passed. Not counted below.
+- Full harness run at 1920×1080: 142 passed, 3 failed, 12 skipped (the 5 below and the explicit
+  diagnostics) in 16 min 9 s. Contract 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node
+  only); Document 6 passed, 1 failed; M0 5; Performance 2; Scenario 20 passed, 2 failed, 1
+  skipped (10b: Word refuses every shortcut change in the harness, research R4).
+- The three failures, then each rerun alone (`--filter-method` for the three, one run):
+
+| # | Full run | Alone | Notes |
+|---|---|---|---|
+| 20 | Fail | Pass | Timed out after 10.4 s waiting for the add-in to finish its Office calls, with the reference already inserted and formatted |
+| 23 | Fail | **Fail** | Timed out after 10 s waiting for Esc to dismiss the multi-paragraph warning: the warning was shown, Esc was pressed, the warning stayed |
+| 27 | Fail | **Fail** | The same, on the "cursor is inside a field" warning |
+
+Scenarios 23 and 27 fail every time on this desktop, and failed the same way in a harness run
+here on 2026-10-15; they pass on the test VM. Esc closes the palette normally in the other tests,
+and clearing a warning on Esc needs no Office call, so the keystroke seems not to reach the page
+while a warning is shown; not yet investigated. The automated part of T103 is therefore not
+green on the desktop, and Part 2 (the human checks) is still to do.

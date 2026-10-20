@@ -23,9 +23,13 @@ export interface PerfTask {
   /** Milliseconds from the open's start, or from page load when outside an open. */
   readonly start: number;
   readonly duration: number;
+  /** The frame the browser blames for it (`attribution`), when it says. */
+  readonly source?: string;
 }
 
 export interface PerfOpen {
+  /** Page time the open started, to line it up with `otherLongTasks` and `marks`. */
+  readonly at: number;
   /** Milliseconds from the shortcut's handler to ready, or null if it never became ready. */
   readonly ready: number | null;
   readonly calls: readonly PerfCall[];
@@ -45,10 +49,17 @@ export interface PerfSummary {
   readonly longTasksObserved: boolean;
 }
 
+/** Something that happened in the page (a keystroke), at page time. */
+export interface PerfMark {
+  readonly name: string;
+  readonly at: number;
+}
+
 export interface PerfResults {
   readonly opens: readonly PerfOpen[];
   /** Long tasks outside any open (typing, background refresh), from page load. */
   readonly otherLongTasks: readonly PerfTask[];
+  readonly marks: readonly PerfMark[];
   readonly summary: PerfSummary;
 }
 
@@ -70,6 +81,7 @@ export function median(values: readonly number[]): number | null {
 export class PerfRecorder {
   private readonly opens: OpenInProgress[] = [];
   private readonly otherTasks: PerfTask[] = [];
+  private readonly marks: PerfMark[] = [];
   private nextId = 0;
   private longTasksObserved = true;
 
@@ -92,18 +104,24 @@ export class PerfRecorder {
     return open !== null && open.ready === null ? open.id : null;
   }
 
+  /** Note `name` at the current page time, for placing long tasks outside an open. */
+  mark(name: string): void {
+    this.marks.push({ name, at: this.now() });
+  }
+
   /** The page cannot report long tasks, so `longestTask` means nothing. */
   longTasksUnavailable(): void {
     this.longTasksObserved = false;
   }
 
   /** A main-thread task over 50 ms that started at `start` (page time) and took `duration`. */
-  longTask(start: number, duration: number): void {
+  longTask(start: number, duration: number, source?: string): void {
     const open = this.current();
+    const blamed = source === undefined ? {} : { source };
     if (open && start >= open.start && (open.ready === null || start - open.start <= open.ready)) {
-      open.longTasks.push({ start: start - open.start, duration });
+      open.longTasks.push({ start: start - open.start, duration, ...blamed });
     } else {
-      this.otherTasks.push({ start, duration });
+      this.otherTasks.push({ start, duration, ...blamed });
     }
   }
 
@@ -131,7 +149,7 @@ export class PerfRecorder {
   }
 
   results(): PerfResults {
-    const opens: PerfOpen[] = this.opens.map((o) => ({ ready: o.ready, calls: [...o.calls], longTasks: [...o.longTasks] }));
+    const opens: PerfOpen[] = this.opens.map((o) => ({ at: o.start, ready: o.ready, calls: [...o.calls], longTasks: [...o.longTasks] }));
     const ready = opens.map((o) => o.ready).filter((r): r is number => r !== null);
     const byName = new Map<string, number[]>();
     let failedCalls = 0;
@@ -146,6 +164,7 @@ export class PerfRecorder {
     return {
       opens,
       otherLongTasks: [...this.otherTasks],
+      marks: [...this.marks],
       summary: {
         openCount: opens.length,
         readyMedian: median(ready),
@@ -162,6 +181,7 @@ export class PerfRecorder {
   clear(): void {
     this.opens.length = 0;
     this.otherTasks.length = 0;
+    this.marks.length = 0;
   }
 
   private current(): OpenInProgress | null {
