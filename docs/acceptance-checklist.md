@@ -528,3 +528,19 @@ here on 2026-10-15; they pass on the test VM. Esc closes the palette normally in
 and clearing a warning on Esc needs no Office call, so the keystroke seems not to reach the page
 while a warning is shown; not yet investigated. The automated part of T103 is therefore not
 green on the desktop, and Part 2 (the human checks) is still to do.
+
+**Follow-up, 2026-10-21: scenarios 23 and 27 explained and fixed.** Windows' "Show text
+suggestions when typing on the physical keyboard" is on on this desktop (not on the VM). A moment
+after a word is typed into a text box, Windows shows its suggestion pop-up, and the pop-up takes
+the next Esc: the page never sees it, focus does not move, and a second Esc works. Both scenarios
+type a heading's name and then read the document through COM before pressing Esc, long enough for
+the pop-up to appear; elsewhere Esc came within about 100 ms of the last key. The warning, the COM
+reads, the background refresh, Enter, the pointer and the Word selection were each ruled out with
+an explicit probe (`tests/desktop/RadCut.DesktopTests/Feasibility/EscAfterTypingProbe.cs`; typing
+"scope" then Esc 1.4 s after opening: lost every time in a text box, never in a search box or with
+the setting off). The palette's search box is now `type="search"`, which gets no pop-up, so people
+with the setting on no longer need two presses of Esc either. With that change: `npm test` 662
+passed, 4 skipped, lint and typecheck clean; scenarios 23 and 27 passed alone, and the Scenario
+category passed (22 passed, 10b skipped as before) in 8 min 58 s. The settings view's template
+fields are still text boxes and get the pop-up; no test failed on it. The rest of T103's automated
+part stands as above (scenario 20's single failure passed alone); Part 2 is still to do.

@@ -203,10 +203,12 @@
 
 <div class="palette radcut-pane">
   <div class="search">
+    <!-- type="search": with Windows' text suggestions for the physical keyboard on, a text box shows
+         Windows' suggestion pop-up, which takes the first Esc (T103); a search box gets none. -->
     <input
       bind:this={input}
       class="query"
-      type="text"
+      type="search"
       role="combobox"
       aria-label="Search headings"
       aria-expanded="true"
@@ -308,6 +310,12 @@
     background: var(--colorNeutralBackground1);
     color: var(--colorNeutralForeground1);
     font: inherit;
+    appearance: none;
+  }
+
+  /* Esc already belongs to the palette; no clear button of the browser's own. */
+  .query::-webkit-search-cancel-button {
+    appearance: none;
   }
 
   .query:focus {
