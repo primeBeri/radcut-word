@@ -544,3 +544,11 @@ passed, 4 skipped, lint and typecheck clean; scenarios 23 and 27 passed alone, a
 category passed (22 passed, 10b skipped as before) in 8 min 58 s. The settings view's template
 fields are still text boxes and get the pop-up; no test failed on it. The rest of T103's automated
 part stands as above (scenario 20's single failure passed alone); Part 2 is still to do.
+
+**Part 2, human checks, 2026-10-21.** The owner ran Part 2 on the desktop with commit 5453741:
+the physical UK keyboard (scenario 10), the visual pass over the themes (scenario 15), the
+Narrator pass and the speed by hand (SC-001). Everything behaved as expected and performed well;
+the runs were not timed, so no median is recorded for SC-001. Co-authoring (scenario 17) is
+deferred until after the MVP, when it can be tested properly; `docs/known-behaviours.md` still
+calls it untested. The owner chose to leave the settings
+view's template fields as text boxes (the suggestion pop-up there is a fringe case). T103 is done.
