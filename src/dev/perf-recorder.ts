@@ -2,7 +2,7 @@
  * Dev-only performance runner (feature 001 T096): times each palette open from the shortcut's
  * handler to the palette being ready (search box focused, rows on screen, painted), with every
  * port call in between, and collects main-thread tasks over 50 ms (`longtask`). Loaded by
- * `main.ts` in the Vite dev server only; the desktop harness reads `window.__radcutPerf` after its
+ * `main.ts` in the Vite dev server only; the desktop harness reads `window.__xrefPerf` after its
  * timing runs (tests/desktop/.../Performance/BudgetTests.cs). No Office or DOM use here: the
  * page-side wiring is `installPerfRecorder` in `perf-pane.ts`.
  */

@@ -3,8 +3,8 @@ import { parseFieldCode } from "../../src/core/references/field-code";
 
 describe("parseFieldCode", () => {
   it("reads the bookmark and switches, joining \\* with its argument", () => {
-    expect(parseFieldCode(" REF _RCabc1234567 \\w \\h \\* CHARFORMAT ")).toEqual({
-      bookmark: "_RCabc1234567",
+    expect(parseFieldCode(" REF _XRabc1234567 \\w \\h \\* CHARFORMAT ")).toEqual({
+      bookmark: "_XRabc1234567",
       switches: ["\\w", "\\h", "\\* CHARFORMAT"],
     });
   });

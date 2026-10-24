@@ -44,7 +44,7 @@
     onannounce: (text: string) => void;
   } = $props();
 
-  const ERROR_ID = "radcut-formats-error";
+  const ERROR_ID = "xref-formats-error";
   let list: HTMLOListElement;
   let addMenu = $state<AddFormatMenu>();
   let newButton: HTMLButtonElement;
@@ -227,14 +227,14 @@
     bind:this={newButton}
     type="button"
     class="text-button"
-    aria-describedby={addError ? "radcut-add-template-error" : undefined}
+    aria-describedby={addError ? "xref-add-template-error" : undefined}
     onclick={() => void addTemplate()}
   >
     {SETTINGS_TEXT.newTemplate}
   </button>
 </div>
 {#if addError}
-  <p id="radcut-add-template-error" class="error" role="alert">{addError}</p>
+  <p id="xref-add-template-error" class="error" role="alert">{addError}</p>
 {/if}
 
 <style>

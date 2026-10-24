@@ -45,7 +45,7 @@ export class OfficeHostShell implements IHostShell {
       .onVisibilityModeChanged((args) => {
         if (args.visibilityMode === Office.VisibilityMode.hidden) handler();
       })
-      .catch((error: unknown) => console.error("[radcut:visibility-handler]", error));
+      .catch((error: unknown) => console.error("[xref:visibility-handler]", error));
   }
 
   theme(): HostTheme {
@@ -71,7 +71,7 @@ export class OfficeHostShell implements IHostShell {
       } catch (error) {
         // Custom shortcuts need a signed-in Microsoft 365 account (research R4); Word reports
         // that as a failure, but so would anything else, so it is logged.
-        console.error("[radcut:can-customise]", error);
+        console.error("[xref:can-customise]", error);
         return false;
       }
     },

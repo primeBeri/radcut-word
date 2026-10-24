@@ -73,11 +73,11 @@
   <div class="add-format" onfocusout={onFocusOut}>
     <button
       bind:this={button}
-      id="radcut-add-format"
+      id="xref-add-format"
       type="button"
       aria-haspopup="menu"
       aria-expanded={expanded}
-      aria-controls="radcut-add-format-menu"
+      aria-controls="xref-add-format-menu"
       onclick={() => (expanded ? closeMenu(true) : void openMenu())}
       onkeydown={onButtonKeydown}
     >
@@ -88,7 +88,7 @@
     </button>
     {#if expanded}
       <!-- svelte-ignore a11y_interactive_supports_focus -->
-      <div bind:this={menu} id="radcut-add-format-menu" class="menu" role="menu" aria-labelledby="radcut-add-format" onkeydown={onMenuKeydown}>
+      <div bind:this={menu} id="xref-add-format-menu" class="menu" role="menu" aria-labelledby="xref-add-format" onkeydown={onMenuKeydown}>
         {#each formats as format (format.id)}
           <button type="button" role="menuitem" tabindex="-1" class="item" onclick={() => choose(format.id)}>
             <span>{format.label}</span>

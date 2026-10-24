@@ -18,13 +18,13 @@ const ALL = [...BUILT_IN_FORMATS, tplA, tplB];
 const ids = (formats: readonly ReferenceFormat[]) => formats.map((f) => f.id);
 
 const fireStrategy: Heading = {
-  key: { kind: "bookmark", name: "_RCaaaaaaaaaa" },
+  key: { kind: "bookmark", name: "_XRaaaaaaaaaa" },
   level: 2,
   text: "Fire strategy",
   number: "4.3",
   order: 17,
   location: "main",
-  bookmark: "_RCaaaaaaaaaa",
+  bookmark: "_XRaaaaaaaaaa",
 };
 
 const OUTSIDE: readonly InsertionLocation[] = ["footnote", "endnote", "header", "footer", "textBox"];

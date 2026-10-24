@@ -26,7 +26,7 @@ async function setup() {
   });
   const shell = new FakeHostShell();
   shell.visible = true;
-  // Deterministic names: 0.5 gives "_RCssssssssss".
+  // Deterministic names: 0.5 gives "_XRssssssssss".
   return { gateway, index, input, shell, deps: { gateway, index, shell, random: () => 0.5 } };
 }
 
@@ -43,10 +43,10 @@ describe("InsertReference", () => {
     const { gateway, deps, input } = await setup();
     const before = gateway.bookmarks();
     const result = await insertReference(deps, input("Fire strategy"));
-    expect(result).toMatchObject({ kind: "inserted", bookmark: "_RCssssssssss", bookmarkCreated: true });
+    expect(result).toMatchObject({ kind: "inserted", bookmark: "_XRssssssssss", bookmarkCreated: true });
     const after = gateway.bookmarks();
     expect(after).toHaveLength(before.length + 1);
-    expect(after.filter((b) => !before.some((o) => o.name === b.name)).map((b) => b.name)).toEqual(["_RCssssssssss"]);
+    expect(after.filter((b) => !before.some((o) => o.name === b.name)).map((b) => b.name)).toEqual(["_XRssssssssss"]);
     expect(after.find((b) => b.name === "_Toc100000002")).toEqual(before.find((b) => b.name === "_Toc100000002"));
   });
 
@@ -125,7 +125,7 @@ describe("InsertReference", () => {
       });
       gateway.listBookmarkNames = () => Promise.reject(new Error("Word is busy."));
       expect(await insertReference(deps, input("Fire strategy"))).toMatchObject({ detail: "Word is busy." });
-      expect(logged.mock.calls.map(([tag]) => tag)).toEqual(["[radcut:insert-host-error]", "[radcut:insert-host-error]"]);
+      expect(logged.mock.calls.map(([tag]) => tag)).toEqual(["[xref:insert-host-error]", "[xref:insert-host-error]"]);
     } finally {
       logged.mockRestore();
     }
@@ -277,7 +277,7 @@ describe("InsertReference", () => {
       const recents = new RecentHeadings(store);
       await insertReference({ ...deps, recents }, input("Scope"));
       await insertReference({ ...deps, recents }, input("Fire strategy"));
-      expect(await store.loadRecents(docId)).toEqual(["_RCssssssssss", "_Ref200000001"]);
+      expect(await store.loadRecents(docId)).toEqual(["_XRssssssssss", "_Ref200000001"]);
     });
 
     it("records nothing when nothing was inserted", async () => {
@@ -299,8 +299,8 @@ describe("InsertReference", () => {
       const { deps, index, input } = await setup();
       await insertReference(deps, input("Fire strategy"));
       const fire = index.cached()?.headings.find((h) => h.text === "Fire strategy");
-      expect(fire?.bookmark).toBe("_RCssssssssss");
-      expect(fire?.key).toEqual({ kind: "bookmark", name: "_RCssssssssss" });
+      expect(fire?.bookmark).toBe("_XRssssssssss");
+      expect(fire?.key).toEqual({ kind: "bookmark", name: "_XRssssssssss" });
     });
   });
 

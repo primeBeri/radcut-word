@@ -138,12 +138,12 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div bind:this={region} class="settings radcut-pane" role="region" aria-label="Settings" onkeydown={onKeydown}>
+<div bind:this={region} class="settings xref-pane" role="region" aria-label="Settings" onkeydown={onKeydown}>
   <h1 class="title">Settings</h1>
   <div class="body">
-    <SettingsSection bind:this={formatsSection} id="radcut-section-formats" title="Cross Reference Formats" bind:expanded={open.formats}>
+    <SettingsSection bind:this={formatsSection} id="xref-section-formats" title="Cross Reference Formats" bind:expanded={open.formats}>
       {#snippet info()}
-        <InfoTip id="radcut-formats-info" label="cross reference formats" text={SETTINGS_TEXT.formatsInfo} />
+        <InfoTip id="xref-formats-info" label="cross reference formats" text={SETTINGS_TEXT.formatsInfo} />
       {/snippet}
       <FormatList
         {entries}
@@ -159,15 +159,15 @@
         onannounce={(text) => (status = text)}
       />
       <div class="option">
-        <input id="radcut-remember-format" type="checkbox" bind:checked={draft.rememberLastFormat} aria-describedby="radcut-remember-format-text" />
-        <label for="radcut-remember-format">{SETTINGS_TEXT.rememberLastFormat}</label>
-        <InfoTip id="radcut-remember-format-text" label="remembering the last used format" text={SETTINGS_TEXT.rememberLastFormatInfo} />
+        <input id="xref-remember-format" type="checkbox" bind:checked={draft.rememberLastFormat} aria-describedby="xref-remember-format-text" />
+        <label for="xref-remember-format">{SETTINGS_TEXT.rememberLastFormat}</label>
+        <InfoTip id="xref-remember-format-text" label="remembering the last used format" text={SETTINGS_TEXT.rememberLastFormatInfo} />
       </div>
     </SettingsSection>
-    <SettingsSection id="radcut-section-shortcut" title="Shortcut" bind:expanded={open.shortcut}>
+    <SettingsSection id="xref-section-shortcut" title="Shortcut" bind:expanded={open.shortcut}>
       <ShortcutCapture {shortcut} onannounce={(text) => (status = text)} />
     </SettingsSection>
-    <SettingsSection id="radcut-section-headings" title="Headings" bind:expanded={open.headings}>
+    <SettingsSection id="xref-section-headings" title="Headings" bind:expanded={open.headings}>
       <HeadingOptions
         bind:allowInHeadings={draft.allowReferencesInHeadings}
         bind:showOutsideMainText={draft.showHeadingsOutsideMainText}
@@ -181,9 +181,9 @@
   {/if}
 
   {#if confirming}
-    <div class="prompt" role="alertdialog" aria-labelledby="radcut-unsaved-title" aria-describedby="radcut-unsaved-body">
-      <p id="radcut-unsaved-title" class="prompt-title">{SETTINGS_TEXT.unsavedTitle}</p>
-      <p id="radcut-unsaved-body">{SETTINGS_TEXT.unsavedBody}</p>
+    <div class="prompt" role="alertdialog" aria-labelledby="xref-unsaved-title" aria-describedby="xref-unsaved-body">
+      <p id="xref-unsaved-title" class="prompt-title">{SETTINGS_TEXT.unsavedTitle}</p>
+      <p id="xref-unsaved-body">{SETTINGS_TEXT.unsavedBody}</p>
       <div class="actions">
         <button bind:this={keepButton} type="button" class="primary" onclick={() => void keepEditing()}>Keep editing</button>
         <button type="button" onclick={close}>Discard changes</button>

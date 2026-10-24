@@ -47,12 +47,12 @@ export function requirementSupport(): Record<string, boolean> {
   );
 }
 
-/** A random hidden bookmark name in the planned scheme (`_RC` + 10 of [a-z0-9]). */
+/** A random hidden bookmark name in the planned scheme (`_XR` + 10 of [a-z0-9]). */
 export function spikeBookmarkName(): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
   let suffix = "";
   for (let i = 0; i < 10; i++) suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return `_RC${suffix}`;
+  return `_XR${suffix}`;
 }
 
 /** First heading paragraph in the main body whose trimmed text equals `text`. */

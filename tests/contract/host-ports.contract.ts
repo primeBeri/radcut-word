@@ -85,18 +85,18 @@ export function defineSettingsStoreContract(
 
     it("R1. saved recents load back as they were, most recent first", async () => {
       const { store } = await makeStore();
-      await store.saveRecents("https://example.invalid/a.docx", ["_RCb", "_Ref1"]);
-      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_RCb", "_Ref1"]);
-      await store.saveRecents("https://example.invalid/a.docx", ["_RCc"]);
-      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_RCc"]);
+      await store.saveRecents("https://example.invalid/a.docx", ["_XRb", "_Ref1"]);
+      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_XRb", "_Ref1"]);
+      await store.saveRecents("https://example.invalid/a.docx", ["_XRc"]);
+      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_XRc"]);
     });
 
     it("R2. recents of different documents are independent", async () => {
       const { store } = await makeStore();
-      await store.saveRecents("https://example.invalid/a.docx", ["_RCa"]);
-      await store.saveRecents("https://example.invalid/b.docx", ["_RCb"]);
-      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_RCa"]);
-      expect(await store.loadRecents("https://example.invalid/b.docx")).toEqual(["_RCb"]);
+      await store.saveRecents("https://example.invalid/a.docx", ["_XRa"]);
+      await store.saveRecents("https://example.invalid/b.docx", ["_XRb"]);
+      expect(await store.loadRecents("https://example.invalid/a.docx")).toEqual(["_XRa"]);
+      expect(await store.loadRecents("https://example.invalid/b.docx")).toEqual(["_XRb"]);
     });
 
     it("R3. an unknown document has no recents", async () => {
@@ -107,10 +107,10 @@ export function defineSettingsStoreContract(
     it(`R4. recents of a ${MAX_DOCUMENTS + 1}st document drop the one saved longest ago`, async () => {
       const { store } = await makeStore();
       const doc = (i: number) => `https://example.invalid/doc-${i}.docx`;
-      for (let i = 0; i <= MAX_DOCUMENTS; i++) await store.saveRecents(doc(i), [`_RC${i}`]);
+      for (let i = 0; i <= MAX_DOCUMENTS; i++) await store.saveRecents(doc(i), [`_XR${i}`]);
       expect(await store.loadRecents(doc(0))).toEqual([]);
-      expect(await store.loadRecents(doc(1))).toEqual(["_RC1"]);
-      expect(await store.loadRecents(doc(MAX_DOCUMENTS))).toEqual([`_RC${MAX_DOCUMENTS}`]);
+      expect(await store.loadRecents(doc(1))).toEqual(["_XR1"]);
+      expect(await store.loadRecents(doc(MAX_DOCUMENTS))).toEqual([`_XR${MAX_DOCUMENTS}`]);
     });
 
     (api.environment === "node" ? it : api.skip)("S5. saving settings leaves the document untouched (Node only)", async () => {

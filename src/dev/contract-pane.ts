@@ -115,7 +115,7 @@ const choice = await autorun(
       script.textContent = json;
       document.getElementById("contract-results")?.remove();
       document.body.append(script);
-      (window as { __radcutContractResults?: unknown }).__radcutContractResults = value;
+      (window as { __xrefContractResults?: unknown }).__xrefContractResults = value;
     },
   },
 );

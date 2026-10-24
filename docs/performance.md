@@ -8,10 +8,10 @@ Budgets (Constitution IV, feature 001): palette ready under 500 ms after the sho
 
 | What | Where | Command |
 |---|---|---|
-| Shortcut to palette ready, as a person meets it (real keystroke until the search box has Word's keyboard focus and rows are listed), median of 10 after a warm-up | `tests/desktop/RadCut.DesktopTests/Performance/BudgetTests.cs` | `npm run test:desktop -- --filter-trait "Category=Performance"` |
+| Shortcut to palette ready, as a person meets it (real keystroke until the search box has Word's keyboard focus and rows are listed), median of 10 after a warm-up | `tests/desktop/XRef.DesktopTests/Performance/BudgetTests.cs` | `npm run test:desktop -- --filter-trait "Category=Performance"` |
 | Keystroke to list updated on guide-500 (timed in the page) | same | same |
-| In-page breakdown: shortcut handler to ready, each port call before ready, main-thread tasks over 50 ms | the performance runner, `src/dev/perf-recorder.ts` and `src/dev/perf-pane.ts`, loaded by `main.ts` in the Vite dev server only and read by `BudgetTests` as `window.__radcutPerf`; each run's timeline is saved as `tests/desktop/test-results/perf-*.json`, with each open's start (`at`) and each keystroke (`marks`) on the page clock and the frame the browser blames for each long task (`source`), so a long task outside an open can be placed | same |
-| Where the cursor read's time goes, in variants | `tests/desktop/RadCut.DesktopTests/Performance/OpenCostDiagnostics.cs` (explicit) | `npm run test:desktop -- --filter-method "*Open_cost*" --explicit only` |
+| In-page breakdown: shortcut handler to ready, each port call before ready, main-thread tasks over 50 ms | the performance runner, `src/dev/perf-recorder.ts` and `src/dev/perf-pane.ts`, loaded by `main.ts` in the Vite dev server only and read by `BudgetTests` as `window.__xrefPerf`; each run's timeline is saved as `tests/desktop/test-results/perf-*.json`, with each open's start (`at`) and each keystroke (`marks`) on the page clock and the frame the browser blames for each long task (`source`), so a long task outside an open can be placed | same |
+| Where the cursor read's time goes, in variants | `tests/desktop/XRef.DesktopTests/Performance/OpenCostDiagnostics.cs` (explicit) | `npm run test:desktop -- --filter-method "*Open_cost*" --explicit only` |
 | `FuzzyMatcher` | `tests/bench/fuzzy-matcher.bench.ts` (asserts the 5 ms budget) | `npm run bench` |
 
 The harness's time includes what Office does before the add-in's handler runs (dispatching the

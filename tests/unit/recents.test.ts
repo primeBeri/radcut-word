@@ -17,15 +17,15 @@ function heading(order: number, text: string, bookmark: string | null = null): H
   return { ...base, key: headingKeyFor(base) };
 }
 
-const headings = [heading(0, "Scope", "_Ref1"), heading(1, "Fire strategy", "_RCa"), heading(2, "Concrete", "_RCb"), heading(3, "Untouched")];
+const headings = [heading(0, "Scope", "_Ref1"), heading(1, "Fire strategy", "_XRa"), heading(2, "Concrete", "_XRb"), heading(3, "Untouched")];
 
 describe("withRecent (data-model RecentHeadings)", () => {
   it("puts the bookmark first, most recent first", () => {
-    expect(withRecent(["_RCa", "_RCb"], "_RCc")).toEqual(["_RCc", "_RCa", "_RCb"]);
+    expect(withRecent(["_XRa", "_XRb"], "_XRc")).toEqual(["_XRc", "_XRa", "_XRb"]);
   });
 
   it("keeps each bookmark once, case-insensitively, moving a repeat to the front", () => {
-    expect(withRecent(["_RCa", "_RCb"], "_rcb")).toEqual(["_rcb", "_RCa"]);
+    expect(withRecent(["_XRa", "_XRb"], "_xrb")).toEqual(["_xrb", "_XRa"]);
   });
 
   it(`keeps at most ${MAX_RECENTS}`, () => {
@@ -36,11 +36,11 @@ describe("withRecent (data-model RecentHeadings)", () => {
 
 describe("recentHeadings", () => {
   it("gives the listed headings in recency order, matching bookmarks case-insensitively", () => {
-    expect(recentHeadings(["_RCB", "_Ref1"], headings).map((h) => h.text)).toEqual(["Concrete", "Scope"]);
+    expect(recentHeadings(["_XRB", "_Ref1"], headings).map((h) => h.text)).toEqual(["Concrete", "Scope"]);
   });
 
   it("drops bookmarks that no longer exist or no longer sit on a heading (US5 scenario 3)", () => {
-    expect(recentHeadings(["_RCgone", "_RCa"], headings).map((h) => h.text)).toEqual(["Fire strategy"]);
+    expect(recentHeadings(["_XRgone", "_XRa"], headings).map((h) => h.text)).toEqual(["Fire strategy"]);
   });
 });
 
@@ -84,10 +84,10 @@ describe("RecentHeadings", () => {
   it("records into the store for a saved document and loads them back", async () => {
     const store = new FakeSettingsStore();
     const recents = new RecentHeadings(store);
-    await recents.record("doc", "_RCa");
-    await recents.record("doc", "_RCb");
-    expect(await recents.load("doc")).toEqual(["_RCb", "_RCa"]);
-    expect(await store.loadRecents("doc")).toEqual(["_RCb", "_RCa"]);
+    await recents.record("doc", "_XRa");
+    await recents.record("doc", "_XRb");
+    expect(await recents.load("doc")).toEqual(["_XRb", "_XRa"]);
+    expect(await store.loadRecents("doc")).toEqual(["_XRb", "_XRa"]);
   });
 
   it("keeps an unsaved document's recents in memory only, never sending them to the store", async () => {
@@ -98,41 +98,41 @@ describe("RecentHeadings", () => {
       saveRecents: async (id: string, b: readonly string[]) => (calls++, store.saveRecents(id, b)),
     };
     const recents = new RecentHeadings(counting);
-    await recents.record(null, "_RCa");
-    expect(await recents.load(null)).toEqual(["_RCa"]);
+    await recents.record(null, "_XRa");
+    expect(await recents.load(null)).toEqual(["_XRa"]);
     expect(calls).toBe(0);
   });
 
   it("works in memory without a store", async () => {
     const recents = new RecentHeadings(null);
-    await recents.record("doc", "_RCa");
-    expect(await recents.load("doc")).toEqual(["_RCa"]);
+    await recents.record("doc", "_XRa");
+    expect(await recents.load("doc")).toEqual(["_XRa"]);
     expect(await recents.load("other")).toEqual([]);
   });
 
   it("prunes against a fresh heading list, writing only when something went", async () => {
     const store = new FakeSettingsStore();
-    await store.saveRecents("doc", ["_RCgone", "_RCa"]);
+    await store.saveRecents("doc", ["_XRgone", "_XRa"]);
     let saves = 0;
     const recents = new RecentHeadings({ loadRecents: (id) => store.loadRecents(id), saveRecents: async (id, b) => (saves++, store.saveRecents(id, b)) });
-    await recents.prune("doc", headings, ["_RCgone", "_RCa"]);
-    expect(await store.loadRecents("doc")).toEqual(["_RCa"]);
-    await recents.prune("doc", headings, ["_RCa"]);
+    await recents.prune("doc", headings, ["_XRgone", "_XRa"]);
+    expect(await store.loadRecents("doc")).toEqual(["_XRa"]);
+    await recents.prune("doc", headings, ["_XRa"]);
     expect(saves).toBe(1);
   });
 
   it("prunes only the bookmarks it was given to judge, keeping one recorded since the read began", async () => {
     const store = new FakeSettingsStore();
-    await store.saveRecents("doc", ["_RCgone"]);
+    await store.saveRecents("doc", ["_XRgone"]);
     const recents = new RecentHeadings(store);
-    await recents.record("doc", "_RCnew");
-    await recents.prune("doc", headings, ["_RCgone"]);
-    expect(await store.loadRecents("doc")).toEqual(["_RCnew"]);
+    await recents.record("doc", "_XRnew");
+    await recents.prune("doc", headings, ["_XRgone"]);
+    expect(await store.loadRecents("doc")).toEqual(["_XRnew"]);
   });
 
   it("runs a prune and a record one after the other, so neither overwrites the other", async () => {
     const store = new FakeSettingsStore();
-    await store.saveRecents("doc", ["_RCgone", "_RCa"]);
+    await store.saveRecents("doc", ["_XRgone", "_XRa"]);
     const slow = {
       // Read, then take a while to answer: an unqueued write would read the same list as the other.
       loadRecents: async (id: string) => {
@@ -143,7 +143,7 @@ describe("RecentHeadings", () => {
       saveRecents: (id: string, b: readonly string[]) => store.saveRecents(id, b),
     };
     const recents = new RecentHeadings(slow);
-    await Promise.all([recents.prune("doc", headings, ["_RCgone", "_RCa"]), recents.record("doc", "_RCb")]);
-    expect(await store.loadRecents("doc")).toEqual(["_RCb", "_RCa"]);
+    await Promise.all([recents.prune("doc", headings, ["_XRgone", "_XRa"]), recents.record("doc", "_XRb")]);
+    expect(await store.loadRecents("doc")).toEqual(["_XRb", "_XRa"]);
   });
 });

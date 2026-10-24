@@ -6,13 +6,13 @@ import { previewReference } from "../../src/core/formats/preview";
 import type { Heading } from "../../src/core/headings/types";
 
 const fireStrategy: Heading = {
-  key: { kind: "bookmark", name: "_RCaaaaaaaaaa" },
+  key: { kind: "bookmark", name: "_XRaaaaaaaaaa" },
   level: 2,
   text: "Fire strategy",
   number: "4.3",
   order: 17,
   location: "main",
-  bookmark: "_RCaaaaaaaaaa",
+  bookmark: "_XRaaaaaaaaaa",
 };
 
 describe("built-in formats", () => {

@@ -74,7 +74,7 @@ describe("manifest icons", () => {
 
   it("gives the ribbon group and every button an icon at each recommended size", () => {
     const icons = ribbonIcons();
-    expect([...icons.keys()].sort()).toEqual(["RadCut.CrossReference", "RadCut.Group", "RadCut.Settings"]);
+    expect([...icons.keys()].sort()).toEqual(["XRef.CrossReference", "XRef.Group", "XRef.Settings"]);
     for (const [owner, sizes] of icons) {
       expect([...sizes.keys()].sort((a, b) => a - b), `${owner} icon sizes`).toEqual(RIBBON_SIZES);
     }
@@ -88,8 +88,8 @@ describe("manifest icons", () => {
 
   it("uses a different picture for Settings than for Cross-reference", () => {
     const icons = ribbonIcons();
-    expect(imageUrl(icons.get("RadCut.Settings")!.get(32)!)).not.toBe(
-      imageUrl(icons.get("RadCut.CrossReference")!.get(32)!),
+    expect(imageUrl(icons.get("XRef.Settings")!.get(32)!)).not.toBe(
+      imageUrl(icons.get("XRef.CrossReference")!.get(32)!),
     );
   });
 });

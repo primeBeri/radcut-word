@@ -78,7 +78,7 @@
 </script>
 
 <div class="section">
-  <p class="current" id="radcut-shortcut-current">
+  <p class="current" id="xref-shortcut-current">
     {SETTINGS_TEXT.shortcutIntro}
     <span data-testid="current-shortcut">
       {#if status === null}
@@ -98,7 +98,7 @@
         type="button"
         class:recording
         aria-pressed={recording}
-        aria-describedby="radcut-shortcut-current{recording ? ' radcut-shortcut-hint' : ''}{error ? ' radcut-shortcut-error' : ''}"
+        aria-describedby="xref-shortcut-current{recording ? ' xref-shortcut-hint' : ''}{error ? ' xref-shortcut-error' : ''}"
         onclick={startRecording}
         onkeydown={onKeydown}
         onkeyup={onKeyup}
@@ -109,10 +109,10 @@
       <button type="button" onclick={() => void apply(null)}>Reset to default</button>
     </div>
     {#if recording}
-      <p id="radcut-shortcut-hint" class="hint">{SETTINGS_TEXT.recordingHint}</p>
+      <p id="xref-shortcut-hint" class="hint">{SETTINGS_TEXT.recordingHint}</p>
     {/if}
     {#if error}
-      <p id="radcut-shortcut-error" class="error" role="alert">{error}</p>
+      <p id="xref-shortcut-error" class="error" role="alert">{error}</p>
     {/if}
   {/if}
 </div>

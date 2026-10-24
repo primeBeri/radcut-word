@@ -9,7 +9,7 @@ describe("Word-managed bookmarks", () => {
     (name) => expect(isWordManaged(name)).toBe(true),
   );
 
-  it.each(["_Ref242545576", "_RCabc", "Toc1", "_GoBackup", "Alpha", "x_Toc"])("%s is not Word-managed", (name) =>
+  it.each(["_Ref242545576", "_XRabc", "Toc1", "_GoBackup", "Alpha", "x_Toc"])("%s is not Word-managed", (name) =>
     expect(isWordManaged(name)).toBe(false),
   );
 

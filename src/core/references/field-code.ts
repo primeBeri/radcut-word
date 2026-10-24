@@ -6,7 +6,7 @@ export interface ParsedFieldCode {
 }
 
 /**
- * Parse " REF _RC… \w \h \* CHARFORMAT ". Word's field code text can carry control characters
+ * Parse " REF _XR… \w \h \* CHARFORMAT ". Word's field code text can carry control characters
  * (field marks such as \u0001, \u0013, \u0014), which are dropped first.
  */
 export function parseFieldCode(code: string): ParsedFieldCode {

@@ -15,8 +15,8 @@ function heading(order: number, text: string, number: string, bookmark: string |
 const HEADINGS: Heading[] = [
   heading(0, "Introduction", "1"),
   heading(1, "Scope", "1.1", "_Ref1"),
-  heading(2, "Concrete", "3.1", "_RCconcrete"),
-  heading(3, "Fire strategy", "4.3", "_RCfire"),
+  heading(2, "Concrete", "3.1", "_XRconcrete"),
+  heading(3, "Fire strategy", "4.3", "_XRfire"),
 ];
 
 const POINT: InsertionPoint = {
@@ -41,7 +41,7 @@ const withinOptions = (element: HTMLElement) => within(element).getAllByRole("op
 
 describe("palette recents (US5, FR-022)", () => {
   it("with an empty query, lists the recents under Recent, most recent first, then every heading under All headings", () => {
-    const { names } = setup(["_RCfire", "_Ref1"]);
+    const { names } = setup(["_XRfire", "_Ref1"]);
     const recent = screen.getByRole("group", { name: "Recent" });
     const all = screen.getByRole("group", { name: "All headings" });
     expect(names(recent)).toEqual(["4.3 Fire strategy, level 2", "1.1 Scope, level 2"]);
@@ -52,14 +52,14 @@ describe("palette recents (US5, FR-022)", () => {
   });
 
   it("selects the most recent heading first, and Enter inserts it", async () => {
-    const { input, insert, selected } = setup(["_RCfire", "_Ref1"]);
+    const { input, insert, selected } = setup(["_XRfire", "_Ref1"]);
     expect(selected()).toHaveAccessibleName("4.3 Fire strategy, level 2");
     await fireEvent.keyDown(input, { key: "Enter" });
     expect(insert.mock.calls[0]?.[0].text).toBe("Fire strategy");
   });
 
   it("moves across the groups as one list with the arrow keys", async () => {
-    const { input, selected } = setup(["_RCfire", "_Ref1"]);
+    const { input, selected } = setup(["_XRfire", "_Ref1"]);
     await fireEvent.keyDown(input, { key: "ArrowDown" });
     expect(selected()).toHaveAccessibleName("1.1 Scope, level 2");
     expect(selected()?.closest("[role=group]")).toHaveAccessibleName("Recent");
@@ -88,7 +88,7 @@ describe("palette recents (US5, FR-022)", () => {
   });
 
   it("typing removes the groups and ranks by match only (US5 scenario 2)", async () => {
-    const { input } = setup(["_RCfire"]);
+    const { input } = setup(["_XRfire"]);
     await fireEvent.input(input, { target: { value: "sc" } });
     expect(screen.queryByRole("group")).toBeNull();
     expect(screen.getAllByRole("option")[0]).toHaveAccessibleName("1.1 Scope, level 2");
@@ -97,7 +97,7 @@ describe("palette recents (US5, FR-022)", () => {
   });
 
   it("has no groups without recents, or when none of them is listed", () => {
-    setup(["_RCgone"]);
+    setup(["_XRgone"]);
     expect(screen.queryByRole("group")).toBeNull();
     expect(screen.getAllByRole("option")).toHaveLength(4);
   });

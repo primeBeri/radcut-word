@@ -15,9 +15,9 @@
 
   let { headings, format, formats, point, recents = [], initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
 
-  const LIST_ID = "radcut-palette-list";
+  const LIST_ID = "xref-palette-list";
   const NO_MATCH = { score: 0, numberRanges: [], textRanges: [] } as const;
-  const optionId = (index: number) => `radcut-option-${index}`;
+  const optionId = (index: number) => `xref-option-${index}`;
   /** Rows per Page Up/Down when the list has no layout (e.g. before first paint). */
   const FALLBACK_PAGE = 10;
 
@@ -201,7 +201,7 @@
   />
 {/snippet}
 
-<div class="palette radcut-pane">
+<div class="palette xref-pane">
   <div class="search">
     <!-- type="search": with Windows' text suggestions for the physical keyboard on, a text box shows
          Windows' suggestion pop-up, which takes the first Esc (T103); a search box gets none. -->

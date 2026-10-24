@@ -1,7 +1,7 @@
 /** Returns a number in [0, 1), like Math.random. Injectable so tests are deterministic. */
 export type RandomSource = () => number;
 
-const PREFIX = "_RC";
+const PREFIX = "_XR";
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const RANDOM_LENGTH = 10;
 /** 36^10 names make a collision run this long practically impossible with a real source. */
@@ -13,7 +13,7 @@ export function sameBookmarkName(a: string, b: string): boolean {
 }
 
 /**
- * A new hidden bookmark name `_RC` + 10 characters from [a-z0-9] (research R6, FR-012), unique
+ * A new hidden bookmark name `_XR` + 10 characters from [a-z0-9] (research R6, FR-012), unique
  * case-insensitively against `existing` (every bookmark in the document, hidden ones included).
  * The name never derives from heading text or position, so it stays stable under edits.
  */

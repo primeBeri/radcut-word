@@ -1,5 +1,5 @@
 {
-  "name": "radcut-word",
+  "name": "xref-word",
   "version": "0.1.0",
   "private": true,
   "description": "XRef: a keyboard palette for inserting native heading cross-references in Word",
@@ -17,7 +17,7 @@
     "test:unit": "vitest run --project unit",
     "test:component": "vitest run --project component",
     "bench": "vitest bench --run --project \"unit (bench)\" --silent=false",
-    "test:desktop": "dotnet test --solution tests/desktop/RadCut.DesktopTests.slnx --results-directory tests/desktop/test-results --report-xunit-trx --report-xunit-junit",
+    "test:desktop": "dotnet test --solution tests/desktop/XRef.DesktopTests.slnx --results-directory tests/desktop/test-results --report-xunit-trx --report-xunit-junit",
     "lint": "eslint .",
     "typecheck": "tsc -b && svelte-check --tsconfig ./tsconfig.json",
     "icons": "node scripts/build-icons.mjs"

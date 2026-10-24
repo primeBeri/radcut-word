@@ -18,12 +18,12 @@ try {
     try {
       ports = (await import("../dev/perf-pane")).installPerfRecorder(ports, target);
     } catch (error) {
-      console.error("[radcut:perf-install]", error);
+      console.error("[xref:perf-install]", error);
     }
   }
   createApp(ports, target);
 } catch (error) {
   // Without this the shortcut would silently do nothing: say so in the pane, and log it locally.
-  console.error("[radcut:start]", error);
+  console.error("[xref:start]", error);
   if (target) target.textContent = "XRef couldn't start. Close the pane and reopen the document to try again.";
 }

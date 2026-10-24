@@ -101,12 +101,12 @@ describe("HeadingIndex.noteBookmark", () => {
     const fire = heading(1, "Fire");
     const index = new HeadingIndex(async () => snapshot(heading(0, "Scope", "_Ref1"), fire));
     const before = await index.get();
-    index.noteBookmark(fire, "_RCnew");
+    index.noteBookmark(fire, "_XRnew");
     const after = index.cached()!;
     expect(after).not.toBe(before);
-    expect(after.headings[1]).toMatchObject({ bookmark: "_RCnew", key: { kind: "bookmark", name: "_RCnew" } });
+    expect(after.headings[1]).toMatchObject({ bookmark: "_XRnew", key: { kind: "bookmark", name: "_XRnew" } });
     expect(after.headings[0]).toBe(before.headings[0]);
-    expect(index.byKey({ kind: "bookmark", name: "_rcnew" })?.text).toBe("Fire");
+    expect(index.byKey({ kind: "bookmark", name: "_xrnew" })?.text).toBe("Fire");
   });
 
   it("keeps a bookmark noted while a refresh was under way, which that read may predate", async () => {
@@ -120,20 +120,20 @@ describe("HeadingIndex.noteBookmark", () => {
     await index.get();
     gate = new Promise((resolve) => (release = resolve));
     const refreshing = index.refresh();
-    index.noteBookmark(fire, "_RCnew");
+    index.noteBookmark(fire, "_XRnew");
     release();
-    expect((await refreshing).headings[1]).toMatchObject({ bookmark: "_RCnew" });
-    expect(index.byKey({ kind: "bookmark", name: "_RCnew" })?.text).toBe("Fire");
+    expect((await refreshing).headings[1]).toMatchObject({ bookmark: "_XRnew" });
+    expect(index.byKey({ kind: "bookmark", name: "_XRnew" })?.text).toBe("Fire");
     // The note was for that read only.
     expect((await index.refresh()).headings[1]?.bookmark).toBeNull();
   });
 
   it("changes nothing for a heading that is not in the snapshot, or before any read", async () => {
     const index = new HeadingIndex(async () => snapshot(heading(0, "Scope")));
-    index.noteBookmark(heading(0, "Scope"), "_RCx");
+    index.noteBookmark(heading(0, "Scope"), "_XRx");
     expect(index.cached()).toBeNull();
     const before = await index.get();
-    index.noteBookmark(heading(0, "Elsewhere"), "_RCx");
+    index.noteBookmark(heading(0, "Elsewhere"), "_XRx");
     expect(index.cached()).toBe(before);
   });
 });

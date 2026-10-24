@@ -1,5 +1,5 @@
 /**
- * Dev-only: the desktop harness (tests/desktop) exposes `__radcutDesktop` to the contract pane over
+ * Dev-only: the desktop harness (tests/desktop) exposes `__xrefDesktop` to the contract pane over
  * Playwright, so a contract case can ask Word COM or UI Automation for a state Office.js cannot
  * create (a caret in a comment, protection, real keystrokes, Undo, following a hyperlink). In a run
  * started by hand the bridge is absent and those cases keep their manual instructions.
@@ -26,7 +26,7 @@ type Reply = { ok: true; value?: unknown } | { ok: false; error: string };
 
 /** The bridge if the desktop harness exposed it on `scope` (normally `globalThis`), else null. */
 export function desktopBridge(scope: object = globalThis): DesktopBridge | null {
-  const exposed = (scope as { __radcutDesktop?: unknown }).__radcutDesktop;
+  const exposed = (scope as { __xrefDesktop?: unknown }).__xrefDesktop;
   if (typeof exposed !== "function") return null;
   const call = exposed as (request: string) => Promise<string>;
   return async (request) => {

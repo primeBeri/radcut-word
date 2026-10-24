@@ -75,14 +75,14 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
   const { recents } = deps;
   const recentBookmarks =
     (await recents?.load(snapshot.documentId).catch((error: unknown) => {
-      console.error("[radcut:load-recents]", error);
+      console.error("[xref:load-recents]", error);
       return [];
     })) ?? [];
   // Only a fresh read can tell that a bookmark is gone: the cache may predate it (data-model
   // RecentHeadings). Only the recents loaded here are judged; one recorded meanwhile is kept.
   // A skipped refresh (null) prunes nothing.
   const prune = async (fresh: HeadingSnapshot | null): Promise<void> => {
-    if (fresh) await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[radcut:prune-recents]", error));
+    if (fresh) await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[xref:prune-recents]", error));
   };
   const mayRefresh = deps.mayRefresh ?? (async () => true);
   const refreshing = cached === null ? null : mayRefresh().then((go) => (go ? deps.index.refresh() : null));

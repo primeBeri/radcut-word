@@ -39,7 +39,7 @@ export interface App {
 
 /** Local diagnostics only (Constitution V): nothing leaves the machine. */
 function report(where: string, error: unknown): void {
-  console.error(`[radcut:${where}]`, error);
+  console.error(`[xref:${where}]`, error);
 }
 
 function optionsFor(settings: UserSettings): OpenPaletteOptions {
