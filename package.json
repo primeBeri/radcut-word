@@ -11,7 +11,7 @@
     "start": "node scripts/office-debug.mjs start desktop --app word --dev-server \"npm run dev-server\" --dev-server-port 3000",
     "start:dev-pane": "node scripts/office-debug.mjs start desktop --app word --dev-server \"vite --mode devpane\" --dev-server-port 3000",
     "stop": "node scripts/office-debug.mjs stop",
-    "build": "node scripts/build-tokens.mjs && vite build && node scripts/check-bundle-size.mjs",
+    "build": "node scripts/build-tokens.mjs && vite build && node scripts/release-manifest.ts && node scripts/check-bundle-size.mjs",
     "build:dev-pane": "node scripts/build-tokens.mjs && vite build --mode devpane",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
