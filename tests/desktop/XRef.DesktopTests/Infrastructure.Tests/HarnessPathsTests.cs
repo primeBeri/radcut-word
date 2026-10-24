@@ -17,6 +17,6 @@ public class HarnessPathsTests
     public void The_dev_folder_is_ascii_so_Word_accepts_it()
     {
         Assert.True(HarnessPaths.IsAscii(HarnessPaths.DevRoot), HarnessPaths.DevRoot);
-        Assert.False(HarnessPaths.IsAscii(HarnessPaths.RepoRoot), "the repository folder contains '·'");
+        Assert.False(HarnessPaths.IsAscii(@"C:\repos\RAD·CUT"), "a clone under a folder with '·' is not ASCII");
     }
 }
