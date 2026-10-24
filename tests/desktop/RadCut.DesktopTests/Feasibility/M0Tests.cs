@@ -64,7 +64,7 @@ public sealed class M0Tests : HarnessTest, IClassFixture<NormalBuildSession>
     {
         var session = fixture.Require();
         Assert.True(session.Pane is not null, $"No route reached the task pane: {session.PaneFailure}. Stop and report (FR-012).");
-        Assert.Equal("RAD·CUT", await session.Pane.Page.TitleAsync());
+        Assert.Equal("XRef", await session.Pane.Page.TitleAsync());
     }
 
     [Fact]

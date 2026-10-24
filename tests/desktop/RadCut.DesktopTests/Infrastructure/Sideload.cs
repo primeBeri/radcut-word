@@ -71,12 +71,12 @@ public sealed class Sideload : IDisposable
     private static Sideload FromCatalogue()
     {
         if (!Directory.Exists(CatalogueFolder) || !IsTrustedCatalogue(CatalogueShare)) throw new HarnessRefusedException(CatalogueMessage);
-        // Word would load both copies (two RAD·CUT ribbon groups, Ctrl+Shift+Y claimed twice), and
+        // Word would load both copies (two XRef ribbon groups, Ctrl+Shift+Y claimed twice), and
         // the catalogue copy's replaceShortcuts is refused (2026-10-18, research R4).
         if (IsRegisteredForDevelopment(AddinManifest.Load().Id))
         {
             throw new HarnessRefusedException(
-                "RAD·CUT is also registered for development (HKCU\\Software\\Microsoft\\Office\\16.0\\WEF\\Developer), left by npm start, " +
+                "XRef is also registered for development (HKCU\\Software\\Microsoft\\Office\\16.0\\WEF\\Developer), left by npm start, " +
                 "so Word would load it twice. Run npm stop with Word closed, then rerun.");
         }
         var source = Path.Combine(HarnessPaths.RepoRoot, "manifest.xml");

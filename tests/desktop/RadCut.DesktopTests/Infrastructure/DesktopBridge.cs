@@ -121,14 +121,14 @@ public sealed class DesktopBridge(WordSession word)
         }
     }
 
-    /// <summary>Closes RAD·CUT's task pane with its own Close button, as the user's × does.</summary>
+    /// <summary>Closes XRef's task pane with its own Close button, as the user's × does.</summary>
     private void ClosePane()
     {
         using var automation = new UIA3Automation();
         var window = automation.FromHandle(word.MainWindow);
         var cf = automation.ConditionFactory;
-        // Each task pane has a "Close pane" button (UI Automation, 2026-10-15); RAD·CUT's is the one
-        // with the pane titled "RAD·CUT" among its ancestors (the Navigation pane has another).
+        // Each task pane has a "Close pane" button (UI Automation, 2026-10-15); XRef's is the one
+        // with the pane titled "XRef" among its ancestors (the Navigation pane has another).
         foreach (var close in window.FindAllDescendants(cf.ByControlType(ControlType.Button).And(cf.ByName("Close pane"))))
         {
             for (var ancestor = close.Parent; ancestor is not null; ancestor = ancestor.Parent)
@@ -146,6 +146,6 @@ public sealed class DesktopBridge(WordSession word)
             .Select(b => $"\"{Safe(() => b.Name)}\" in \"{Safe(() => b.Parent?.Name)}\" ({Safe(() => b.Parent?.ClassName)})")
             .Where(s => s.Contains("Close", StringComparison.OrdinalIgnoreCase) || s.Contains(Ribbon.GroupName, StringComparison.Ordinal))
             .ToList();
-        throw new InvalidOperationException($"No Close button on the RAD·CUT task pane. Buttons seen: {string.Join("; ", seen)}");
+        throw new InvalidOperationException($"No Close button on the XRef task pane. Buttons seen: {string.Join("; ", seen)}");
     }
 }

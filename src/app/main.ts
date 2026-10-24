@@ -25,5 +25,5 @@ try {
 } catch (error) {
   // Without this the shortcut would silently do nothing: say so in the pane, and log it locally.
   console.error("[radcut:start]", error);
-  if (target) target.textContent = "RAD·CUT couldn't start. Close the pane and reopen the document to try again.";
+  if (target) target.textContent = "XRef couldn't start. Close the pane and reopen the document to try again.";
 }

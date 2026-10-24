@@ -2,7 +2,7 @@ namespace RadCut.DesktopTests.Infrastructure;
 
 /// <summary>
 /// Everything a pane-driven test needs: the dev server, the add-in registered, Word on a scratch
-/// copy with the pane opened from RAD·CUT's ribbon button, COM to the document, and Playwright to
+/// copy with the pane opened from XRef's ribbon button, COM to the document, and Playwright to
 /// the pane. Uses pane route
 /// B (research D3: route A sets no debugging port in this Office build) unless
 /// <c>RADCUT_PANE_ROUTE</c> names another, and records each attempt in <c>test-results/routes.md</c>.
@@ -61,7 +61,7 @@ public sealed class PaneSession : IAsyncDisposable
         sideload = Sideload.Register(directDebugger: route == PaneRoute.A);
         Scratch = ScratchFixture.Create(fixture, $"{testId}-{route}");
         // The document must reference the add-in, where the sideload put it, for Word to load it
-        // (without it the RAD·CUT ribbon group never appears: M0, 2026-10-15).
+        // (without it the XRef ribbon group never appears: M0, 2026-10-15).
         TaskpaneDocument.AddAutoOpenTaskpane(Scratch.Path, AddinManifest.Load(), sideload.Store);
         Word = await WordSession.StartAsync(Scratch.Path, route);
 

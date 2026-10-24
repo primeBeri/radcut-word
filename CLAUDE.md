@@ -13,6 +13,7 @@ Scaffolded (Vite + Svelte 5 + TypeScript strict + Vitest), feature `001-heading-
 - Single test file: `npx vitest run tests/unit/fuzzy-matcher.test.ts`; single test by name: `npx vitest run -t "<name>"`.
 - Lint (includes the Office.js boundary rules): `npm run lint`. Types (TS + Svelte): `npm run typecheck`.
 - Release build (tokens, Vite, dev-page and 150 KB gzip budget checks): `npm run build`.
+- Icons: SVG masters in `design/icons` (a 16 px and a 32 px master per ribbon button, Office Monoline style); `npm run icons` renders the committed PNGs in `src/app/public/assets`, and `tests/unit/manifest-assets.test.ts` checks every size the manifest declares exists.
 - Matcher benchmark (not part of `npm test`; asserts 5 ms per query over 500 headings): `npm run bench`. Vitest 5 benchmarks use the `bench` test-context fixture and run only in the projects it derives from `benchmark.include` (here `unit (bench)`).
 - In-Word checks (desktop harness, `tests/desktop`, C# on .NET 10): `npm run test:desktop`, or one category with `npm run test:desktop -- --filter-trait "Category=Contract"` (also `Harness`, `M0`, `Document`, `Scenario`, `Performance`; `Diagnose` holds explicit probes, run with `--explicit only`) or one test with `--filter-method "*Scenario03*"`. Save and close Word first and leave the keyboard and mouse alone: the harness refuses to run while Word is open, starts its own Word on scratch copies, and sends real keystrokes. Evidence of failures and `summary.md` go to `tests/desktop/test-results/`; `RADCUT_KEEP_SCRATCH=1` keeps the scratch documents. `global.json` opts `dotnet test` into Microsoft.Testing.Platform, so filters are xUnit's `--filter-trait`/`--filter-method`, not VSTest's `--filter`. Details and the routes that work: `tests/desktop/README.md`.
 
@@ -34,7 +35,7 @@ Community extensions (each offers an optional hook after the matching core step)
 
 ## What it is
 
-RAD·CUT (RadBeri) is a Word add-in in TypeScript on Office.js. Shortcut (default Ctrl+Shift+Y) → palette of the document's headings → fuzzy filter → Enter inserts a native Word cross-reference at the cursor. Windows desktop only for the MVP; Mac and web are phase 4 on the same codebase.
+XRef (by RadBeri; formerly RAD·CUT) is a Word add-in in TypeScript on Office.js. Shortcut (default Ctrl+Shift+Y) → palette of the document's headings → fuzzy filter → Enter inserts a native Word cross-reference at the cursor. Windows desktop only for the MVP; Mac and web are phase 4 on the same codebase.
 
 Stack: TypeScript (strict), Office.js with the **shared runtime** (required for custom keyboard shortcuts in Word), an add-in only XML manifest (`manifest.xml`, shortcuts in `src/app/shortcuts.json`), Svelte 5 views styled with Fluent 2 tokens (`src/ui/theme/tokens.css`, generated), Vite and Vitest. Phase 0 spikes (shortcut → focus; REF survives F9; tracked changes and co-authoring) run from the dev pane before any adapter work.
 

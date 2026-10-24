@@ -5,17 +5,17 @@ using FlaUI.UIA3;
 namespace RadCut.DesktopTests.Infrastructure;
 
 /// <summary>
-/// RAD·CUT's own ribbon group on the Home tab, driven through UI Automation (Invoke), which needs
+/// XRef's own ribbon group on the Home tab, driven through UI Automation (Invoke), which needs
 /// no keyboard and no foreground window. Word's References tab has its own "Cross-reference"
-/// button, so the search starts from the RAD·CUT group.
+/// button, so the search starts from the XRef group.
 /// </summary>
 public static class Ribbon
 {
-    public const string GroupName = "RAD·CUT";
+    public const string GroupName = "XRef";
     public const string CrossReference = "Cross-reference";
     public const string Settings = "Settings";
 
-    /// <summary>Invokes a button of the RAD·CUT group, e.g. <see cref="CrossReference"/> to open the pane.</summary>
+    /// <summary>Invokes a button of the XRef group, e.g. <see cref="CrossReference"/> to open the pane.</summary>
     public static void Invoke(WordSession word, string buttonName)
     {
         using var automation = new UIA3Automation();

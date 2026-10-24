@@ -2,7 +2,7 @@
   "name": "radcut-word",
   "version": "0.1.0",
   "private": true,
-  "description": "RAD·CUT: a keyboard palette for inserting native heading cross-references in Word",
+  "description": "XRef: a keyboard palette for inserting native heading cross-references in Word",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "bench": "vitest bench --run --project \"unit (bench)\" --silent=false",
     "test:desktop": "dotnet test --solution tests/desktop/RadCut.DesktopTests.slnx --results-directory tests/desktop/test-results --report-xunit-trx --report-xunit-junit",
     "lint": "eslint .",
-    "typecheck": "tsc -b && svelte-check --tsconfig ./tsconfig.json"
+    "typecheck": "tsc -b && svelte-check --tsconfig ./tsconfig.json",
+    "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
     "svelte": "^5.57.2"
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@fluentui/tokens": "^1.0.0-alpha.24",
+    "@resvg/resvg-js": "^2.6.2",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
