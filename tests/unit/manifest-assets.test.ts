@@ -97,7 +97,7 @@ describe("manifest icons", () => {
 describe("product name", () => {
   const name = defaultValue("DisplayName");
 
-  it("is short, plain text that can be typed and searched (Marketplace listing rules)", () => {
+  it("is plain text of at most 30 characters, so it can be typed and searched", () => {
     expect(name.length).toBeLessThanOrEqual(30);
     expect(name).toMatch(/^[A-Za-z0-9 ]+$/);
   });

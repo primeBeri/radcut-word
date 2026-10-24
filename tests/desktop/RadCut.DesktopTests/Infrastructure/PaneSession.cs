@@ -61,7 +61,7 @@ public sealed class PaneSession : IAsyncDisposable
         sideload = Sideload.Register(directDebugger: route == PaneRoute.A);
         Scratch = ScratchFixture.Create(fixture, $"{testId}-{route}");
         // The document must reference the add-in, where the sideload put it, for Word to load it
-        // (without it the XRef ribbon group never appears: M0, 2026-10-15).
+        // (without it the RAD·CUT ribbon group never appears: M0, 2026-10-15).
         TaskpaneDocument.AddAutoOpenTaskpane(Scratch.Path, AddinManifest.Load(), sideload.Store);
         Word = await WordSession.StartAsync(Scratch.Path, route);
 
