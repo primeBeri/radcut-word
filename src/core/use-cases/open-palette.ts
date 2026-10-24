@@ -1,22 +1,36 @@
-import { BUILT_IN_FORMATS, DEFAULT_FORMAT_ID, formatById } from "../formats/built-ins";
+import { DEFAULT_FORMATS } from "../formats/built-ins";
+import { offeredFormats, openingFormat } from "../formats/cycle";
 import type { ReferenceFormat } from "../formats/types";
 import { filterHeadings } from "../headings/filter";
 import type { HeadingIndex } from "../headings/heading-index";
-import type { Heading } from "../headings/types";
+import type { Heading, HeadingSnapshot } from "../headings/types";
 import type { InsertionPoint, LocationPolicy } from "../location/types";
 import type { MessageId } from "../messages";
 import type { IDocumentGateway } from "../ports/document-gateway";
+import type { RecentHeadings } from "../recents/recent-headings";
 
 export interface OpenPaletteDeps {
   readonly gateway: IDocumentGateway;
   readonly index: HeadingIndex;
+  /** Left out while "Show recently used headings" is off (FR-022a): no recents are read. */
+  readonly recents?: RecentHeadings | null;
+  /**
+   * Asked only when the list came from the cache: settles true when the background refresh may
+   * start, or false to skip it (the palette has gone by then). Word runs Office.js reads on the
+   * thread that moves focus into the pane, so a full read begun at once holds up the palette
+   * (T098). Default: at once.
+   */
+  readonly mayRefresh?: () => Promise<boolean>;
 }
 
-/** From user settings; defaults until the settings view is wired (US2). */
+/** From user settings. */
 export interface OpenPaletteOptions {
   readonly policy: LocationPolicy;
   readonly showHeadingsOutsideMainText: boolean;
-  readonly defaultFormatId: string;
+  /** The remembered format to open on if it is listed (FR-017a), or null for the first. */
+  readonly startFormatId: string | null;
+  /** The format list, in cycle order (FR-015). Defaults to the out-of-the-box list. */
+  readonly formats?: readonly ReferenceFormat[];
 }
 
 export type OpenPaletteState =
@@ -26,9 +40,16 @@ export type OpenPaletteState =
       readonly point: InsertionPoint;
       /** Filtered, in story order; from the cache when there is one. */
       readonly headings: readonly Heading[];
+      /** The format shown first: the first or remembered one, unless it is not offered here (FR-016a). */
       readonly format: ReferenceFormat;
-      /** The fresh list when `headings` came from the cache, else null. */
-      readonly refreshed: Promise<Heading[]> | null;
+      /** The Tab cycle at this cursor location (FR-015, FR-016a). */
+      readonly formats: readonly ReferenceFormat[];
+      /** The document's recent bookmarks, most recent first (FR-022); the palette lists those on a heading. */
+      readonly recents: readonly string[];
+      /** The fresh list, when `headings` came from the cache and the refresh was allowed; else null. */
+      readonly refreshed: Promise<Heading[] | null>;
+      /** Settles once recents no longer on a heading are dropped from the store, after a fresh read. */
+      readonly pruned: Promise<void>;
     };
 
 /**
@@ -51,12 +72,30 @@ export async function openPalette(deps: OpenPaletteDeps, options: OpenPaletteOpt
   const headings = filter(snapshot.headings);
   if (headings.length === 0 && cached === null) return { kind: "message", message: "noHeadings" };
 
-  const format = formatById(options.defaultFormatId) ?? formatById(DEFAULT_FORMAT_ID) ?? BUILT_IN_FORMATS[0]!;
+  const { recents } = deps;
+  const recentBookmarks =
+    (await recents?.load(snapshot.documentId).catch((error: unknown) => {
+      console.error("[radcut:load-recents]", error);
+      return [];
+    })) ?? [];
+  // Only a fresh read can tell that a bookmark is gone: the cache may predate it (data-model
+  // RecentHeadings). Only the recents loaded here are judged; one recorded meanwhile is kept.
+  // A skipped refresh (null) prunes nothing.
+  const prune = async (fresh: HeadingSnapshot | null): Promise<void> => {
+    if (fresh) await recents?.prune(fresh.documentId, fresh.headings, recentBookmarks).catch((error: unknown) => console.error("[radcut:prune-recents]", error));
+  };
+  const mayRefresh = deps.mayRefresh ?? (async () => true);
+  const refreshing = cached === null ? null : mayRefresh().then((go) => (go ? deps.index.refresh() : null));
+
+  const all = options.formats ?? DEFAULT_FORMATS;
   return {
     kind: "open",
     point,
     headings,
-    format,
-    refreshed: cached === null ? null : deps.index.refresh().then((fresh) => filter(fresh.headings)),
+    format: openingFormat(all, point.location, options.startFormatId),
+    formats: offeredFormats(all, point.location),
+    recents: recentBookmarks,
+    refreshed: refreshing ? refreshing.then((fresh) => fresh && filter(fresh.headings)) : Promise.resolve(null),
+    pruned: refreshing ? refreshing.then(prune, () => undefined) : prune(snapshot),
   };
 }

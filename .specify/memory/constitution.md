@@ -31,14 +31,26 @@ adapters on the same codebase.
 - One shared **contract suite** MUST run against both `FakeGateway` and `OfficeJsGateway`
   (the latter inside Word). A behaviour the fake exhibits but real Word does not is a defect
   in the fake.
+- Tests are organised in layers: **L1** unit and component; **L2** contract against
+  `FakeGateway`; **L3** contract or task pane state in Word; **L4** the document read through
+  Word itself (COM); **L5** keyboard and focus; **L6** exploratory, never a gate; **L7** human.
+  Each behaviour MUST be tested at the lowest layer that can observe it, and each test task in
+  `tasks.md` MUST carry its layer tag (`[L1]`…`[L7]`).
+- Layers 3–5 run unattended through the desktop harness (`tests/desktop`,
+  `npm run test:desktop`). A quickstart scenario that can be automated MUST be written as a
+  harness test, and seen to fail, before the implementation that satisfies it; only what no
+  layer below 7 can observe is left to a person.
 - Every bug fix starts with a test that reproduces the bug.
 - Tests MUST exercise behaviour through public interfaces, not private implementation details,
-  and MUST be deterministic (no reliance on timing, ordering or network).
+  and MUST be deterministic (no reliance on timing, ordering or network). Tests that drive Word
+  wait for conditions with time-outs, never for fixed delays; a flaky test is a defect, never
+  skipped or quarantined.
 - Tasks in `tasks.md` MUST place each test task before the implementation task it drives.
 
 **Rationale:** The product's promise is that references never silently break. Tests written
 first are the executable form of that promise, and the contract suite stops the fake drifting
-from real Word.
+from real Word. Checks that wait for a person get run late or not at all; running every check a
+machine can observe without one keeps that promise checked at every change, not only at release.
 
 ### III. Native, Portable Word Output
 
@@ -117,8 +129,12 @@ Proving them early is cheaper than building on guesses.
   OOXML. Fallbacks live in the adapter, behind the same port. On Word for Windows the spikes
   (2026-10-11) showed the task pane takes focus and `insertField` works, so neither fallback is
   built for the MVP; they remain the documented route if a later platform needs them.
-- **Testing:** Vitest for unit and contract suites; the Office.js contract run happens inside
-  Word (Script Lab or a dev task pane).
+- **Testing:** Vitest for unit and contract suites. The Office.js contract run happens inside
+  Word, from the dev contract pane, started and read by the desktop harness (`tests/desktop`:
+  C# on .NET, xUnit v3, Playwright for .NET over the WebView2 debugging protocol, FlaUI and Word
+  COM), which also drives the palette and reads documents back through Word. The harness is
+  development-only tooling: it is never shipped, its hooks MUST stay out of the release build,
+  and it opens debugging access only on 127.0.0.1 and only for the Word process it starts.
 - **Licensing and repository hygiene:** the project is free and open source. Internal planning
   documents are gitignored and MUST NOT be committed or copied into specs, plans, commits or
   issues beyond what is fit for a public repository.
@@ -137,7 +153,10 @@ Proving them early is cheaper than building on guesses.
      dependency rule once the scaffold exists);
   4. performance budgets in Principle IV are met for changes touching the palette or heading
      index;
-  5. the manual acceptance checklist for the target platform passes before a release.
+  5. before a release, layers 3–5 (`npm run test:desktop`) pass on the Windows machine, and the
+     manual acceptance checklist, which holds only the layer 7 checks (co-authoring, a physical
+     UK keyboard, a visual pass over the themes, a screen-reader pass), passes for the target
+     platform.
 - Requirement changes go through spec refinement (update the spec, then propagate to plan and
   tasks) rather than regenerating artefacts from scratch.
 
@@ -158,4 +177,4 @@ Proving them early is cheaper than building on guesses.
   complexity is grounds to reject a change.
 - Runtime development guidance for agents lives in `CLAUDE.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-11
+**Version**: 1.2.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-15

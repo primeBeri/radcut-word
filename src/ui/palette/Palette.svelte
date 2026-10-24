@@ -1,28 +1,43 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { hidesAboveBelow, offeredFormats, openingFormat, stepFormat } from "../../core/formats/cycle";
   import { previewReference } from "../../core/formats/preview";
   import { headingIdentity } from "../../core/headings/key";
-  import { rankHeadings } from "../../core/matching/fuzzy-matcher";
+  import { rankHeadings, type RankedHeading } from "../../core/matching/fuzzy-matcher";
+  import { recentHeadings } from "../../core/recents/recent-headings";
   import { confirmationFor } from "../../core/location/rules";
   import type { Confirmation } from "../../core/location/types";
   import { messageText, warningFor, type ConfirmationWarning, type MessageId } from "../../core/messages";
-  import FormatStrip from "./FormatStrip.svelte";
+  import { ABOVE_BELOW_HIDDEN } from "./labels";
   import MessageRegion from "./MessageRegion.svelte";
   import ResultRow from "./ResultRow.svelte";
-  import type { PaletteProps } from "./types";
+  import type { PaletteProps, RowPreview } from "./types";
 
-  let { headings, format, point, insert, cancel, openSettings }: PaletteProps = $props();
+  let { headings, format, formats, point, recents = [], initialQuery = "", insert, cancel, openSettings }: PaletteProps = $props();
 
   const LIST_ID = "radcut-palette-list";
+  const NO_MATCH = { score: 0, numberRanges: [], textRanges: [] } as const;
   const optionId = (index: number) => `radcut-option-${index}`;
   /** Rows per Page Up/Down when the list has no layout (e.g. before first paint). */
   const FALLBACK_PAGE = 10;
 
   let input: HTMLInputElement;
   let listbox: HTMLElement;
-  let query = $state("");
+  // Read once: the palette owns the query from here on.
+  // svelte-ignore state_referenced_locally
+  let query = $state(initialQuery);
+  /** Tab and Shift+Tab move this (FR-015); a fresh palette starts on `format`. */
+  // svelte-ignore state_referenced_locally
+  let formatId = $state(format.id);
+  const all = $derived(formats ?? [format]);
+  const cycle = $derived(offeredFormats(all, point.location));
+  /** If the cursor has moved where this format cannot be shown, the next one that can (FR-016a). */
+  const current = $derived(cycle.find((f) => f.id === formatId) ?? openingFormat(all, point.location, formatId));
+  /** A listed heading and the group it is listed in; a recent heading is in both (FR-022). */
+  type Row = RankedHeading & { readonly group: "recent" | "all" };
+  const rowKey = (row: Row) => `${row.group}:${headingIdentity(row.heading)}`;
   /** Survives refreshes of `headings`; null = first row. */
-  let selectedIdentity = $state<string | null>(null);
+  let selectedKey = $state<string | null>(null);
   /** Asked for after the first Enter; the second Enter confirms exactly this (FR-008a, FR-008b). */
   let pending = $state<Confirmation | null>(null);
   const warning = $derived<ConfirmationWarning | null>(pending === null ? null : warningFor(pending));
@@ -31,14 +46,30 @@
   let popoverTop = $state(0);
   let busy = false;
 
-  const rows = $derived(rankHeadings(query, headings));
+  /** With an empty query only; typing ranks by match alone (US5 scenario 2). */
+  const recentRows = $derived<Row[]>(
+    query.trim() === ""
+      ? recentHeadings(recents, headings).map((heading) => ({ heading, match: NO_MATCH, group: "recent" }))
+      : [],
+  );
+  const rows = $derived<Row[]>([...recentRows, ...rankHeadings(query, headings).map((r): Row => ({ ...r, group: "all" }))]);
   const selectedIndex = $derived.by(() => {
-    if (selectedIdentity === null) return 0;
-    const found = rows.findIndex((r) => headingIdentity(r.heading) === selectedIdentity);
+    if (selectedKey === null) return 0;
+    const found = rows.findIndex((r) => rowKey(r) === selectedKey);
     return found >= 0 ? found : 0;
   });
   const selected = $derived(rows[selectedIndex]?.heading ?? null);
-  const preview = $derived(selected ? previewReference(format.parts, selected, point).text : "");
+  const preview = $derived<RowPreview | null>(
+    selected === null
+      ? null
+      : {
+          label: current.label,
+          text: previewReference(current.parts, selected, point).text,
+          note: hidesAboveBelow(point.location) ? ABOVE_BELOW_HIDDEN : null,
+        },
+  );
+  /** Spoken after Tab or Shift+Tab; arrowing is covered by the selected row's description. */
+  let announcement = $state("");
   const status = $derived<MessageId | null>(warning ?? message ?? (rows.length === 0 ? "noMatches" : null));
 
   onMount(() => {
@@ -66,11 +97,12 @@
 
   function select(index: number): void {
     const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
-    if (row) selectedIdentity = headingIdentity(row.heading);
+    if (row) selectedKey = rowKey(row);
   }
 
   function pageSize(): number {
-    const row = listbox.querySelector<HTMLElement>("[role=option]");
+    // An unselected row: the selected one is taller, with its preview line.
+    const row = listbox.querySelector<HTMLElement>("[role=option][aria-selected=false]") ?? listbox.querySelector<HTMLElement>("[role=option]");
     const rows = row && row.offsetHeight > 0 ? Math.floor(listbox.clientHeight / row.offsetHeight) : 0;
     return Math.max(1, rows || FALLBACK_PAGE);
   }
@@ -83,7 +115,7 @@
   // Input handlers never await anything (FR-026): every keystroke is applied before returning.
   function onInput(): void {
     query = input.value;
-    selectedIdentity = null;
+    selectedKey = null;
     dismiss();
   }
 
@@ -100,7 +132,7 @@
     pending = null;
     busy = true;
     try {
-      const feedback = await insert(target, confirmed);
+      const feedback = await insert(target, current, confirmed);
       if (feedback.kind === "needsConfirmation") pending = feedback.confirm;
       else if (feedback.kind === "message") message = feedback.message;
     } catch {
@@ -116,10 +148,10 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    // Only once there is a settings view to open (US2); until then Ctrl+, is left alone.
+    // Only when there is a settings view to open; otherwise Ctrl+, is left alone.
     if (openSettings && event.ctrlKey && event.key === ",") {
       event.preventDefault();
-      openSettings();
+      openSettings(query);
       return;
     }
     switch (event.key) {
@@ -136,7 +168,9 @@
         move(-pageSize());
         break;
       case "Tab":
-        // Format cycling arrives with US2; Tab never moves focus out of the palette.
+        // Tab never moves focus out of the palette (contracts/palette-ui.md).
+        formatId = stepFormat(cycle, current.id, event.shiftKey ? -1 : 1).id;
+        announcement = preview ? `${preview.label}: ${preview.text}` : current.label;
         break;
       case "Enter":
         void enter();
@@ -157,12 +191,24 @@
   }
 </script>
 
+{#snippet result(row: Row, index: number)}
+  <ResultRow
+    id={optionId(index)}
+    ranked={row}
+    selected={index === selectedIndex}
+    preview={index === selectedIndex ? preview : null}
+    onchoose={() => choose(index)}
+  />
+{/snippet}
+
 <div class="palette radcut-pane">
   <div class="search">
+    <!-- type="search": with Windows' text suggestions for the physical keyboard on, a text box shows
+         Windows' suggestion pop-up, which takes the first Esc (T103); a search box gets none. -->
     <input
       bind:this={input}
       class="query"
-      type="text"
+      type="search"
       role="combobox"
       aria-label="Search headings"
       aria-expanded="true"
@@ -182,7 +228,7 @@
         tabindex="-1"
         aria-label="Settings"
         aria-keyshortcuts="Control+Comma"
-        onclick={openSettings}
+        onclick={() => openSettings(query)}
       >
         <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
           <path
@@ -203,14 +249,29 @@
       aria-label="Headings"
       onscroll={() => warning && placePopover()}
     >
-      {#each rows as row, index (headingIdentity(row.heading) + "#" + row.heading.order)}
-        <ResultRow
-          id={optionId(index)}
-          ranked={row}
-          selected={index === selectedIndex}
-          onchoose={() => choose(index)}
-        />
-      {/each}
+      {#if recentRows.length > 0}
+        <!-- Groups only with recents (contracts/palette-ui.md); option ids number the rows across both. -->
+        <li role="presentation">
+          <ul class="group" role="group" aria-label="Recent">
+            <li class="group-label" role="presentation" aria-hidden="true">Recent</li>
+            {#each recentRows as row, index (rowKey(row))}
+              {@render result(row, index)}
+            {/each}
+          </ul>
+        </li>
+        <li role="presentation">
+          <ul class="group" role="group" aria-label="All headings">
+            <li class="group-label" role="presentation" aria-hidden="true">All headings</li>
+            {#each rows.slice(recentRows.length) as row, i (rowKey(row) + "#" + row.heading.order)}
+              {@render result(row, recentRows.length + i)}
+            {/each}
+          </ul>
+        </li>
+      {:else}
+        {#each rows as row, index (rowKey(row) + "#" + row.heading.order)}
+          {@render result(row, index)}
+        {/each}
+      {/if}
     </ul>
     {#if warning}
       <!-- Visual only: the live region below speaks the same text, once. -->
@@ -221,7 +282,7 @@
   </div>
 
   <MessageRegion message={status} visuallyHidden={warning !== null} />
-  <FormatStrip label={format.label} {preview} />
+  <div class="announcement" data-testid="format-announcement" aria-live="polite">{announcement}</div>
 </div>
 
 <style>
@@ -249,6 +310,12 @@
     background: var(--colorNeutralBackground1);
     color: var(--colorNeutralForeground1);
     font: inherit;
+    appearance: none;
+  }
+
+  /* Esc already belongs to the palette; no clear button of the browser's own. */
+  .query::-webkit-search-cancel-button {
+    appearance: none;
   }
 
   .query:focus {
@@ -292,6 +359,15 @@
     box-shadow: var(--shadow8);
   }
 
+  .announcement {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .results {
     flex: 1;
     min-height: 0;
@@ -299,5 +375,19 @@
     padding: 0;
     overflow-y: auto;
     list-style: none;
+  }
+
+  .group {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .group-label {
+    padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+    color: var(--colorNeutralForeground3);
+    font-size: var(--fontSizeBase200);
+    font-weight: var(--fontWeightSemibold);
+    line-height: var(--lineHeightBase200);
   }
 </style>

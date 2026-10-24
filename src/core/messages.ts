@@ -5,6 +5,7 @@ export type MessageId =
   | DeclinedReason
   | "noHeadings"
   | "noMatches"
+  | "noNumber"
   | "staleTarget"
   | "hostError"
   | "hostErrorPartial"
@@ -13,7 +14,7 @@ export type MessageId =
 
 const ELSEWHERE = "Put the cursor in the main text, a footnote or endnote, a header or footer, or a text box.";
 const HEADINGS =
-  "References can't go in headings or titles. To allow them, turn on “Allow references in headings” in Settings.";
+  "References can't go in headings or titles. To allow them, turn on “Allow cross references in headings” in Settings.";
 
 const TEXTS: Record<MessageId, string> = {
   comment: `References can't go in comments. ${ELSEWHERE}`,
@@ -28,6 +29,7 @@ const TEXTS: Record<MessageId, string> = {
   noHeadings:
     "This document has no headings. Headings are listed when they use Word's Heading 1–9 styles or an outline level.",
   noMatches: "No headings match.",
+  noNumber: "This heading has no number. Press Tab for another format.",
   staleTarget: "That heading has changed since the list was shown. The list has been refreshed; choose again.",
   hostError: "The reference couldn't be inserted. The document hasn't been changed.",
   hostErrorPartial: "Word stopped part-way through inserting the reference. Press Ctrl+Z once to remove anything it wrote.",

@@ -1,4 +1,5 @@
 import { generateBookmarkName, type RandomSource } from "../bookmarks/naming";
+import { partsForHeading } from "../formats/parts";
 import type { FormatPart } from "../formats/types";
 import type { HeadingIndex } from "../headings/heading-index";
 import { headingFingerprint } from "../headings/key";
@@ -7,12 +8,15 @@ import type { Confirmation, LocationPolicy } from "../location/types";
 import { warningFor, type ConfirmationWarning, type MessageId } from "../messages";
 import type { IDocumentGateway, InsertedReference, InsertReferenceResult } from "../ports/document-gateway";
 import type { IHostShell } from "../ports/host-shell";
+import type { RecentHeadings } from "../recents/recent-headings";
 
 export interface InsertReferenceDeps {
   readonly gateway: IDocumentGateway;
   readonly index: HeadingIndex;
   /** The pane is hidden before the caret is returned; that order is what gives Word keyboard focus (spike 1). */
   readonly shell: Pick<IHostShell, "hidePane">;
+  /** Left out while "Show recently used headings" is off (FR-022a): nothing is recorded. */
+  readonly recents?: RecentHeadings | null;
   readonly random?: RandomSource;
 }
 
@@ -54,13 +58,16 @@ export async function insertReference(
   deps: InsertReferenceDeps,
   input: InsertReferenceInput,
 ): Promise<InsertReferenceOutcome> {
+  // Word would show "0" for an unnumbered heading's number, so it is left out, as in the preview (T145).
+  const parts = partsForHeading(input.parts, input.target.number);
+  if (parts.length === 0) return { kind: "message", message: "noNumber" };
   let result: InsertReferenceResult;
   try {
     const existing = await deps.gateway.listBookmarkNames();
     result = await deps.gateway.insertReference({
       target: input.target.key,
       expectedFingerprint: headingFingerprint(input.target),
-      parts: input.parts,
+      parts,
       newBookmarkName: generateBookmarkName(existing, deps.random),
       policy: input.policy,
       confirmed: input.confirmed,
@@ -71,6 +78,12 @@ export async function insertReference(
   }
 
   if (result.ok) {
+    // Known by its bookmark from now on, so the next palette lists it as recent without a read
+    // (FR-022). Recorded before the pane hides: once hidden, the user may already be reopening it.
+    deps.index.noteBookmark(input.target, result.bookmark);
+    await deps.recents
+      ?.record(deps.index.cached()?.documentId ?? null, result.bookmark)
+      .catch((error: unknown) => console.error("[radcut:record-recent]", error));
     // The reference is in the document: a focus failure must not turn that into a failure, or the
     // palette would stay open and a second Enter would insert it again.
     await deps.shell.hidePane().catch((error: unknown) => console.error("[radcut:hide-pane]", error));

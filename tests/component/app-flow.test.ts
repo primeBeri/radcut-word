@@ -1,7 +1,9 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
-import { createApp, type App } from "../../src/app/create-app";
+import { createApp, type App, type AppOptions } from "../../src/app/create-app";
 import { messageText } from "../../src/core/messages";
+import { paletteReady } from "../../src/dev/perf-pane";
+import { SETTINGS_TEXT } from "../../src/ui/settings/labels";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
 import { FakeHostShell } from "../fakes/fake-host-shell";
@@ -16,18 +18,80 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-function start() {
+/** The app on the fakes; the background refresh starts at once unless `delayRefresh` holds it. */
+function start(delayRefresh: AppOptions["delayRefresh"] = (go) => void setTimeout(go, 0)) {
   const gateway = new FakeGateway(fakeFixtures["spec-300"]());
+  const shell = new FakeHostShell();
+  const settings = new FakeSettingsStore();
+  const target = document.createElement("div");
+  document.body.append(target);
+  app = createApp({ gateway, shell, settings }, target, { delayRefresh });
+  return { gateway, shell, settings, target };
+}
+
+/** Background refreshes held until `elapse()`, as if the delay had passed for every open so far. */
+function heldRefreshes() {
+  const waiting: (() => void)[] = [];
+  return {
+    delay: (go: () => void) => void waiting.push(go),
+    elapse: async () => {
+      for (const go of waiting.splice(0)) go();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
+/** Counts the gateway's full heading reads from now on. */
+function countReads(gateway: FakeGateway): () => number {
+  let reads = 0;
+  const read = gateway.readHeadings.bind(gateway);
+  gateway.readHeadings = () => {
+    reads++;
+    return read();
+  };
+  return () => reads;
+}
+
+/** The settings view's format list; waits for the view to mount. */
+async function settingsView() {
+  return waitFor(() => screen.getByRole("list", { name: SETTINGS_TEXT.formatList }));
+}
+
+/** Saves the settings view as it stands and closes it, back to the document. */
+async function saveAndClose(shell: FakeHostShell) {
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Settings saved."));
+  await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(shell.visible).toBe(false));
+}
+
+/** A new app over the same store, as after restarting Word. */
+function restart(settings: FakeSettingsStore) {
+  app?.destroy();
+  document.body.innerHTML = "";
   const shell = new FakeHostShell();
   const target = document.createElement("div");
   document.body.append(target);
-  app = createApp({ gateway, shell, settings: new FakeSettingsStore() }, target);
-  return { gateway, shell };
+  app = createApp({ gateway: new FakeGateway(fakeFixtures["spec-300"]()), shell, settings }, target);
+  return shell;
 }
+
+const formatLabel = () => screen.getByTestId("format-preview").querySelector(".label")?.textContent;
 
 async function open(shell: FakeHostShell) {
   shell.pressShortcut();
   return waitFor(() => screen.getByRole("combobox"));
+}
+
+/** Opens the palette and closes it with Esc, so the heading list is cached. */
+async function openAndEscape(shell: FakeHostShell) {
+  await fireEvent.keyDown(await open(shell), { key: "Escape" });
+  await waitFor(() => expect(shell.visible).toBe(false));
+}
+
+/** The first row's accessible name, once the list shows `name` first. */
+async function firstRowBecomes(name: string) {
+  await waitFor(() => expect(within(screen.getByRole("listbox")).getAllByRole("option")[0]).toHaveAccessibleName(name));
 }
 
 describe("app flow", () => {
@@ -101,7 +165,7 @@ describe("app flow", () => {
     shell.pressShortcut();
     const status = await waitFor(() => screen.getByRole("status"));
     expect(status).toHaveTextContent(messageText("headingParagraph"));
-    expect(status).toHaveTextContent("Allow references in headings");
+    expect(status).toHaveTextContent("Allow cross references in headings");
     expect(screen.queryByRole("combobox")).toBeNull();
     const close = screen.getByRole("button", { name: "Close" });
     expect(close).toHaveFocus();
@@ -137,17 +201,12 @@ describe("app flow", () => {
   it("a heading edited after opening: says so, shows the fresh list after one read, and inserts on the next try", async () => {
     const { gateway, shell } = start();
     const input = await open(shell);
-    let reads = 0;
-    const readHeadings = gateway.readHeadings.bind(gateway);
-    gateway.readHeadings = () => {
-      reads++;
-      return readHeadings();
-    };
+    const reads = countReads(gateway);
     gateway.setParagraphText("Fire strategy", "Fire safety strategy");
     await fireEvent.input(input, { target: { value: "fstrat" } });
     await fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(messageText("staleTarget")));
-    expect(reads).toBe(1);
+    expect(reads()).toBe(1);
     expect(within(screen.getByRole("listbox")).getAllByRole("option")[0]).toHaveAccessibleName(
       "4.3 Fire safety strategy, level 2",
     );
@@ -177,20 +236,124 @@ describe("app flow", () => {
       expect(screen.queryByRole("status")).toBeNull();
     });
 
-    it("a background refresh that arrives after Esc changes nothing on screen", async () => {
+    it("a palette reopened while an insertion is still finishing stays open", async () => {
       const { gateway, shell } = start();
-      const first = await open(shell);
-      await fireEvent.keyDown(first, { key: "Escape" });
-      await waitFor(() => expect(shell.visible).toBe(false));
-      const { held, release } = hold(gateway.readHeadings.bind(gateway));
-      gateway.readHeadings = held;
       const input = await open(shell);
+      const { held, release } = hold(gateway.returnFocus.bind(gateway));
+      gateway.returnFocus = held;
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      release();
+      await waitFor(() => expect(gateway.insertions()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(shell.visible).toBe(true);
+      expect(screen.getByRole("combobox")).toBeInTheDocument();
+    });
+
+    it("a background refresh that arrives after Esc changes nothing on screen", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const { held, release } = hold(gateway.readHeadings.bind(gateway));
+      let started = false;
+      gateway.readHeadings = () => ((started = true), held());
+      const input = await open(shell);
+      await refreshes.elapse();
+      expect(started).toBe(true); // under way when Esc comes
       await fireEvent.keyDown(input, { key: "Escape" });
       await waitFor(() => expect(shell.visible).toBe(false));
       release();
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(screen.queryByRole("combobox")).toBeNull();
     });
+  });
+
+  describe("the background refresh (T098: a read begun at once held up Word's focus change)", () => {
+    it("starts only once the palette has been on screen for the delay, and shows the fresh list", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      gateway.setParagraphText("Fire strategy", "Fire safety strategy");
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fire safety" } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(reads()).toBe(0);
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      await firstRowBecomes("4.3 Fire safety strategy, level 2");
+    });
+
+    it("is skipped when the palette closes with Esc first", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await openAndEscape(shell);
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+
+    it("is skipped when an insertion closes the palette first", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await fireEvent.keyDown(await open(shell), { key: "Enter" });
+      await waitFor(() => expect(gateway.insertions()).toHaveLength(1));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+
+    it("closed and reopened within the delay: only the open still on screen refreshes, once", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      await openAndEscape(shell);
+      gateway.setParagraphText("Fire strategy", "Fire safety strategy");
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fire safety" } });
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      await firstRowBecomes("4.3 Fire safety strategy, level 2");
+      expect(screen.getByRole("combobox")).toBe(input);
+    });
+
+    it("a second shortcut press within the delay shares one read with the open's own refresh", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      const input = await open(shell);
+      shell.pressShortcut();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await refreshes.elapse();
+      expect(reads()).toBe(1);
+      expect(screen.getByRole("combobox")).toBe(input);
+    });
+
+    it("a second shortcut press and then Esc within the delay: neither refreshes", async () => {
+      const refreshes = heldRefreshes();
+      const { gateway, shell } = start(refreshes.delay);
+      await openAndEscape(shell);
+      const reads = countReads(gateway);
+      const input = await open(shell);
+      shell.pressShortcut();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await refreshes.elapse();
+      expect(reads()).toBe(0);
+    });
+  });
+
+  it("the palette's search box and rows are what the performance runner waits for (T096)", async () => {
+    const { shell, target } = start();
+    await open(shell);
+    expect(paletteReady(target)).toBe(true);
   });
 
   describe("when Word fails", () => {
@@ -286,6 +449,202 @@ describe("app flow", () => {
     shell.currentTheme = { isDark: true, background: "#1f1f1f", foreground: "#ffffff" };
     await open(shell);
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  describe("settings (FR-017, FR-017a, FR-021, FR-021a, FR-021b)", () => {
+    it("the ribbon Settings button opens the settings view with focus on its first control", async () => {
+      const { shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      expect(shell.visible).toBe(true);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Cross Reference Formats" })).toHaveFocus());
+    });
+
+    it("the cog and Ctrl+, open it from the palette", async () => {
+      const { shell } = start();
+      const input = await open(shell);
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await fireEvent.click((await waitFor(() => screen.getByRole("button", { name: "Settings" }))));
+      await settingsView();
+    });
+
+    it("a format moved to the top of the saved list is where the next palette opens, after a restart too", async () => {
+      const { shell, settings } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Move Number Only up" }));
+      await saveAndClose(shell);
+      expect(settings.raw).toMatchObject({ schemaVersion: 2, formatOrder: ["number", "sectionNumberText", "text", "numberText"] });
+      const input = await open(shell);
+      expect(formatLabel()).toBe("Number Only");
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("§ Number & Text");
+      await fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+
+      const restarted = restart(settings);
+      await open(restarted);
+      expect(formatLabel()).toBe("Number Only");
+    });
+
+    it("after inserting in another format, the next palette opens on the first again, and nothing is written", async () => {
+      const { shell, settings } = start();
+      const input = await open(shell);
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("Number Only");
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await open(shell);
+      expect(formatLabel()).toBe("§ Number & Text");
+      expect(settings.raw).toBeNull();
+    });
+
+    it("with Remember the last used format on, the next palette opens on the format last inserted, after a restart too", async () => {
+      const { shell, settings } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("checkbox", { name: SETTINGS_TEXT.rememberLastFormat }));
+      await saveAndClose(shell);
+      let input = await open(shell);
+      await fireEvent.keyDown(input, { key: "Tab" });
+      await fireEvent.keyDown(input, { key: "Tab" });
+      expect(formatLabel()).toBe("Text Only");
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await waitFor(() => expect(settings.raw).toMatchObject({ rememberLastFormat: true, lastFormatId: "text" }));
+      input = await open(shell);
+      expect(formatLabel()).toBe("Text Only");
+      await fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+
+      const restarted = restart(settings);
+      await open(restarted);
+      expect(formatLabel()).toBe("Text Only");
+    });
+
+    it("turning on Allow references in headings lets the palette open in a heading, without listing it", async () => {
+      const { gateway, shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Allow cross references in headings" }));
+      await saveAndClose(shell);
+      gateway.select("Fire strategy");
+      await open(shell);
+      expect(screen.queryByRole("option", { name: "4.3 Fire strategy, level 2" })).toBeNull();
+      expect(screen.getByRole("option", { name: "4.1 Means of escape, level 2" })).toBeInTheDocument();
+    });
+
+    it("turning off Show headings outside the main text hides the badged headings", async () => {
+      const { shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show headings outside of the main text" }));
+      await saveAndClose(shell);
+      await open(shell);
+      expect(screen.queryByRole("option", { name: /in footnote$/ })).toBeNull();
+      expect(screen.queryByRole("option", { name: /in text box$/ })).toBeNull();
+    });
+
+    it("Close returns to the palette with its query restored when opened from it", async () => {
+      const { shell } = start();
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: "fstrat" } });
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      await fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+      const back = await waitFor(() => screen.getByRole("combobox"));
+      expect(back).toHaveValue("fstrat");
+      await waitFor(() => expect(back).toHaveFocus());
+      expect(shell.visible).toBe(true);
+    });
+
+    it("Close from the ribbon's settings hides the pane and returns focus to the document", async () => {
+      const { gateway, shell } = start();
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(shell.visible).toBe(false));
+      expect(gateway.focusReturned).toEqual({ after: null });
+      expect(screen.queryByRole("list", { name: SETTINGS_TEXT.formatList })).toBeNull();
+    });
+
+    it("settings that cannot be read give the defaults, and the settings view says so", async () => {
+      const { shell, settings } = start();
+      settings.raw = "{not json";
+      const input = await open(shell);
+      expect(formatLabel()).toBe("§ Number & Text");
+      await fireEvent.keyDown(input, { key: ",", ctrlKey: true });
+      await settingsView();
+      expect(screen.getByRole("status")).toHaveTextContent(SETTINGS_TEXT.settingsReset);
+    });
+  });
+
+  describe("recents (US5, FR-022, FR-022a)", () => {
+    const DOC = "https://example.invalid/spec-300.docx";
+
+    /** Open, type `query`, Enter, and wait for the pane to close. */
+    async function insertTo(shell: FakeHostShell, query: string) {
+      const input = await open(shell);
+      await fireEvent.input(input, { target: { value: query } });
+      await fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+    }
+
+    const recentNames = () =>
+      within(screen.getByRole("group", { name: "Recent" }))
+        .getAllByRole("option")
+        .map((o) => o.getAttribute("aria-label"));
+
+    it("after inserting to two headings, an empty query lists both under Recent, most recent first", async () => {
+      const { shell, settings } = start();
+      await insertTo(shell, "scope");
+      await insertTo(shell, "fstrat");
+      await open(shell);
+      await waitFor(() => expect(recentNames()).toEqual(["4.3 Fire strategy, level 2", "1.1 Scope, level 2"]));
+      expect(screen.getByRole("group", { name: "All headings" })).toBeInTheDocument();
+      expect(await settings.loadRecents(DOC)).toHaveLength(2);
+    });
+
+    it("keeps them across a restart of Word", async () => {
+      const { shell, settings } = start();
+      // Scope's bookmark is in the fixture, so the restarted (fresh) fake document has it too.
+      await insertTo(shell, "scope");
+      const again = restart(settings);
+      await open(again);
+      await waitFor(() => expect(recentNames()).toEqual(["1.1 Scope, level 2"]));
+    });
+
+    it("with Show recently used headings off, shows no Recent group and records nothing; back on, the earlier ones return", async () => {
+      const { shell, settings } = start();
+      await insertTo(shell, "scope");
+
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show recently used headings" }));
+      await saveAndClose(shell);
+
+      await open(shell);
+      // Let the background refresh settle: the groups must stay away.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.queryByRole("group")).toBeNull();
+      await fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+      await waitFor(() => expect(shell.visible).toBe(false));
+      await insertTo(shell, "fstrat");
+      expect(await settings.loadRecents(DOC)).toEqual(["_Ref200000001"]);
+
+      shell.clickSettingsButton();
+      await settingsView();
+      await fireEvent.click(screen.getByRole("button", { name: "Headings" }));
+      await fireEvent.click(screen.getByRole("checkbox", { name: "Show recently used headings" }));
+      await saveAndClose(shell);
+      await open(shell);
+      await waitFor(() => expect(recentNames()).toEqual(["1.1 Scope, level 2"]));
+    });
   });
 
   it("shows a fresh palette each time it opens", async () => {

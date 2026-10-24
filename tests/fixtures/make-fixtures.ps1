@@ -34,8 +34,8 @@
 [CmdletBinding()]
 param(
     [string] $OutDir = $PSScriptRoot,
-    [ValidateSet('spec-300', 'guide-500', 'tracked', 'plain-headings')]
-    [string[]] $Only = @('spec-300', 'guide-500', 'tracked', 'plain-headings'),
+    [ValidateSet('spec-contract', 'spec-300', 'guide-500', 'tracked', 'plain-headings')]
+    [string[]] $Only = @('spec-contract', 'spec-300', 'guide-500', 'tracked', 'plain-headings'),
     [switch] $Visible,
     [string] $LogPath
 )
@@ -366,13 +366,15 @@ function Save-Fixture($Doc, [string] $FileName) {
 
 #region Fixtures
 
-function New-Spec300 {
-    $doc = New-FixtureDocument 'spec-300'
+# spec-300 (filler to Chapter 76, for the 300-heading budget) and spec-contract (filler to
+# Chapter 6, for the in-Word contract suite) share every named paragraph, so the two stay in step.
+function New-SpecDocument([string] $Name, [int] $LastChapter) {
+    $doc = New-FixtureDocument $Name
     Enter-Step 'resolve style names'
     $S = Get-StyleNames $doc
-    Enter-Step 'spec-300 : heading numbering'
+    Enter-Step "$Name : heading numbering"
     Set-HeadingNumbering $doc $S
-    Enter-Step 'spec-300 : main text'
+    Enter-Step "$Name : main text"
 
     # Placeholder for the table of contents, inserted once all headings exist.
     $null = Add-Para $doc '' $S.Normal
@@ -405,7 +407,7 @@ function New-Spec300 {
     $null = Add-Para $doc 'First of two paragraphs.' $S.Normal
     $null = Add-Para $doc 'Second of two paragraphs.' $S.Normal
 
-    Enter-Step 'spec-300 : table'
+    Enter-Step "$Name : table"
     # One table: a Normal cell and a Heading 3 cell (numbered 4.4.1).
     $blank = Add-Para $doc '' $S.Normal
     $table = Invoke-Com $doc.Tables 'Add' @($blank.Range, 1, 2, $wdWord9TableBehavior, 0)
@@ -415,11 +417,11 @@ function New-Spec300 {
     Set-ParaStyle ($table.Cell(1, 2).Range.Paragraphs.Item(1)) $S.Heading3
     $script:ReuseLast = $true   # Word leaves an empty paragraph after the table; fill it next
 
-    Enter-Step 'spec-300 : inline picture'
+    Enter-Step "$Name : inline picture"
     $p = Add-Para $doc 'Paragraph with an inline picture.' $S.Normal
     $null = Invoke-Com $doc.InlineShapes 'AddPicture' @($script:PicturePath, $false, $true, (Get-ParaEnd $doc $p))
 
-    Enter-Step 'spec-300 : content controls'
+    Enter-Step "$Name : content controls"
     # Each control holds its paragraph's whole text: Word allows no fields in the plain-text one.
     # Inline, like a control a user inserts in running text: over the paragraph's whole text, or
     # alone in an empty paragraph, Word makes a block-level control. So add it with a spare
@@ -434,7 +436,7 @@ function New-Spec300 {
         $null = Invoke-Com (Get-DocRange $doc ($spare.End - 2) ($spare.End - 1)) 'Delete'
     }
 
-    Enter-Step 'spec-300 : cross-references'
+    Enter-Step "$Name : cross-references"
     # Two Insert > Cross-reference references to "Scope" (gives Scope a _Ref bookmark).
     $items = @(Invoke-Com $doc 'GetCrossReferenceItems' @($wdRefTypeHeading))
     $scopeItem = 0
@@ -449,9 +451,10 @@ function New-Spec300 {
     $null = Invoke-Com (Get-ParaEnd $doc $doc.Paragraphs.Last) 'InsertCrossReference' @($wdRefTypeHeading, $wdContentText, $scopeItem, $true, $false)
     (Get-ParaEnd $doc $doc.Paragraphs.Last).InsertAfter('.')
 
-    Enter-Step 'spec-300 : filler chapters 5-76'
-    # Filler: Chapter 5 .. Chapter 76, each with three topics.
-    for ($n = 5; $n -le 76; $n++) {
+    Enter-Step "$Name : filler chapters 5-$LastChapter"
+    # Filler: Chapter 5 .. Chapter $LastChapter, each with three topics. Chapters 5 and 6 carry
+    # the footnote and endnote, so every variant keeps them.
+    for ($n = 5; $n -le $LastChapter; $n++) {
         $null = Add-Para $doc "Chapter $n" $S.Heading1
         $null = Add-Para $doc "Chapter $n body." $S.Normal
         for ($m = 1; $m -le 3; $m++) {
@@ -460,10 +463,13 @@ function New-Spec300 {
         }
     }
 
+    # The contract harness tells the small copy from spec-300 by this paragraph.
+    if ($Name -eq 'spec-contract') { $null = Add-Para $doc 'Contract fixture.' $S.Normal }
+
     $null = Add-Para $doc 'Title of the document' $S.Title
     $null = Add-Para $doc 'Subtitle of the document' $S.Subtitle
 
-    Enter-Step 'spec-300 : bookmarks'
+    Enter-Step "$Name : bookmarks"
     # User bookmarks
     $p = Find-Para $doc 'Definitions'
     Add-Bookmark $doc 'WholeParagraph' $p.Range                       # includes the paragraph mark
@@ -475,12 +481,12 @@ function New-Spec300 {
     $p = Find-Para $doc 'Structural fire resistance'
     Add-Bookmark $doc 'PartOfText' (Get-SubRange $doc $p 'fire')
 
-    Enter-Step 'spec-300 : comment'
+    Enter-Step "$Name : comment"
     # Comment
     $p = Find-Para $doc 'This specification sets out the requirements.'
     $null = Invoke-Com $doc.Comments 'Add' @((Get-SubRange $doc $p 'requirements'), 'A comment.')
 
-    Enter-Step 'spec-300 : text box'
+    Enter-Step "$Name : text box"
     # Text box, anchored to "Introduction"
     $p = Find-Para $doc 'Introduction'
     $box = Invoke-Com $doc.Shapes 'AddTextbox' @($msoTextOrientationHorizontal, 300, 0, 180, 90, $p.Range)
@@ -490,7 +496,7 @@ function New-Spec300 {
     Set-ParaStyle ($paras.Item(2)) $S.Normal
     Remove-Numbering $paras.Item(1)
 
-    Enter-Step 'spec-300 : footnote and endnote'
+    Enter-Step "$Name : footnote and endnote"
     # Footnote and endnote, referenced from filler body paragraphs
     $p = Find-Para $doc 'Chapter 5 body.'
     $note = Invoke-Com $doc.Footnotes 'Add' @((Get-ParaEnd $doc $p))
@@ -506,7 +512,7 @@ function New-Spec300 {
     Set-ParaStyle ($note.Range.Paragraphs.Item(2)) $S.EndnoteText
     Remove-Numbering $note.Range.Paragraphs.Item(1)
 
-    Enter-Step 'spec-300 : header and footer'
+    Enter-Step "$Name : header and footer"
     # Primary header and footer
     $section = $doc.Sections.Item(1)
     $section.Headers.Item($wdHeaderFooterPrimary).Range.InsertBefore("Heading in the header`rHeader text.")
@@ -521,7 +527,7 @@ function New-Spec300 {
     Set-ParaStyle ($paras.Item(2)) $S.Footer
     Remove-Numbering $paras.Item(1)
 
-    Enter-Step 'spec-300 : table of contents and field update'
+    Enter-Step "$Name : table of contents and field update"
     # Table of contents (hyperlinked, so every heading gets a _Toc bookmark)
     $start = $doc.Paragraphs.Item(1).Range.Start
     $toc = Invoke-Com $doc.TablesOfContents 'Add' @(
@@ -539,7 +545,7 @@ function New-Spec300 {
     $null = $toc.Update()
     $null = $doc.Fields.Update()
 
-    Save-Fixture $doc 'spec-300.docx'
+    Save-Fixture $doc "$Name.docx"
 }
 
 function New-Guide500 {
@@ -651,7 +657,8 @@ try {
     Write-Log ("Word {0} (build {1}), UI language {2}, Normal template: {3}" -f $script:Word.Version, $script:Word.Build,
         $script:Word.Language, $script:Word.NormalTemplate.FullName)
 
-    if ($Only -contains 'spec-300')       { New-Spec300 }
+    if ($Only -contains 'spec-contract')  { New-SpecDocument 'spec-contract' 6 }
+    if ($Only -contains 'spec-300')       { New-SpecDocument 'spec-300' 76 }
     if ($Only -contains 'guide-500')      { New-Guide500 }
     if ($Only -contains 'tracked')        { New-Tracked }
     if ($Only -contains 'plain-headings') { New-PlainHeadings }

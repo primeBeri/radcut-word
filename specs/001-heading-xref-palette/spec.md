@@ -22,6 +22,12 @@
 
 **Refined**: 2026-10-14 — From the Phase 10 hand checks: references may also be inserted with the cursor in a header, a footer or a text box, as Word's own cross-reference dialog allows (FR-001a); comments and plain-text content controls stay declined. Outside the main text no heading order is known, so the preview does not guess above/below there; formats with an above/below part are also hidden in headers, footers and text boxes if Word shows the heading text there (FR-016a, to be confirmed in Word). Behaviour there (one Undo step, caret return, F9, Ctrl+click, linked headers and footers) is to be confirmed by an in-Word spike before the rule changes.
 
+**Refined**: 2026-10-17 — From the owner's decision on T145: for a heading without a number, a format's number part and its padding are left out of the preview and of the inserted reference (Word would show "0"), while text before the number such as "§" stays as a cue that this is a reference; a format whose only field is the number inserts nothing and suggests Tab. From the T144 hand check: Esc dismisses the field or selection warning and a second Esc closes the palette, as intended.
+
+**Refined**: 2026-10-18 — From the owner's review of the settings view: the formats become one ordered format list, which is the Tab cycle order; out of the box it holds § number text, number, text and number + text, and the other built-in formats (page, above/below, text + above/below) can be added to it, as can templates; any entry can be removed while one remains, and entries can be moved up and down (FR-016, FR-017, FR-018). The separate default-format choice is replaced: the palette opens on the first format in the list, or, with the new setting "Remember the last used format" (off by default), on the format of the last inserted reference (FR-017a). The settings view's sections collapse and expand, longer descriptions sit behind an info button, and sample previews line up in a column (FR-021a).
+
+**Refined**: 2026-10-18 — Owner's wording for the settings view: to the user the format list is "Cross Reference Formats" and templates are custom formats ("Add Custom Format"; built-in formats are added with "Add Default Format"). The built-in formats are named Text Only, Number Only, Number & Text, § Number & Text, Page Number, Above/Below and Text + Above/Below. The settings are named "Allow cross references in headings", "Show headings outside of the main text" and "Remember last used format". The first format in the list is marked as where the palette opens, and in a narrow pane each preview sits under its name (FR-016, FR-017, FR-021a). Names and presentation only; no behaviour changed.
+
 **Input**: User description: "Review the PRD `planning` for the PRD and first phase requirements. The roadmap and context draft are from a earlier abandoned spec driven development attempt. They can be refered to but do not take as gosple."
 
 ## Scope Summary
@@ -85,7 +91,7 @@ confirm the reference shows the new number and jumps to the heading when followe
 3. **Given** a filtered list, **When** the user presses ↑ or ↓, **Then** the selection moves
    accordingly and stays visible in the list.
 4. **Given** a heading is selected, **When** the user presses Enter, **Then** a cross-reference in
-   the default format ("§ number text", e.g. "§ 4.3 Fire strategy") is inserted at the document's
+   the opening format (out of the box "§ Number & Text", e.g. "§ 4.3 Fire strategy") is inserted at the document's
    current cursor position, in the formatting of the surrounding text, the palette closes, and
    the cursor is back in the document directly after the inserted reference.
 5. **Given** the palette is open, **When** the user presses Esc, **Then** the palette closes, the
@@ -115,40 +121,48 @@ confirm the reference shows the new number and jumps to the heading when followe
 Different sentences need different wording: "see 4.3", "the Fire strategy section", "on page 12",
 "described above". While the palette is open the author presses Tab to cycle through the
 available formats; a live preview shows exactly what will be inserted for the selected heading.
-Enter inserts in the format shown. They can also choose which format the palette starts on, so
-their usual style needs no Tab presses.
+Enter inserts in the format shown. They can also put the formats in the order they want, so
+their usual style comes first and needs no Tab presses, or have the palette start on the format
+they used last.
 
 **Why this priority**: Format choice is what makes the palette faster than typing the reference
 by hand in everyday writing, but the P1 default format already delivers value without it.
 
 **Independent Test**: Open the palette, select a heading, press Tab repeatedly and confirm each
-built-in format is previewed in turn and inserts exactly as previewed; change the default format,
-reopen the palette and confirm it starts on the new default.
+format in the list is previewed in turn and inserts exactly as previewed; move another format to
+the top of the format list, reopen the palette and confirm it starts on it.
 
 **Acceptance Scenarios**:
 
 1. **Given** a heading is selected in the palette, **When** the user presses Tab, **Then** the
    format advances to the next one and the preview updates to show the exact text that will be
    inserted; Shift+Tab moves to the previous format; cycling wraps at either end.
-2. **Given** the built-in formats, **Then** the cycle contains: text; number; number + text;
-   § number text; page; above/below; text + above/below. With the cursor in a footnote, an
-   endnote, a header, a footer or a text box, the two formats with above/below are left out of
-   the cycle (FR-016a).
+2. **Given** the out-of-the-box settings, **Then** the cycle contains, in order: § Number & Text;
+   Number Only; Text Only; Number & Text. Page Number, Above/Below and Text + Above/Below can be added from
+   settings (FR-016). With the cursor in a footnote, an endnote, a header, a footer or a text
+   box, formats with above/below are left out of the cycle (FR-016a).
 3. **Given** a format is shown, **When** the user presses Enter, **Then** the inserted reference
    matches the preview and every part of it (number, text, page, above/below) updates when fields
    are updated.
-4. **Given** the user has set a default format, **When** they open the palette in any document,
-   including after restarting Word, **Then** the palette starts on that default.
-5. **Given** the user cycles to a non-default format and inserts, **When** they next open the
-   palette, **Then** it starts on the default format again, not the last one used.
+4. **Given** the user has put a format first in the format list, **When** they open the palette
+   in any document, including after restarting Word, **Then** the palette starts on that format.
+5. **Given** "Remember last used format" is off and the user cycles to another format and
+   inserts, **When** they next open the palette, **Then** it starts on the first format in the
+   list again, not the last one used.
+6. **Given** "Remember last used format" is on and the user inserts with a format, **When**
+   they next open the palette, in any document and after restarting Word, **Then** it starts on
+   that format; if it has since been removed from the list, on the first format.
+7. **Given** the format list in settings, **When** the user moves an entry up or down (by keyboard
+   or pointer), adds a built-in format or a template, or removes an entry, **Then** after saving
+   the Tab cycle follows the list's order; the last remaining entry cannot be removed.
 
 ---
 
 ### User Story 3 - Define my own reference wording (Priority: P3)
 
 An author's house style says "see §4.3 Fire strategy, above". They define a template such as
-"see §{number} {text}, {abovebelow}" once; it then appears in the Tab cycle alongside the
-built-in formats and can be chosen as the default.
+"see §{number} {text}, {abovebelow}" once; it then appears in the format list and the Tab cycle
+alongside the built-in formats, and can be moved first so the palette starts on it.
 
 **Why this priority**: Valuable for teams with a house style, but the built-in formats cover most
 writing.
@@ -160,7 +174,8 @@ preview, insert it, update fields and confirm every placeholder part updates.
 
 1. **Given** the user creates a template using the placeholders {number}, {text}, {page} and
    {abovebelow} plus literal text, **When** they open the palette and press Tab, **Then** the
-   template appears in the cycle after the built-in formats with a live preview.
+   template appears in the cycle at its place in the format list (at the end when new) with a
+   live preview.
 2. **Given** a template is inserted, **When** fields are updated, **Then** each placeholder part
    updates and the literal text is unchanged.
 3. **Given** the user enters a template with an unknown placeholder or no placeholder at all,
@@ -214,6 +229,9 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 2. **Given** the user types a query, **Then** ranking is by match quality only and recents get no
    boost.
 3. **Given** a recently used heading has since been deleted, **Then** it no longer appears.
+4. **Given** the user has turned off "Show recently used headings" in settings, **When** they open
+   the palette with an empty query, **Then** only the full list in document order is shown, and
+   insertions made while it is off are not remembered as recent. (Added 2026-10-18.)
 
 ---
 
@@ -222,8 +240,11 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 - **No headings**: the palette opens with a message explaining that headings must use Word's
   heading styles or outline levels; Esc closes it.
 - **No matches**: the list shows an empty-state message; Enter does nothing; Esc closes.
-- **Unnumbered heading with a number format**: the preview shows what Word will display (empty or
-  an error) and a warning; the user can still insert or Tab to another format.
+- **Unnumbered heading with a number format**: the number part and its padding (the text after it
+  up to the next part, or brackets around it) are left out, in the preview and in the inserted
+  reference alike. Text before the number stays as a cue that this is a reference, so
+  "§ Number & Text" gives "§ " and the heading text. If the number is the format's
+  only field, Enter inserts nothing and a message suggests Tab for another format.
 - **Duplicate heading text**: both headings are listed and distinguishable by number, level and
   position; each reference targets the heading actually selected.
 - **Heading with several usable bookmarks**: the first by case-insensitive name order is reused,
@@ -243,7 +264,7 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   field, Esc cancels (FR-008b).
 - **Headings outside the main text flow** (in table cells, text boxes, footnotes, endnotes,
   headers or footers): listed in document order with a badge naming the location, and hidden
-  when the user turns off "Show headings outside the main text". A heading in a header or footer
+  when the user turns off "Show headings outside of the main text". A heading in a header or footer
   repeats on every page, so its "page" and "above/below" parts show whatever Word computes.
 - **Bookmarks and fields made outside the add-in** (by hand or with Word's dialogs): never
   altered, removed or flagged. Usable ones are reused (FR-011); everything else is left alone.
@@ -258,7 +279,7 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   and is documented.
 - **Cursor in a heading, Title or Subtitle paragraph**: by default the palette explains that
   references cannot be inserted in headings or titles, points to the setting that allows it, and
-  makes no change. With "Allow references in headings" turned on, insertion works as in a normal
+  makes no change. With "Allow cross references in headings" turned on, insertion works as in a normal
   paragraph, except that the heading containing the cursor is not offered as a target (a heading
   never refers to itself).
 - **Cursor in a quote, caption, list item or table cell** in the main text, a footnote or an
@@ -315,7 +336,7 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   returns to where it was. (Headers, footers and text boxes were declined until 2026-10-14;
   allowed from the Phase 10 hand checks; spike 4 confirmed the write, one Undo, F9, Ctrl+click,
   the caret's return and the linked header in Word.)
-- **FR-001b**: A per-user setting "Allow references in headings", off by default, MUST lift the
+- **FR-001b**: A per-user setting "Allow cross references in headings", off by default, MUST lift the
   exclusion of heading, Title and Subtitle paragraphs in FR-001a. The setting MUST carry a short
   explanation of why it is discouraged (headings feed the table of contents, the navigation pane
   and text references to that heading, so references inside them can nest or loop). Whatever the
@@ -327,7 +348,7 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   Headings in table cells, text boxes, footnotes, endnotes, headers and footers MUST be listed.
 - **FR-003a**: Headings outside the main text flow (table cells, text boxes, footnotes, endnotes,
   headers, footers) MUST carry a visible location badge, not relying on colour alone. A per-user
-  setting "Show headings outside the main text", on by default, MUST hide them from the list when
+  setting "Show headings outside of the main text", on by default, MUST hide them from the list when
   turned off.
 - **FR-004**: Paragraphs formatted to look like headings without a heading style or outline level
   MUST NOT be listed.
@@ -400,37 +421,60 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 
 **Formats**
 
-- **FR-015**: Tab and Shift+Tab MUST cycle forwards and backwards through the formats while the
-  palette is open, with a live preview of the exact text to be inserted for the selected heading.
-- **FR-016**: The built-in formats MUST be: text; number; number + text; § number text; page;
-  above/below; text + above/below.
+- **FR-015**: Tab and Shift+Tab MUST cycle forwards and backwards through the formats, in the
+  order of the format list (FR-017), while the palette is open, with a live preview of the exact text to be inserted for the selected heading.
+- **FR-016**: The built-in formats MUST be: Text Only; Number Only; Number & Text; § Number &
+  Text; Page Number; Above/Below; Text + Above/Below. Out of the box the format list MUST hold
+  § Number & Text, Number Only, Text Only and Number & Text, in that order; the others MUST be
+  available to add. (Names from the owner, 2026-10-18; they were text, number, number + text,
+  § number text, page, above/below and text + above/below.)
+  ~~All seven are always in the cycle.~~ (Changed 2026-10-18: a shorter list by default, the
+  rest added on request.)
 - **FR-016a**: While the cursor is in a footnote or endnote, formats with an above/below part
   MUST NOT be offered: there Word shows the heading text instead of "above" or "below". The same
   MUST apply in a header, footer or text box, where Word does the same (spike 4, 2026-10-14;
-  also so in Word's own cross-reference dialog). If the default format is one of them, the palette
-  MUST open on the first offered format after it in the cycle. The format area SHOULD say briefly
+  also so in Word's own cross-reference dialog). If the format the palette would open on (FR-017,
+  FR-017a) is one of them, the palette MUST open on the first offered format after it in the
+  cycle. The format area SHOULD say briefly
   why they are missing. (Added 2026-10-13 from the Phase 9 hand checks in Word; extended
   2026-10-14.)
-- **FR-017**: Users MUST be able to choose a default format; the palette MUST open on it in every
-  document and session. The out-of-the-box default MUST be "§ number text".
+- **FR-017**: ~~Users MUST be able to choose a default format; the palette MUST open on it in every
+  document and session. The out-of-the-box default MUST be "§ number text".~~ (Replaced
+  2026-10-18 by the format list.) Users MUST be able to arrange the formats in a format list:
+  add built-in formats and templates, remove any entry as long as one remains, and move entries
+  up and down by keyboard and by pointer. The palette MUST open on the first format in the list
+  in every document and session, unless FR-017a applies. Out of the box that is "§ Number & Text".
+  The settings view MUST mark the first format as the one the palette opens on (2026-10-18: a
+  "Default" badge).
+- **FR-017a**: A per-user setting "Remember last used format", off by default, MUST make the
+  palette open on the format of the last inserted reference, in every document and session. If
+  that format is no longer in the list, the palette MUST open on the first format.
 - **FR-018**: Users SHOULD be able to create, edit and delete format templates combining literal
   text with the placeholders {number}, {text}, {page} and {abovebelow}; templates MUST appear in
-  the Tab cycle and be selectable as the default; invalid templates MUST be rejected with a
-  reason.
+  the format list and the Tab cycle like any built-in format ~~and be selectable as the
+  default~~ (2026-10-18: the first format in the list is where the palette opens); invalid
+  templates MUST be rejected with a reason.
 
 **Access and settings**
 
 - **FR-019**: Users SHOULD be able to open the same palette from a ribbon button.
 - **FR-020**: Users MUST be able to change the shortcut; Ctrl+@ and combinations reserved by Word
   or the system MUST be refused with an explanation.
-- **FR-021**: Settings (default format, templates, shortcut, "Allow references in headings",
-  "Show headings outside the main text") MUST persist per user across
+- **FR-021**: Settings (the format list with its templates, "Remember last used format" and
+  the last used format, shortcut, "Allow cross references in headings",
+  "Show headings outside of the main text", "Show recently used headings") MUST persist per user across
   documents and Word restarts, and MUST NOT be stored in the documents themselves.
 - **FR-021a**: Settings MUST be edited in a dedicated settings view in the add-in pane, separate
   from the palette. The settings view MUST be reachable from the ribbon and from a cog icon in a
   corner of the palette; the cog MUST also be reachable from the keyboard and MUST open the
   settings view directly, with focus on its first control, without the user hunting through
-  other panes.
+  other panes. Its sections (formats, shortcut, headings) MUST collapse and expand, with the
+  formats section expanded on opening; a section holding an error MUST expand when Save reports
+  it. A control's longer description SHOULD sit behind an info button beside it, shown on hover,
+  focus or click, and stay linked to the control for assistive technology. The format list's
+  sample previews SHOULD line up in a column; in a pane too narrow for that, each preview MAY sit
+  under its name instead (Word does not let an add-in set its pane's width). The view MUST call
+  the format list "Cross Reference Formats" and templates custom formats. (Added 2026-10-18.)
 - **FR-021b**: Leaving the settings view MUST return the user to the document (or to the palette
   if it was opened from there) with focus restored.
 
@@ -438,7 +482,12 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
 
 - **FR-022**: With an empty query, the palette COULD list up to 5 headings most recently
   referenced in the current document first, most recent first; recents MUST NOT affect ranking
-  once a query is typed.
+  once a query is typed. The full list in document order MUST follow the recents, complete, so a
+  recent heading is listed twice. (Refined 2026-10-18.)
+- **FR-022a**: A per-user setting "Show recently used headings", on by default, MUST turn the
+  recents off: while it is off the palette MUST NOT show them and insertions MUST NOT be recorded
+  as recent. Recents recorded before it was turned off MUST be kept and shown again once it is
+  turned back on. (Added 2026-10-18.)
 
 **Privacy and feedback**
 
@@ -470,8 +519,10 @@ listed first, most recent at the top; type a query and confirm normal ranking ap
   pointing at a single Heading Bookmark.
 - **Reference Format**: a named recipe for a Cross-Reference — built-in or user-defined
   template — combining literal text with number, text, page and above/below parts.
-- **User Settings**: per-user preferences — default format, templates, shortcut, allow
-  references in headings, show headings outside the main text — edited in the settings view.
+- **User Settings**: per-user preferences — the format list (built-in formats and templates, in
+  cycle order), remember the last used format, shortcut, allow references in headings, show
+  headings outside the main text, show recently used headings — edited in the settings view;
+  also the last used format.
 - **Recent Headings**: per-document list of the headings most recently referenced, in recency
   order.
 

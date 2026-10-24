@@ -53,7 +53,7 @@ export interface InsertReferenceRequest {
 
 /**
  * Opaque handle for an inserted reference. `returnFocus` takes it as a hint that the caret goes
- * after the reference; OfficeJsGateway relies on Word's selection already being there.
+ * after the reference; OfficeJsGateway's insertReference already leaves the selection there.
  */
 export interface InsertedReference {
   readonly id: string;

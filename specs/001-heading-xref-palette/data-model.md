@@ -111,17 +111,21 @@ dropped. Each non-literal part maps to exactly one field (research R5).
 
 **Template grammar** (FR-018): see [contracts/format-templates.md](contracts/format-templates.md).
 
-**Format cycle** (FR-015, FR-016): built-ins in the order of FR-016, then templates in creation
-order. Tab = next, Shift+Tab = previous, wrapping at both ends.
+**Format cycle** (FR-015, FR-016): the formats of `UserSettings.formatOrder`, in that order
+(refined 2026-10-18; it was built-ins in FR-016 order, then templates in creation order). Tab =
+next, Shift+Tab = previous, wrapping at both ends. The palette opens on the first, or on
+`lastFormatId` when `rememberLastFormat` is on and that format is still in the list (FR-017,
+FR-017a), then FR-016a.
 
 ## ReferencePreview
 
 | Field | Type | Rules |
 |---|---|---|
 | `text` | `string` | What the reference will display now, e.g. "§ 4.3 Fire strategy". |
-| `warnings` | `("noNumber" \| "pageUnknown" \| "positionUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered. `positionUnknown` when the format has an above/below part and the target is in a text box, header or footer (Word decides; preview shows "above/below ?"). |
+| `warnings` | `("noNumber" \| "pageUnknown" \| "positionUnknown")[]` | `noNumber` when the format has a number part and the heading is unnumbered; the number and its padding are then left out of the text, as they are when inserting, while text before the number such as "§" stays (T145). `positionUnknown` when the format has an above/below part and the target is in a text box, header or footer (Word decides; preview shows "{above/below}", refined 2026-10-17 from "above/below ?"). |
 
-Page is shown as "page ?" because the page cannot be computed before insertion; above/below is
+Page is shown as its template placeholder, "{page}", because the page cannot be computed before
+insertion (refined 2026-10-17; it was "?"); above/below is
 computed from `InsertionPoint.precedingHeadingOrder` versus the target's `order`.
 
 ## MatchResult
@@ -139,11 +143,20 @@ Stored per user, outside documents (FR-021).
 
 | Field | Type | Rules |
 |---|---|---|
-| `schemaVersion` | `1` | Bumped on breaking change; older versions are migrated, unknown versions reset to defaults with a message. |
-| `defaultFormatId` | `string` | Must name an existing format; falls back to `sectionNumberText` if the template was deleted. |
-| `templates` | `{ id, label, source }[]` | `source` is the template string; validated on save and on load. At most 20. |
+| `schemaVersion` | `2` | Bumped on breaking change; older versions are migrated, unknown versions reset to defaults with a message. (2 since 2026-10-18.) |
+| ~~`defaultFormatId`~~ | ~~`string`~~ | ~~Must name an existing format; falls back to `sectionNumberText` if the template was deleted.~~ Version 1 only; replaced by `formatOrder` (FR-017, 2026-10-18). |
+| `formatOrder` | `string[]` | The format list: built-in ids and template ids, in cycle order (FR-015, FR-017). Not empty; each id at most once; every template is in it exactly once. Default `["sectionNumberText", "number", "text", "numberText"]` (FR-016). On load, unknown ids and repeats are dropped and a template missing from it is added at the end; if nothing is left, the default list is used. |
+| `templates` | `{ id, label, source }[]` | `source` is the template string; validated on save and on load (a template that fails on load is left out, with the `templateDropped` notice). `label` is stored trimmed. At most 20. Their place in the cycle is their place in `formatOrder`; removing a template from the list deletes it. |
+| `rememberLastFormat` | `boolean` | Default `false` (FR-017a). |
+| `lastFormatId` | `string \| null` | The format of the last inserted reference, written after each insertion while `rememberLastFormat` is on; default `null`. Not shown in the settings view and not an unsaved change. |
 | `allowReferencesInHeadings` | `boolean` | Default `false` (FR-001b). Feeds `LocationPolicy.allowInHeadings`. |
 | `showHeadingsOutsideMainText` | `boolean` | Default `true` (FR-003a). When `false`, headings whose `location` is not `main` are left out of the list. |
+| `showRecentHeadings` | `boolean` | Default `true` (FR-022a, added 2026-10-18 without a version bump). When `false`, the palette shows no Recent group and nothing is recorded; stored recents are kept. Missing from stored settings of either version (saved before it existed) reads as `true`; any other non-boolean value resets the settings, as for the other settings. |
+
+**Migration from version 1** (2026-10-18): `formatOrder` = the old `defaultFormatId` first, then
+the seven built-ins in FR-016 order and the templates in creation order, less the default;
+`rememberLastFormat` = `false`, `lastFormatId` = `null`; the other fields unchanged. So a user who
+saved version 1 settings keeps every format they had, starting on their default.
 
 The shortcut is not part of `UserSettings`: Office stores it (research R4). The settings view
 reads and writes it through the `HostShell` port.
@@ -156,8 +169,19 @@ reads and writes it through the `HostShell` port.
 | `bookmarks` | `string[]` | Most recent first, unique (case-insensitive), at most 5. |
 
 Entries whose bookmark no longer exists, or no longer sits on a heading, are dropped when the
-palette opens (spec User Story 5, scenario 3). At most 50 documents are kept; the least recently
-used is dropped.
+palette opens (spec User Story 5, scenario 3), judged against a fresh read of the document only,
+never the cached snapshot. Only the recents loaded when the palette opened are judged by that
+read: one recorded while it was under way is kept. Recording and pruning run one at a time. At most 50 documents are kept; the least recently used (the one whose
+recents were saved longest ago) is dropped. The store keeps every document's list under one key,
+`radcut.recents`, as `{ documentId, bookmarks }[]`, most recently saved first; reading and
+updating that list are core rules (`readStoredRecents`, `withDocumentRecents`) that the adapter
+and the fake both call (refined 2026-10-18). A stored list is held to the same limits when read
+(2026-10-19).
+
+The bookmark recorded is the one the insertion used (`InsertReferenceResult.bookmark`). The cached
+heading snapshot is given that bookmark straight away, so the next palette shows the heading as
+recent before the background refresh arrives, and a refresh that was already reading keeps it too
+(2026-10-19).
 
 ## State transitions
 

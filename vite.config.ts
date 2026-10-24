@@ -49,6 +49,30 @@ function devPaneLauncher(): Plugin {
   };
 }
 
+/**
+ * With `RADCUT_LOG_REQUESTS=1` (set by the desktop harness), logs every request with its status
+ * and time, so a failed add-in install ("failed to download a required resource") shows what
+ * Word asked for.
+ */
+function requestLog(): Plugin {
+  return {
+    name: "radcut-request-log",
+    configureServer(server) {
+      if (process.env.RADCUT_LOG_REQUESTS !== "1") return;
+      server.middlewares.use((req, res, next) => {
+        const started = performance.now();
+        const url = req.url ?? "";
+        res.on("close", () => {
+          const ms = Math.round(performance.now() - started);
+          const ended = res.writableFinished ? "" : " (closed before the response ended)";
+          console.log(`[request] ${new Date().toISOString()} ${req.method} ${url} ${res.statusCode} ${ms} ms${ended}`);
+        });
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig(async ({ command, mode }) => {
   // Dev-only pages (launcher, contract pane, spike pane) are entry points only in the `devpane` mode,
   // so the release build never contains src/dev/** or src/adapters/office/spikes/**.
@@ -76,6 +100,7 @@ export default defineConfig(async ({ command, mode }) => {
     root,
     publicDir: resolve(root, "app/public"),
     plugins: [
+      requestLog(),
       svelte({ configFile: resolve(import.meta.dirname, "svelte.config.js") }),
       shortcutsJson(),
       ...(mode === "devpane" ? [devPaneLauncher()] : []),

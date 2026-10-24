@@ -1,10 +1,14 @@
 import type { ISettingsStore } from "../../src/core/ports/settings-store";
+import { withDocumentRecents, type DocumentRecents } from "../../src/core/recents/recent-headings";
 import type { UserSettings } from "../../src/core/settings/types";
 
-/** In-memory ISettingsStore. `raw` can be set to corrupt data to test the core's loader. */
+/**
+ * In-memory ISettingsStore. `raw` can be set to corrupt data to test the core's loader. Recents
+ * are kept as OfficeSettingsStore keeps them: one list, at most 50 documents, by the core's rule.
+ */
 export class FakeSettingsStore implements ISettingsStore {
   raw: unknown = null;
-  readonly recents = new Map<string, string[]>();
+  recents: DocumentRecents[] = [];
 
   async loadSettings(): Promise<unknown> {
     return structuredClone(this.raw);
@@ -15,10 +19,10 @@ export class FakeSettingsStore implements ISettingsStore {
   }
 
   async loadRecents(documentId: string): Promise<string[]> {
-    return [...(this.recents.get(documentId) ?? [])];
+    return [...(this.recents.find((e) => e.documentId === documentId)?.bookmarks ?? [])];
   }
 
   async saveRecents(documentId: string, bookmarks: readonly string[]): Promise<void> {
-    this.recents.set(documentId, [...bookmarks]);
+    this.recents = withDocumentRecents(this.recents, documentId, bookmarks);
   }
 }

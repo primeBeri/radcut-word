@@ -61,3 +61,11 @@ tmp/
 
 # Word lock files for open documents
 ~$*
+
+# Desktop test harness (tests/desktop) build output and run evidence
+tests/desktop/**/bin/
+tests/desktop/**/obj/
+tests/desktop/test-results/
+
+# Local screenshots for discussion
+screenshots/

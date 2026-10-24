@@ -98,6 +98,59 @@ KeyboardShortcuts 1.1 = 2408.
   rather than four (Ctrl+Shift+Alt+K was rejected as too long), free in Word, and with no Alt
   there is no AltGr clash on any layout. Confirmed in Word the same day: Ctrl+Shift+Y opens the
   pane with no conflict prompt. If a later build claims it, the next choice is Ctrl+Alt+J.
+- **Customising, found in US4 (2026-10-17, Word 2609, signed in, add-in sideloaded by the
+  harness)**: `getShortcuts()` gives `{ OpenPalette: "Ctrl+Shift+Y" }` and `areShortcutsInUse`
+  works (Ctrl+Alt+K and our own Ctrl+Shift+Y in use, Ctrl+Alt+J free), but **every
+  `replaceShortcuts` call is refused with `InvalidArgument`** (`ActionService.replaceShortcuts`):
+  Ctrl+Alt+J, the default itself, `null` (the documented reset), `""` and even `{}`. No office-js
+  issue or documentation explains it; the documented causes (unknown action id, invalid
+  combination, signed out) do not fit. Whether a store or centrally deployed install is allowed
+  could not be checked on this VM (catalogue sideloading is broken on 2609). **Decision**: the
+  host port's `replace` returns `"refused"` for `InvalidArgument`; the settings view then says
+  "Word didn't allow the shortcut to be changed, so it stays as it is." and turns read-only.
+  Ctrl+@ and the other rules are checked by the core first, so they are refused the same way
+  whatever Word does. Recheck on each new Word build (harness scenario 10b skips with this reason
+  while Word refuses).
+- **Customising in the owner's Word (2026-10-18, same VM and build, Word started normally)**:
+  changes work there for some combinations (Ctrl+Shift+1 to 4, Ctrl+Alt+B) and not others, so
+  the refusal is per combination outside the harness. Two causes, found with a harness probe:
+  (1) **Word runs its own shortcuts before the pane sees the key**: while the pane has focus,
+  Ctrl+B, Ctrl+J, Ctrl+Q, Ctrl+1, Ctrl+Alt+1, Ctrl+Alt+K and Ctrl+Shift+A, J, M and Q never
+  reach the page; it gets only the modifiers' keydown and keyup. Ctrl+A, Ctrl+Shift+ a digit,
+  Ctrl+Alt+J or Q, Alt+Shift+J and Ctrl+Shift+Alt+K do reach it. (2) **`replaceShortcuts`
+  refuses some combinations that `areShortcutsInUse` calls free**, with the same bare
+  `InvalidArgument` and no reason (`debugInfo` has only the statement). **Decision** (replaces
+  the read-only one above): a refusal is about that combination only. The view says "Word
+  wouldn't accept <combination> and gave no reason. Try another." and keeps recording; Ctrl or
+  Alt pressed and released with no other key reaching the pane is reported as "Word kept that
+  combination for one of its own commands. Try another."; the recording hint says Ctrl+Shift
+  with a digit is usually free. Word still runs its command on the document (Ctrl+B toggles
+  bold), which the add-in cannot prevent. Why the harness's Word refuses every change while
+  the owner's accepts some is not known; Office keeps the shortcut per account, so a change
+  made in the owner's Word is the harness's too, and the harness cannot reset it.
+  Later the same morning the owner's Word refused every change too (Ctrl+Shift+4, which had
+  worked, and the reset, `null`), with the shortcut left at Ctrl+Alt+B; the manifest default
+  Ctrl+Shift+Y is reported in use (by the add-in itself), so choosing it is now treated as the
+  reset. The customisation is not in any local file or registry key (it roams with the account,
+  as the guide says); why Word stops accepting changes is not known.
+- **Cause found (2026-10-18)**: since 2026-10-15 every Word on the VM had loaded the add-in
+  **twice**, the `npm start` developer registration (never unregistered) and the harness's
+  catalogue copy, same id, two RAD·CUT ribbon groups. Word's cached shortcut table
+  (`%LOCALAPPDATA%\Microsoft\Office\16.0\Wef\AggregatedCache\1.1\<hash>\ShortcutsMapping.Word.en-US`, last written 2026-10-17) maps Ctrl+Shift+Y to the **developer** copy only. With
+  the developer registration removed (`npm stop`) the catalogue copy is still refused; with the
+  cache moved aside too, `getShortcuts()` returns `{}`: **Word 2609 never registered the
+  catalogue copy's shortcuts at all** (the same regression as office-js#6973, which also drops
+  them for developer registrations on most starts). `InvalidArgument` is then accurate
+  ("ActionId doesn't exist"): there is nothing of this add-in's to replace. Ctrl+Shift+Y had
+  worked in the harness only through the stale cache entry, which the shared runtime honours
+  because the id is the same. The owner's changes that did work were presumably made on a start
+  where Word had registered the shortcuts. **Consequences**: (1) the add-in's handling stands: a
+  refusal is reported with the combination and recording goes on, since on a start where the
+  shortcuts are registered changes do work; (2) the harness keeps relying on the cached entry
+  (restored after the experiment) and now refuses to run while a developer registration exists,
+  so Word cannot load two copies; (3) do not use `npm start` and the catalogue route at the
+  same time, and `npm stop` after `npm start`. Recheck customising when Microsoft fixes
+  office-js#6973.
 
 ## R5. Inserting cross-references — SPIKE 2
 

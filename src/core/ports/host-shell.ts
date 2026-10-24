@@ -19,13 +19,19 @@ export interface IHostShell {
 }
 
 export interface HostShortcut {
+  /** The shortcuts.json default, which Word keeps reserved for the add-in even when customised. */
+  readonly manifestDefault: string;
   /** null = unassigned or lost to a Word conflict. */
   current(): Promise<string | null>;
   /** False when signed out or KeyboardShortcuts 1.1 is unsupported. */
   canCustomise(): Promise<boolean>;
   isInUse(combo: string): Promise<boolean>;
-  /** null = reset to the manifest default (OfficeHostShell: arrives with T085, US4). */
-  replace(combo: string | null): Promise<void>;
+  /**
+   * null = reset to the manifest default. Callers check the core's rules and `isInUse` first (FR-020).
+   * "refused": the host would not take this combination, and the shortcut is as it was (Word 2609
+   * refuses some free combinations with no reason, and in the harness's Word every change, research R4).
+   */
+  replace(combo: string | null): Promise<"replaced" | "refused">;
 }
 
 export interface HostTheme {

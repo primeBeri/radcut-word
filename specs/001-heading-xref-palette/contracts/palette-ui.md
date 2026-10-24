@@ -7,16 +7,16 @@ row; the manual acceptance checklist repeats the focus rows in real Word.
 
 | Key | Effect | Spec |
 |---|---|---|
-| (open) | Search box focused, empty query, default format, first row selected | FR-002, FR-017 |
+| (open) | Search box focused, empty query, opening format (the first in the format list, or the last used with "Remember the last used format" on; 2026-10-18), first row selected | FR-002, FR-017, FR-017a |
 | Printable keys | Edit query; results re-ranked; first row selected | FR-005, FR-007 |
 | ↑ / ↓ | Move selection, no wrap; selected row scrolled into view | FR-006 |
 | Page Up / Page Down | Move selection by one visible page | (convenience) |
-| Tab / Shift+Tab | Next / previous format, wrapping; preview updates. With the cursor in a footnote, endnote, header, footer or text box, formats with an above/below part are left out (opening on the next offered format if the default is one) and the format strip says why | FR-015, FR-016a |
+| Tab / Shift+Tab | Next / previous format, wrapping; preview updates. With the cursor in a footnote, endnote, header, footer or text box, formats with an above/below part are left out (opening on the next offered format if the opening format is one) and the preview line says why | FR-015, FR-016a |
 | Enter | Insert selected heading in the shown format; with an extended selection, or the cursor inside a field, the first Enter shows the warning and changes nothing, the second inserts | FR-006, FR-008a, FR-008b |
 | Esc | Close, no change, caret restored; while the selection warning is shown, dismiss the warning only | FR-006, FR-008a |
 | Ctrl+, | Open settings (same as clicking the cog) | FR-021a |
 | Shortcut, with the palette still on screen | Search box focused again; query, format and selection kept; the list refreshes in place | FR-002 |
-| Shortcut, after the pane was closed (Esc, insert or ×) | A fresh palette: empty query, default format, cursor checked again | FR-002 |
+| Shortcut, after the pane was closed (Esc, insert or ×) | A fresh palette: empty query, opening format, cursor checked again | FR-002 |
 
 Tab does not move focus while the palette is open; the cog is reached with Ctrl+, or by mouse.
 The cog button stays in the accessibility tree with its shortcut announced
@@ -35,11 +35,18 @@ The cog button stays in the accessibility tree with its shortcut announced
   (`colorPalette<Name>Background2` / `Foreground2` / `BorderActive`), so they can be told apart
   at a glance; the text still names the location.
 - Recents group (empty query only): `role="group"` labelled "Recent", then a group labelled
-  "All headings" (FR-022).
+  "All headings" (FR-022). Refined 2026-10-18: up to 5 headings, most recent first, then every
+  heading in document order, so a recent one is listed in both groups; ↑/↓ and Page Up/Down move
+  across the groups as one list. Each group's label is shown above it. With no recents, or with
+  "Show recently used headings" off (FR-022a), the list has no groups. Typing removes them.
 - Highlighted characters use `<mark>` with bold weight and an underline as well as colour
   (FR-005a: not colour alone).
-- Format strip: current format name plus preview text, in a polite live region
-  (`aria-live="polite"`) so screen readers announce format changes.
+- Preview line (refined 2026-10-17): the selected row grows a second line, under its text, with
+  what Enter would insert (accent colour) and the current format's name with a Tab hint; in a
+  footnote, endnote, header, footer or text box it also says why above/below formats are missing.
+  Only the selected row has it, so moving the selection shifts just the row moved onto; the list's
+  height never changes. The line is the option's `aria-describedby` description, and Tab or
+  Shift+Tab also speaks "format: preview" in a visually hidden polite live region.
 - Messages (no headings, no matches, declined, stale, failed, selection warning): one polite live
   region; Enter is a no-op when there is no selectable row. Fixed texts:
   - Selection warning: "The selection covers more than one paragraph or a picture.
@@ -55,7 +62,7 @@ The cog button stays in the accessibility tree with its shortcut announced
     they sit next to what the second Enter will insert; other messages stay at the foot of the
     list.
   - Declined in a heading or title: "References can't go in headings or titles. To allow them,
-    turn on “Allow references in headings” in Settings."
+    turn on “Allow cross references in headings” in Settings."
   - Self reference: "A heading can't refer to itself."
 - The heading containing the cursor is never listed (FR-001b).
 
@@ -64,8 +71,8 @@ The cog button stays in the accessibility tree with its shortcut announced
 - Colours, type ramp, spacing, radii and focus ring come only from Fluent 2 tokens, light or dark
   per `HostTheme` (FR-025). No product branding.
 - Indent per heading level: one token step (`spacingHorizontalL`) per level, capped at level 6.
-- Long text truncates with an ellipsis in the row; the full text appears in the preview and the
-  row's `title`.
+- Long text truncates with an ellipsis in the row and its preview line; the full heading text
+  appears in the row's `title`.
 - Motion (FR-026): pane content fade-in and selection highlight move, each ≤ 150 ms, CSS
   transitions only, never awaited before handling input; all disabled under
   `prefers-reduced-motion: reduce` (or the settings toggle, per research R11).
@@ -74,11 +81,57 @@ The cog button stays in the accessibility tree with its shortcut announced
 
 - Opened from the ribbon "Settings" button, the palette cog, or Ctrl+, in the palette; focus on
   the first control (FR-021a).
-- Sections: Default format (radio list of all formats with a sample preview); Templates (list
+- Refined 2026-10-18 (FR-017, FR-017a, FR-021a), replacing the Default format and Templates
+  sections below:
+  - Three collapsible sections, Cross Reference Formats, Shortcut and Headings, each a heading
+    holding a disclosure button (`aria-expanded`, `aria-controls`). Cross Reference Formats is
+    expanded on opening, the others collapsed; focus starts on its button. Save expands a collapsed section holding
+    an error before moving focus to it.
+  - Cross Reference Formats: the format list as an ordered list labelled "Cross reference
+    formats, in 'Tab' order", one row per format laid out in columns: name (the first row's name
+    followed by a "Default" badge, drawn by CSS so the name's text stays the name), sample preview for "4.3 Fire strategy" (page 12, above),
+    "Move <name> up", "Move <name> down" and "Remove <name>" buttons. Rows can also be dragged by
+    pointer. Below a list width of about 360 px each row puts its preview on a second line under
+    its name, still lined up. Moving announces "<name> is now <n> of <total>." in the view's status line and keeps
+    focus on the button pressed (or on the other move button at either end). Remove is disabled on
+    the last row. Removing moves focus to the next row's remove button, else the previous one.
+    Template (custom format) rows also have "Edit <name>", which shows the template editor under
+    the row, with the inputs "Cross reference format name" and "Cross reference format text"; a
+    template not yet named is called "New custom format". "Add Custom Format" adds a template at
+    the end with its editor open and focus in its name. "Add Default Format" is a menu button listing the built-in formats not in the list, each
+    added at the end; it is hidden when there are none. The menu closes on Esc without closing
+    settings. Below the list, the checkbox "Remember last used format" (off).
+  - Info buttons: a control with a longer description has a small "About <control>" button beside
+    it. Hover, focus or click shows the description in a tooltip; Esc or moving away hides it; the
+    description stays in the DOM and is linked to the control by `aria-describedby`. Used for the
+    format list, "Remember last used format", the template text's placeholder help and both
+    Headings checkboxes. A description may hold line breaks, which the tooltip keeps.
+  - Wording (owner, 2026-10-18): the exact texts of the view, its tooltips and messages are those
+    in `src/ui/settings/labels.ts` and the settings components; built-in format names are in
+    `src/core/formats/built-ins.ts`. Where the texts quoted below (as built before 2026-10-18)
+    differ, those files win. The heading checkboxes are "Allow cross references in headings" and
+    "Show headings outside of the main text"; the shortcut button is "Record a new keyboard
+    shortcut" and its announcement "The cross reference palette now opens with <combination>."
+- (As built before 2026-10-18.) Sections: Default format (radio list of all formats with a sample preview); Templates (list
   with add, edit, delete; editor shows live preview against a sample heading and inline
-  validation errors from [format-templates.md](format-templates.md)); Shortcut (current value,
-  "Record new shortcut" capture, reset to default; read-only with explanation when signed out);
-  Headings (two checkboxes, each with a description linked by `aria-describedby`):
+  validation errors from [format-templates.md](format-templates.md); refined 2026-10-17: each
+  template is a fieldset named by its name, with "Template name" and "Template text" inputs, a
+  hint on the placeholders, a live preview of the sample heading "4.3 Fire strategy" (page 12,
+  above) in a polite live region, and "Delete template <name>"; "Add template" adds a blank one
+  and focuses its name, and says "There can be at most 20 templates." at 20; deleting moves
+  focus to the next template's name, else Add template; the default-format list follows the
+  draft, so a template is listed there once its text is valid; errors appear on Save, set
+  `aria-invalid`, are linked by `aria-describedby`, and go once their field is edited); Shortcut (current value,
+  "Record new shortcut" capture, reset to default; read-only with explanation when signed out;
+  refined 2026-10-17: the change applies at once, not on Save, since Office stores it; recording
+  reads the next combination with Ctrl or Alt, a refusal is shown inline as an alert and recording
+  goes on, Esc stops recording without leaving settings and Tab moves on; a change is announced
+  in the view's status line, "The palette now opens with <combination>."; refined 2026-10-18: a
+  combination Word refuses is named in the alert and recording goes on, and Ctrl or Alt released
+  with no key reaching the pane says Word kept that combination, research R4);
+  Headings (two checkboxes, each with a description linked by `aria-describedby`; from
+  2026-10-18 behind an info button; a third from 2026-10-18, "Show recently used headings" (on),
+  FR-022a):
   - "Allow references in headings" (off): "Not recommended. Headings feed the table of
     contents, the navigation pane and text references to that heading, so a reference inside a
     heading gets copied into them and can nest or loop. A heading can never refer to itself."

@@ -1,14 +1,73 @@
-# Manual acceptance checklist
+# Acceptance checklist
 
-Per-release checks on Word for Windows desktop. The full list from quickstart scenarios 1–27 is
-added by T101; items below were added by earlier tasks.
+Per-release checks on Word for Windows desktop, from quickstart scenarios 1–27
+(`specs/001-heading-xref-palette/quickstart.md`). Copy the two parts below into a new dated
+section for each release and fill them in; the run log after them records earlier runs.
 
-## Co-authoring (spike 3, research R9)
+## Per-release checklist
 
-- [ ] With the document open by two users on SharePoint or OneDrive, user A inserts a reference
-      while user B edits elsewhere. After both save and sync: the reference shows the right
-      number and text, F9 updates it, Ctrl+click jumps, and user B sees the same. Record the
-      outcome in `docs/known-behaviours.md`.
+### Part 1: automated (desktop harness)
+
+Save and close Word, leave the keyboard and mouse alone, then:
+
+```powershell
+npm test; npm run lint; npm run typecheck; npm run build; npm run bench
+npm run test:desktop        # every category: Contract, Document, Scenario, Performance, M0, Harness
+```
+
+Paste `tests/desktop/test-results/summary.md` and `acceptance-summary.md` into the release's
+section. Every scenario below must pass; a skip needs its reason written next to it.
+
+| # | Scenario | Harness test |
+|---|---|---|
+| 1 | fuzzy query, Enter inserts, caret after | `Us1Scenarios.Scenario01_…` |
+| 2 | Esc changes nothing | `Us1Scenarios.Scenario02_…` |
+| 3 | moved heading: F9 renumbers, Ctrl+click jumps | `DocumentVerificationTests.Scenario03_…` |
+| 4 | second reference reuses the bookmark | `DocumentVerificationTests.Scenario04_…` |
+| 5 | one Ctrl+Z per insertion, with and without tracking | `Us1Scenarios.Scenario05_…` |
+| 6 | references work without the add-in | `DocumentVerificationTests.Scenario06_…` |
+| 7 | every format cycles, inserts as previewed, survives F9 | `Us2Scenarios.Scenario07_…`, `FootnoteCycle_…` |
+| 8, 8b | format order and "Remember the last used format", across a restart | `Us2Scenarios.Scenario08_…`, `Scenario08b_…` |
+| 9 | custom format joins the cycle; `{num}` rejected | `Us3Scenarios.Scenario09_…` |
+| 10 | ribbon opens the same palette; Ctrl+@ refused; UK layout types nothing; recorded shortcut works | `Us4Scenarios.Scenario10_…` (both; 10b skips while Word refuses every change, research R4) |
+| 11, 11b | recently used headings, and the setting that hides them | `Us5Scenarios.Scenario11_…`, `Scenario11b_…` |
+| 12 | declined places say why; header, footer and text box insert | `Us1Scenarios.Scenario12_…` |
+| 13 | caption, quote, table cell, footnote | `Us1Scenarios.Scenario13_…` |
+| 14 | tracked insertion: accept and reject | `DocumentVerificationTests.Scenario14_…` |
+| 16 | Ctrl+, opens settings, Esc returns | `Us2Scenarios.Scenario16_…` |
+| 18 | no network requests leave localhost after load | `Us1Scenarios.Scenario18_…` |
+| 19 | table of contents bookmark not reused | `DocumentVerificationTests.Scenario19_…` |
+| 20 | reference takes the surrounding formatting | `DocumentVerificationTests.Scenario20_…` |
+| 21 | Enter inserts where the cursor is then | `Us1Scenarios.Scenario21_…` |
+| 22 | tracked-deleted heading; leftover bookmark reused | `Us1Scenarios.Scenario22_…` |
+| 23 | selections: words, two paragraphs, table | `Us1Scenarios.Scenario23_…` |
+| 24 | references in headings allowed and declined | `Us2Scenarios.Scenario24_…` |
+| 25 | other stories: badges, references resolve and jump; hide setting | `Us1Scenarios.Scenario25_…`, `Us2Scenarios.Scenario25_…` |
+| 26 | output matches Word's own Cross-reference dialog | `DocumentVerificationTests.Scenario26_…` |
+| 27 | inside an existing reference: confirm, replace, one Ctrl+Z | `Us1Scenarios.Scenario27_…` |
+| — | palette ready < 500 ms on spec-300; keystroke < 50 ms on guide-500 (docs/performance.md) | `BudgetTests` (Performance) |
+| — | `FuzzyMatcher` < 5 ms per query over 500 headings | `npm run bench` |
+| — | release bundle under 150 KB gzip, no dev page or harness hook in `dist/` | `npm run build` |
+
+### Part 2: human (layer 7 only)
+
+- [ ] **Scenario 17, co-authoring.** With the document open by two users on SharePoint or
+      OneDrive, user A inserts a reference while user B edits elsewhere. After both save and
+      sync: the reference shows the right number and text, F9 updates it, Ctrl+click jumps, and
+      user B sees the same. Record the outcome in `docs/known-behaviours.md`.
+- [ ] **Scenario 10 on a physical UK keyboard.** Ctrl+Shift+Y and a changed shortcut open the
+      palette; AltGr combinations type their characters and do not open it.
+- [ ] **Scenario 15, visual pass over the themes.** Office Colorful, Dark Grey, Black and White
+      with Windows light and dark mode: the palette, its preview line, the story badges, the
+      Recent group and the settings view are legible and follow the theme; with Windows
+      "Animation effects" off, nothing moves.
+- [ ] **Narrator pass.** Palette: the search box, each option with its preview line, the groups,
+      Tab's format announcement and every warning are read. Settings: each section, the format
+      list's rows and buttons, the info buttons' descriptions and the shortcut recorder.
+- [ ] **Speed by hand (SC-001).** Ten practised runs from the shortcut to the inserted
+      reference; median under 3 s.
+
+# Run log
 
 ## US1 run (T055), 2026-10-11
 
@@ -203,3 +262,293 @@ script after the restore, so that part is a hand check:
 - [ ] **5b, text box heading.** Once the settings view exists (T069), turn on "allow references
       in headings", click in "Heading in a text box", press Ctrl+Shift+Y: the palette opens and
       inserts. With the setting off (as shipped) it declines as a heading.
+
+## Contract-run speed (feature 002, T008 and T012), 2026-10-15
+
+`IDocumentGateway: OfficeJsGateway` from the dev pane, on fresh scratch copies:
+
+| Fixture | Change | Total | Outcome |
+|---|---|---|---|
+| `spec-300.docx` | before 002 | 20–25 min | 46 passed, 13 by design |
+| `spec-300.docx` | restore only after a case that wrote | 17 min 16.6 s | 46 passed, the same 13 |
+| `spec-contract.docx` | and the small contract fixture | 1 min 3.5 s | 47 passed, 12 by design |
+
+The extra pass is case 5b's text box heading: no write precedes it, so no restore runs before it
+and Word accepts the selection. It still depends on that order (after a restore Word refuses),
+so the item above stays open until the desktop harness covers it (002 T028). Details: 
+`specs/002-desktop-test-harness/research.md`, "D2 measurements".
+
+## Automated contract run (feature 002, M1), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Contract"`, three runs, no person involved: 65
+passed, 1 failed, the same each time. The desktop harness opens scratch copies of `spec-contract`,
+`tracked` and `plain-headings`, runs the gateway and host-shell suites from the dev contract pane,
+and sets up through Word COM and UI Automation what Office.js cannot. Now automated, so off the
+hand-check lists of T051, T138 and T142: the caret in a comment; a protected document; the text box
+heading (5b); the plain-text control inside (5d); formatting after F9 (7a); Ctrl+click on each
+reference (7c, in every story); one Undo after a caret, a word, a picture and a content control
+(14); the number after moving a heading and F9 (14); the shortcut, the ribbon button and the
+pane's × (host shell).
+
+Deferred past V1 (002 T047, owner's decision 2026-10-15): case 10f, the plain-text control
+selected whole, and the plain-text part of the 10a hand check. Office.js stops listing the control
+after the harness's restore, so the case cannot be set up in Word; it still runs against the fake.
+See `docs/backlog.md`.
+
+## Automated document checks (feature 002, M2), 2026-10-15
+
+`npm run test:desktop -- --filter-trait "Category=Document"`, three runs, 7 of 7 each time, about
+1.5 minutes. Each scenario inserts through the real palette (Ctrl+Shift+Y, typing, Enter) and
+reads the result through Word itself:
+
+| # | Result | Notes |
+|---|---|---|
+| 3 | Pass | "4.3" becomes "4.1" after moving the section and F9; Ctrl+click lands on the heading |
+| 4 | Pass | The second reference reuses the first one's `_RC…` bookmark; one bookmark added in all |
+| 6 | Pass | Saved, reopened with the add-in unregistered, F9: same results, no errors |
+| 14 | Pass | `tracked.docx`: the insertion is tracked; correct after Accept All; Reject All removes it with no errors. With Track Changes on, F9 itself is tracked (Word), so the check after accepting runs with tracking off |
+| 19 | Pass | A new `_RC…` bookmark (the `_Toc…` one not reused); still correct after the TOC update and F9 |
+| 20 | Pass | Bold and italic follow the surrounding text, not the heading, before and after F9 |
+| 26 | Pass | Against Word's own dialog: same field types and bookmark extent, switches differ only by design (`\w`, `\* CHARFORMAT`); B gets `_RC…`, A reuses Word's `_Ref…`; Word's bookmark and fields untouched |
+
+## Automated US1 run (feature 002, T041), 2026-10-16
+
+`npm run test:desktop`, ten consecutive full runs on the test VM (Word 2609, 16.0.20430), no
+person involved; every scenario had the same result in all ten (the Scenario category alone was
+run twice more for the locked-screen check). Rows marked Human stay on this checklist; "Not run"
+rows have no harness test in US1 (later stories).
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | Fail | Feature 001 T143: after Enter the caret stays before the inserted reference, not after it |
+| 2 | Pass | Automated |
+| 3 | Pass | Automated |
+| 4 | Pass | Automated |
+| 5 | Pass | Automated |
+| 6 | Pass | Automated |
+| 7 | Not run | No harness test yet |
+| 8 | Not run | No harness test yet |
+| 9 | Not run | No harness test yet |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+| 11 | Not run | No harness test yet |
+| 12 | Pass | Automated |
+| 13 | Pass | Automated |
+| 14 | Pass | Automated |
+| 15 | Human | A visual pass over the light, dark and black themes |
+| 16 | Not run | No harness test yet |
+| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |
+| 18 | Pass | Automated |
+| 19 | Pass | Automated |
+| 20 | Pass | Automated |
+| 21 | Pass | Automated |
+| 22 | Pass | Automated |
+| 23 | Fail | Words and multi-paragraph selections pass; with a table selected the add-in declines as the palette opens ("References can't replace a table."), while the test expected the palette and the refusal on Enter. Owner's decision, 2026-10-17: declining at open is right; a table selected after the palette opened must be declined at Enter. The test now checks both and passes (three runs) |
+| 24 | Not run | No harness test yet |
+| 25 | Pass | Automated. By hand: the badges' colours, by eye; the settings part waits for the settings view (US2) |
+| 26 | Pass | Automated |
+| 27 | Pass | Automated |
+
+## Automated US1 and US2 run (feature 001, T071), 2026-10-17
+
+`npm run test:desktop` on the test VM (Word 2609), no person involved: every scenario with a
+harness test passes, US1 after the T143, T144 and T145 changes and US2 for the first time. Rows
+9 and 11 have no harness test yet (later stories); rows marked Human stay on this checklist.
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | Pass | Automated |
+| 2 | Pass | Automated |
+| 3 | Pass | Automated |
+| 4 | Pass | Automated |
+| 5 | Pass | Automated |
+| 6 | Pass | Automated |
+| 7 | Pass | Automated |
+| 8 | Pass | Automated |
+| 9 | Not run | No harness test in this run |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+| 11 | Not run | No harness test in this run |
+| 12 | Pass | Automated |
+| 13 | Pass | Automated |
+| 14 | Pass | Automated |
+| 15 | Human | A visual pass over the light, dark and black themes |
+| 16 | Pass | Automated |
+| 17 | Human | Co-authoring on SharePoint or OneDrive with two users |
+| 18 | Pass | Automated |
+| 19 | Pass | Automated |
+| 20 | Pass | Automated |
+| 21 | Pass | Automated |
+| 22 | Pass | Automated |
+| 23 | Pass | Automated |
+| 24 | Pass | Automated |
+| 25 | Pass | Automated. By hand: The badges' colours, by eye |
+| 26 | Pass | Automated |
+| 27 | Pass | Automated |
+
+## Automated US3 run (feature 001, T078), 2026-10-17
+
+`npm run test:desktop -- --filter-class "*Us3Scenarios"` and the Contract category on the test
+VM (Word 2609), no person involved. Scenario 9 makes the template in the settings view, sees
+`{num}` refused with its message next to the field and focus on it, cycles to the template
+after the built-ins, inserts it as previewed, updates fields, then edits and deletes the
+template and checks the inserted reference is unchanged. Contract case 9e inserts a template
+with every placeholder kind, a repeat and literal braces: 72 passed, 2 skipped (10f deferred,
+S5 Node only).
+
+| # | Result | Notes |
+|---|---|---|
+| 9 | Pass | Automated (`Scenario09`) |
+
+## Automated US4 run (feature 001, T088), 2026-10-17
+
+`npm run test:desktop -- --filter-class "*Us4Scenarios"` and the Contract category on the test
+VM (Word 2609, signed in), no person involved, with the UK layout made Word's input language
+for the test. Scenario 10 (first test) opens the palette from the ribbon's Cross-reference
+button with keyboard focus in the search box and inserts as after the shortcut; presses
+Ctrl+Shift+Y and checks no character is typed; records Ctrl+@ (Shift+' on UK) and sees it
+refused with its reason, then Ctrl+B and sees it reported as kept by Word (updated
+2026-10-18). Scenario 10b records Ctrl+Alt+J: Word refuses every
+`Office.actions.replaceShortcuts` call (`InvalidArgument`, research R4), so the test checks the
+settings view names the refused combination and keeps recording, that Ctrl+Shift+Y still opens
+the palette, and skips the rest with that reason. Rerun 2026-10-18 after the owner reset the
+account's shortcut and removed `npm start`'s leftover developer registration: scenario 10
+passes, 10b skips as above. The refusal's cause is Word 2609 never registering the catalogue
+copy's shortcuts (office-js#6973, research R4). Contract and Scenario categories: 95 passed,
+5 skipped, 0 failed.
+
+| # | Result | Notes |
+|---|---|---|
+| 10 | Partial | Ribbon, Ctrl+@ and UK layout pass (`Scenario10_the_ribbon_…`); a new shortcut cannot be set on this Word (`Scenario10_a_recorded_shortcut_…` skipped: replaceShortcuts refused). Recheck on a later Word build or a store install |
+| 10 | Human | A physical UK keyboard: the shortcut works and no stray character is typed |
+
+## Automated run after the settings refinement (feature 001, Phase 13, T156), 2026-10-18
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"`, then `"Category=Contract"` (two
+`--filter-trait` options do not combine), on the test VM (Word 2609), no person involved. The format
+list replaces the default format: scenario 7 adds page, above/below and text + above/below in
+settings and cycles all seven in list order; scenario 8 moves Number to the top; new scenario 8b
+remembers the last used format across a restart until it is removed from the list. Contract: 76
+passed, 4 skipped (10f deferred; K3, K6 and S5 Node only). Scenario: 19 passed, 1 skipped (10b,
+replaceShortcuts refused, research R4), 1 failed: US1 scenario 25 timed out waiting for the RAD·CUT
+ribbon group and then passed 3 of 3 on its own; its evidence was cleared by the Contract run, so the
+cause is not confirmed (Word's mid-session add-in reinstall, seen twice before, drops that group).
+
+| # | Result | Notes |
+|---|---|---|
+| 7 | Pass | Automated (`Scenario07`), all seven built-ins once added |
+| 8 | Pass | Automated (`Scenario08`), format moved to the top of the list |
+| 8b | Pass | Automated (`Scenario08b`) |
+| 9 | Pass | Automated (`Scenario09`), template at the end of the list |
+| — | Human | Visual check of the settings view in Word: sections, info tooltips, previews lined up in their column, dragging a row |
+
+## Automated run after the owner's wording (feature 001, T158), 2026-10-18
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"`, then `"Category=Contract"`, on the test VM (Word 2609), no person involved, after the settings texts and built-in format names were renamed (T157). Scenario: 20 passed, 1 skipped (10b, replaceShortcuts refused, research R4), including US1 scenario 25, which failed once in the T156 run. Contract: 76 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only). The visual check of the settings view (badge, tooltips with line breaks, narrow-pane rows) was done by the owner in Word.
+
+## Automated run for US5, recently used headings (feature 001, T095), 2026-10-19
+
+`npm run test:desktop -- --filter-trait "Category=Contract"`, then `"Category=Scenario"`, on the test VM (Word 2609), no person involved. Contract: 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only), including the new recents cases R1–R4 on `OfficeRuntime.storage`. Scenario: 20 passed, 1 skipped (10b, replaceShortcuts refused, research R4), 2 failed: both new US5 scenarios, on a harness mistake (each looked up a paragraph by its whole text after an insertion had changed it). With each insertion in a paragraph of its own, `--filter-class "*Us5Scenarios"` passed 2 of 2. The scenarios were written after the implementation, so they were not seen red against the code before it.
+
+| # | Result | Notes |
+|---|---|---|
+| 11 | Pass | Automated (`Scenario11`): both under Recent, most recent first; ↓ crosses into All headings; typing removes the groups |
+| 11b | Pass | Automated (`Scenario11b`): no groups while "Show recently used headings" is off and nothing recorded; back on, the earlier recent returns |
+| — | Human | Visual check in Word of the Recent and All headings labels and the new Headings checkbox with its tooltip |
+
+## Automated rerun after the US5 review fixes (feature 001), 2026-10-19
+
+`npm run test:desktop -- --filter-trait "Category=Scenario"` on the test VM (Word 2609), no person involved, after commit 7970600 (prune race, stored recents held to the limits, recents writes one at a time). Scenario: 21 passed, 2 failed, including both US5 scenarios 11 and 11b. The two failures, US1 scenario 2 and US4 scenario 10b, each timed out after 60 s waiting for the RAD·CUT ribbon group, before the palette was reached (the add-in not loading on this Word, as in the T156 run). Run on their own, `--filter-method "*Scenario02_*"` passed 1 of 1 and `"*Scenario10_*"` gave 1 passed, 1 skipped (10b, replaceShortcuts refused, research R4).
+
+## Polish run on the test VM (feature 001, Phase 8: T096–T098, T102), 2026-10-20
+
+Release build (T102): `npm run build` passes; the task pane bundle is 41,247 of 153,600 bytes
+gzip; `dist/` holds no `src/dev/**` or spike page, and the release check now also refuses the
+performance runner's `__radcutPerf` hook. Quickstart 18 (no request leaves localhost after load) is
+harness `Scenario18`, which passed in the full run below.
+
+Full harness run after the first optimisation (refresh deferred by 1 s): 144 passed, 1 failed, 12
+skipped (the 5 below and the explicit diagnostics, which run only on request) in 23 min 5 s. Contract 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node only);
+Document 7; M0 5; Scenario 22 passed, 1 skipped (10b: Word refuses every shortcut change in the
+harness, research R4). The failure was the spec-300 timing test: the deferred read began after
+Esc and was still running 12.7 s later. Fixed (the refresh is skipped once the palette has
+closed, app-flow test seen red first), then:
+
+- Performance, two full runs: spec-300 ready median 836 and 818 ms (in-page 595 ms; Word slow
+  after `showAsTaskpane` in full runs, docs/performance.md); guide-500 keystroke median 16 to 25 ms over the runs (longest task 97 to
+  118 ms: the 100 ms budget is not met on the VM).
+- spec-300 timing alone, two runs: median **447 and 475 ms** (budget 500 ms).
+- Scenario and Document: 28 passed, 1 skipped (10b), 1 failed: scenario 11b timed out waiting for
+  the RAD·CUT ribbon group before its first step (the T156 flake), then passed 2 of 2 alone.
+- `npm test` 652 passed, 4 skipped; lint and typecheck clean; `npm run bench` within budget.
+
+The budget is to be confirmed on the owner's desktop in the release run (T103).
+
+After the Phase 8 review fixes (refresh go-ahead injectable for tests, `mayRefresh`, the performance
+runner's ready check tied to its open and failed calls counted apart), same day:
+
+- Performance category: spec-300 ready median 796 ms (in-page 586 ms, `checkInsertionPoint` 484 ms:
+  Word slow after `showAsTaskpane`, as in the earlier full runs); guide-500 keystroke median 26 ms,
+  longest task 118 ms (over the 100 ms budget on the VM, docs/performance.md).
+- spec-300 timing alone: median **416 ms** (in-page 180 ms); passed.
+- `npm test` 661 passed, 4 skipped; lint, typecheck, release build (41,263 bytes gzip) and the
+  harness build clean.
+
+## Release run on the desktop (feature 001, T103, automated part), 2026-10-20
+
+On the owner's desktop (AMD Ryzen 7 9800X3D, Word 2609, build 16.0.20430.20146), commit ea20f0f
+plus the performance runner's page-clock marks and long-task attribution (dev only), no person
+involved. The trusted catalogue `\\localhost\radcut-catalog` was set up on this machine first;
+Ctrl+Shift+Y worked in every harness Word.
+
+- `npm test` 661 passed, 4 skipped (662 with the runner's new test); lint and typecheck clean;
+  `npm run bench` within budget (0.19 to 0.23 ms per 20-character query); release build 41,263
+  bytes gzip, unchanged, with no dev page.
+- Performance at 5120×1440 and 1920×1080: spec-300 ready median **141 to 166 ms** over 7 runs
+  (budget 500 ms), alone and in category and full runs; guide-500 keystroke median 12 to 22 ms
+  over 8;
+  longest task 143 to 181 ms, over the 100 ms budget, but placed after ready, at the second
+  keystroke, with the pane handling keystrokes throughout and the browser blaming `unknown`
+  rather than the page (docs/performance.md). The first mount of 500 rows is 51 ms. The owner
+  accepted the long task for this release: only just perceptible, not worth the effort now.
+- Two Performance runs straight after changing the display resolution failed with the pane stuck
+  at 120×11 pixels; after a restart the same runs passed. Not counted below.
+- Full harness run at 1920×1080: 142 passed, 3 failed, 12 skipped (the 5 below and the explicit
+  diagnostics) in 16 min 9 s. Contract 80 passed, 4 skipped (10f deferred; K3, K6 and S5 Node
+  only); Document 6 passed, 1 failed; M0 5; Performance 2; Scenario 20 passed, 2 failed, 1
+  skipped (10b: Word refuses every shortcut change in the harness, research R4).
+- The three failures, then each rerun alone (`--filter-method` for the three, one run):
+
+| # | Full run | Alone | Notes |
+|---|---|---|---|
+| 20 | Fail | Pass | Timed out after 10.4 s waiting for the add-in to finish its Office calls, with the reference already inserted and formatted |
+| 23 | Fail | **Fail** | Timed out after 10 s waiting for Esc to dismiss the multi-paragraph warning: the warning was shown, Esc was pressed, the warning stayed |
+| 27 | Fail | **Fail** | The same, on the "cursor is inside a field" warning |
+
+Scenarios 23 and 27 fail every time on this desktop, and failed the same way in a harness run
+here on 2026-10-15; they pass on the test VM. Esc closes the palette normally in the other tests,
+and clearing a warning on Esc needs no Office call, so the keystroke seems not to reach the page
+while a warning is shown; not yet investigated. The automated part of T103 is therefore not
+green on the desktop, and Part 2 (the human checks) is still to do.
+
+**Follow-up, 2026-10-21: scenarios 23 and 27 explained and fixed.** Windows' "Show text
+suggestions when typing on the physical keyboard" is on on this desktop (not on the VM). A moment
+after a word is typed into a text box, Windows shows its suggestion pop-up, and the pop-up takes
+the next Esc: the page never sees it, focus does not move, and a second Esc works. Both scenarios
+type a heading's name and then read the document through COM before pressing Esc, long enough for
+the pop-up to appear; elsewhere Esc came within about 100 ms of the last key. The warning, the COM
+reads, the background refresh, Enter, the pointer and the Word selection were each ruled out with
+an explicit probe (`tests/desktop/RadCut.DesktopTests/Feasibility/EscAfterTypingProbe.cs`; typing
+"scope" then Esc 1.4 s after opening: lost every time in a text box, never in a search box or with
+the setting off). The palette's search box is now `type="search"`, which gets no pop-up, so people
+with the setting on no longer need two presses of Esc either. With that change: `npm test` 662
+passed, 4 skipped, lint and typecheck clean; scenarios 23 and 27 passed alone, and the Scenario
+category passed (22 passed, 10b skipped as before) in 8 min 58 s. The settings view's template
+fields are still text boxes and get the pop-up; no test failed on it. The rest of T103's automated
+part stands as above (scenario 20's single failure passed alone); Part 2 is still to do.
+
+**Part 2, human checks, 2026-10-21.** The owner ran Part 2 on the desktop with commit 5453741:
+the physical UK keyboard (scenario 10), the visual pass over the themes (scenario 15), the
+Narrator pass and the speed by hand (SC-001). Everything behaved as expected and performed well;
+the runs were not timed, so no median is recorded for SC-001. Co-authoring (scenario 17) is
+deferred until after the MVP, when it can be tested properly; `docs/known-behaviours.md` still
+calls it untested. The owner chose to leave the settings
+view's template fields as text boxes (the suggestion pop-up there is a fringe case). T103 is done.

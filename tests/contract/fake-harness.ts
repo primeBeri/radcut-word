@@ -1,7 +1,9 @@
 import type { InsertedReference } from "../../src/core/ports/document-gateway";
 import { fakeFixtures } from "../fakes/fake-documents";
 import { FakeGateway } from "../fakes/fake-gateway";
+import { FakeSettingsStore } from "../fakes/fake-settings-store";
 import type { ContractFixture, GatewayContractHarness, SelectionRequest } from "./document-gateway.contract";
+import type { SettingsStoreContractHarness } from "./host-ports.contract";
 
 /** Contract harness over a fresh FakeGateway for the named fixture. */
 export async function fakeGatewayHarness(fixture: ContractFixture): Promise<GatewayContractHarness> {
@@ -30,6 +32,24 @@ export async function fakeGatewayHarness(fixture: ContractFixture): Promise<Gate
     insertionText: async (reference: InsertedReference) => gateway.insertionText(reference.id),
     insertionParagraph: async (reference: InsertedReference) => gateway.insertionParagraph(reference.id),
     replacedText: async (reference: InsertedReference) => gateway.replacedText(reference.id),
+    caretIsAfter: async (reference: InsertedReference) => gateway.focusReturned?.after === reference.id,
+    documentState: async () => gateway.documentState(),
+  };
+}
+
+/** Settings-store contract harness over an empty FakeSettingsStore, paired with a FakeGateway. */
+export async function fakeSettingsStoreHarness(): Promise<SettingsStoreContractHarness> {
+  const store = new FakeSettingsStore();
+  const gateway = new FakeGateway(fakeFixtures["spec-contract"]());
+  return {
+    store,
+    writeRaw: async (text) => {
+      try {
+        store.raw = JSON.parse(text);
+      } catch {
+        store.raw = text;
+      }
+    },
     documentState: async () => gateway.documentState(),
   };
 }

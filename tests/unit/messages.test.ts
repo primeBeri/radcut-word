@@ -16,6 +16,11 @@ describe("messages", () => {
     }
   });
 
+  it("a heading without a number points to Tab for another format (T145)", () => {
+    expect(messageText("noNumber")).toMatch(/no number/);
+    expect(messageText("noNumber")).toMatch(/Tab/);
+  });
+
   it("the selection warning mentions content controls (FR-008a)", () => {
     expect(messageText("selectionWarning")).toMatch(/content control/);
   });
