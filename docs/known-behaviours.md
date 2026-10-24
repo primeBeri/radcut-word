@@ -36,7 +36,7 @@ inserted there appears in every linked section.
 - An insertion with Track Changes on is one tracked insertion. After Accept All, the reference
   updates (F9) and Ctrl+click jumps to the heading as normal.
 - **Rejecting the insertion removes the reference text and fields, but leaves the hidden
-  bookmark (`_RC…`) on the heading.** It is harmless and invisible, and the next reference to
+  bookmark (`_XR…`) on the heading.** It is harmless and invisible, and the next reference to
   that heading reuses it.
 - A heading shown as a tracked deletion is not listed; a tracked inserted heading is.
 - **Moving a heading while Track Changes is on can break references to it** (Word shows the
@@ -46,7 +46,7 @@ inserted there appears in every linked section.
 ## Bookmarks
 
 XRef reuses a bookmark already on the heading when it covers exactly the heading text, and
-otherwise adds one hidden bookmark named `_RC…`. It never uses the bookmarks Word manages itself
+otherwise adds one hidden bookmark named `_XR…`. It never uses the bookmarks Word manages itself
 (`_Toc…` for a table of contents, which Word replaces when the table is updated, `_Hlk…` and
 `_GoBack`). It never renames, moves or deletes a bookmark or field it did not create.
 

@@ -17,7 +17,7 @@
   <Description DefaultValue="Insert native Word cross-references to headings from a keyboard palette."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://github.com/primeBeri/radcut-word"/>
+  <SupportUrl DefaultValue="https://github.com/primeBeri/xref-word"/>
   <Hosts>
     <Host Name="Document"/>
   </Hosts>
@@ -46,7 +46,7 @@
           <FunctionFile resid="Taskpane.Url"/>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
-              <Group id="RadCut.Group">
+              <Group id="XRef.Group">
                 <Label resid="Group.Label"/>
                 <Icon>
                   <bt:Image size="16" resid="CrossReference.16"/>
@@ -58,7 +58,7 @@
                   <bt:Image size="64" resid="CrossReference.64"/>
                   <bt:Image size="80" resid="CrossReference.80"/>
                 </Icon>
-                <Control xsi:type="Button" id="RadCut.CrossReference">
+                <Control xsi:type="Button" id="XRef.CrossReference">
                   <Label resid="CrossReference.Label"/>
                   <Supertip>
                     <Title resid="CrossReference.Label"/>
@@ -78,7 +78,7 @@
                     <FunctionName>OpenPalette</FunctionName>
                   </Action>
                 </Control>
-                <Control xsi:type="Button" id="RadCut.Settings">
+                <Control xsi:type="Button" id="XRef.Settings">
                   <Label resid="Settings.Label"/>
                   <Supertip>
                     <Title resid="Settings.Label"/>
@@ -125,7 +125,7 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/app/taskpane.html"/>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/primeBeri/radcut-word"/>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/primeBeri/xref-word"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="XRef is ready"/>

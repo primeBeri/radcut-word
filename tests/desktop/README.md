@@ -12,10 +12,10 @@ and palette timing. Development tooling only; never shipped. Design:
 - .NET 10 SDK. `global.json` at the repository root opts `dotnet test` into
   Microsoft.Testing.Platform, which the .NET 10 SDK needs for xUnit v3.
 - Once per machine, a trusted add-in catalogue (the harness loads XRef from it, see "Routes
-  that worked"): in an elevated PowerShell, `New-Item -ItemType Directory -Force C:\radcut-catalog`
-  and `New-SmbShare -Name radcut-catalog -Path C:\radcut-catalog -ReadAccess $env:USERNAME`; then
+  that worked"): in an elevated PowerShell, `New-Item -ItemType Directory -Force C:\xref-catalog`
+  and `New-SmbShare -Name xref-catalog -Path C:\xref-catalog -ReadAccess $env:USERNAME`; then
   in Word, File > Options > Trust Center > Trust Center Settings > Trusted Add-in Catalogs, add
-  `\\localhost\radcut-catalog` with "Show in Menu" ticked. Without it every check refuses and says
+  `\\localhost\xref-catalog` with "Show in Menu" ticked. Without it every check refuses and says
   so. The harness copies `manifest.xml` there on each run.
 - On a fresh Office, start Word once by hand and answer its first-run prompts (the "Default File
   Types" choice is modal and blocks every COM call).
@@ -39,8 +39,8 @@ and palette timing. Development tooling only; never shipped. Design:
 | `npm run test:desktop -- --filter-trait "Category=Diagnose" --explicit only` | diagnostics (not checks): WebView2 processes, CDP targets, focus, the shortcut's registration, Esc, and the cursor when opening from a header; explicit, so never part of a normal run |
 
 Exit code 0 means nothing failed; 8 means the filter matched no test. Each run clears the previous
-run's evidence and reports first. Set `RADCUT_KEEP_SCRATCH=1` to keep every scratch document under
-`%LOCALAPPDATA%\radcut-dev\scratch\` (by default only a failed test's copy is kept, in its evidence
+run's evidence and reports first. Set `XREF_KEEP_SCRATCH=1` to keep every scratch document under
+`%LOCALAPPDATA%\xref-dev\scratch\` (by default only a failed test's copy is kept, in its evidence
 folder). Reports (TRX, JUnit,
 `summary.md`) and the evidence of failed tests go to `tests/desktop/test-results/` (gitignored).
 Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
@@ -50,7 +50,7 @@ Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
 - Never kill, reuse or attach to a Word the harness did not start.
 - WebView2 debugging variables are set on the WINWORD process the harness starts, never
   machine-wide or user-wide; the debugging port listens on 127.0.0.1 only.
-- Scratch copies of fixtures live under `%LOCALAPPDATA%\radcut-dev\scratch\` (ASCII path: Word
+- Scratch copies of fixtures live under `%LOCALAPPDATA%\xref-dev\scratch\` (ASCII path: Word
   mishandles the `·` in the repository folder name); fixtures themselves are never saved.
 - No fixed sleeps: every wait is a condition with a time-out.
 - A flaky test is a defect: fix it, never skip or quarantine it.
@@ -58,7 +58,7 @@ Full contract: `specs/002-desktop-test-harness/contracts/harness-commands.md`.
 ## The desktop bridge
 
 Contract cases that need something Office.js cannot do ask the harness for it through
-`__radcutDesktop`, a function Playwright exposes to the contract pane
+`__xrefDesktop`, a function Playwright exposes to the contract pane
 (`Infrastructure/DesktopBridge.cs`, `src/dev/desktop-bridge.ts`): select a paragraph in any story
 (comments and text boxes included), protect or unprotect, renew the plain-text control, press
 Ctrl+Shift+Y, click the ribbon button, close the pane with its ×, Ctrl+Z, F9 on every story, move
@@ -76,19 +76,19 @@ appends its attempts to `test-results/routes.md`.
 |---|---|
 | Loading the add-in for the scratch copy | Register it (`office-addin-dev-settings register`, ASCII manifest copy) **and** add the sideload template's task pane parts to the scratch copy (`TaskpaneDocument`). Without the parts Word never shows the XRef ribbon group for the document. |
 | Opening the pane without the keyboard | The parts load the add-in but do not open its pane. The harness invokes XRef's own "Cross-reference" ribbon button through UI Automation (Invoke needs no keyboard or foreground). Search from the "XRef" group: the References tab has its own "Cross-reference" button. |
-| Reaching the pane over CDP: route A | Fails. Office's direct debugger setting (`UseDirectDebugger`) puts no `--remote-debugging-port` on WebView2 in this build; nothing listens on 9229. Kept behind `RADCUT_PANE_ROUTE=A`. |
+| Reaching the pane over CDP: route A | Fails. Office's direct debugger setting (`UseDirectDebugger`) puts no `--remote-debugging-port` on WebView2 in this build; nothing listens on 9229. Kept behind `XREF_PANE_ROUTE=A`. |
 | Reaching the pane over CDP: route B | Works. The harness starts `WINWORD.EXE` itself with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<free port>` on that process only. All Office panes share one WebView2 browser (one data folder), so the endpoint also shows Word's preloaded Copilot pane; the harness picks the page from `https://localhost:3000/`. The pane's WebView2 starts about 30 s after Word, so the harness waits up to 90 s. |
 | Attaching COM | Find the scratch document in the Running Object Table by its path and take `Document.Application`. This never starts Word and never matches another document. |
 | Word's window | `Document.ActiveWindow.Hwnd`. The process's "main window" is a small helper window. |
 | Keyboard focus | Windows reports focus inside a task pane on Office's `WebView2Holder` window, not on the element inside the WebView2. The harness checks that focus moved from the document (`_WwG`) to `WebView2Holder` and reads the active element from the page. Whether a screen reader can name it stays on the human Narrator check. |
 | Dev-pane build and Ctrl+Shift+Y (research D6) | The dev-pane build does not answer the shortcut (its pane is the dev launcher), so keyboard checks run on the normal build and contract runs on the dev-pane build. |
-| Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. With `RADCUT_LOG_REQUESTS=1` (the harness sets it) `vite.config.ts` logs every request to `dev-server-<mode>.log`, one log per run. |
+| Dev server | `node node_modules/vite/bin/vite.js` directly. Through `cmd` and `npm`, stopping it left Vite orphaned, holding port 3000 and the test run's output pipe. With `XREF_LOG_REQUESTS=1` (the harness sets it) `vite.config.ts` logs every request to `dev-server-<mode>.log`, one log per run. |
 
 ### Added on the test VM, 2026-10-16 (Word 2609, 16.0.20430)
 
 | Question | Answer |
 |---|---|
-| Developer registration (`office-addin-dev-settings register`) | Since Word 2609 an add-in registered this way loses its custom shortcuts on most starts: `Office.actions.getShortcuts()` returns `{}` and Ctrl+Shift+Y does nothing, although Office has fetched `shortcuts.json` (office-js#6973). Route B now loads the add-in from the trusted catalogue above; scratch documents refer to it with `store="\\localhost\radcut-catalog"`, `storeType="Filesystem"`, as Word writes it. Route A keeps the developer registration (Office's direct debugger needs it). |
+| Developer registration (`office-addin-dev-settings register`) | Since Word 2609 an add-in registered this way loses its custom shortcuts on most starts: `Office.actions.getShortcuts()` returns `{}` and Ctrl+Shift+Y does nothing, although Office has fetched `shortcuts.json` (office-js#6973). Route B now loads the add-in from the trusted catalogue above; scratch documents refer to it with `store="\\localhost\xref-catalog"`, `storeType="Filesystem"`, as Word writes it. Route A keeps the developer registration (Office's direct debugger needs it). |
 | The ribbon click that starts the add-in | Often loads the add-in without running OpenPalette: the page is ready and has associated the action, but is never called, and the pane stays 120×11 (7 of 11 sessions; office-js#2744). The harness clicks again when no palette has appeared after 10 s; most sessions need two clicks. |
 | Pane ready | The page appears over CDP before Office.js has initialised; the harness waits for `Office.onReady()` and, on the normal build, for the palette the ribbon opened, before a test touches the pane. |
 | Hidden event | Office tells the page the pane is hidden 0.1–1.5 s after the hide. The add-in clears itself on that event, so a Ctrl+Shift+Y pressed before it is cancelled by it (pane back, empty). The harness subscribes to the event itself and waits for it before the next Ctrl+Shift+Y; `routes.md` notes each wait over 100 ms. |

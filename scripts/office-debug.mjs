@@ -1,6 +1,7 @@
 // Runs office-addin-debugging start/stop against an ASCII-path copy of manifest.xml.
 // Word silently ignores a sideloaded manifest whose path contains non-ASCII characters
-// (the repository folder is "RAD·CUT"), so the registration must point elsewhere.
+// (found when the repository folder was "RAD·CUT"), so the registration points at a copy, wherever
+// the repository was cloned.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -13,7 +14,7 @@ if (command !== "start" && command !== "stop") {
   process.exit(2);
 }
 
-const dir = join(process.env.LOCALAPPDATA ?? tmpdir(), "radcut-dev");
+const dir = join(process.env.LOCALAPPDATA ?? tmpdir(), "xref-dev");
 // The copy's own path must be ASCII too (a user name can carry an accent), or Word ignores it again.
 if (!/^[ -~]*$/.test(dir)) {
   console.error(`office-debug: ${dir} contains non-ASCII characters, which Word ignores. Set LOCALAPPDATA to an ASCII path.`);

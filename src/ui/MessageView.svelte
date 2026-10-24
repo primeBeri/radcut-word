@@ -12,7 +12,7 @@
 
 <!-- Shown instead of the palette when it cannot open: the cursor is somewhere a reference cannot go,
      the document has no headings, or Word failed. -->
-<div class="message-view radcut-pane">
+<div class="message-view xref-pane">
   <MessageRegion {message} />
   <button
     bind:this={button}

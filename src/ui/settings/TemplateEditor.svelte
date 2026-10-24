@@ -19,7 +19,7 @@
     onchange: (change: Partial<Pick<TemplateDefinition, "label" | "source">>) => void;
   } = $props();
 
-  const base = $derived(`radcut-template-${template.id.replace(/[^\w-]/g, "-")}`);
+  const base = $derived(`xref-template-${template.id.replace(/[^\w-]/g, "-")}`);
   const title = $derived(template.label.trim() || SETTINGS_TEXT.unnamedTemplate);
   const describedBy = (...ids: (string | false)[]) => ids.filter(Boolean).join(" ") || undefined;
 

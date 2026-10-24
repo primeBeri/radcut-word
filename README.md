@@ -2,6 +2,8 @@
 
 Keyboard-driven cross-references for Microsoft Word.
 
+XRef was called RAD·CUT until October 2026. The feature specs and run logs under `specs/` and `docs/` keep the old name, as written at the time.
+
 Press a shortcut, fuzzy-search the document's headings in a palette, press Enter, and a live Word cross-reference is inserted at the cursor. XRef brings the two-keystroke linking habit of PKM tools such as Obsidian and Logseq to Word, without locking documents into an add-in.
 
 > **Status:** the MVP for Word on Windows desktop is in its release checks. It is not yet published; to try it, sideload it as below.
@@ -59,8 +61,8 @@ For a heading without a number, the number is left out together with the text th
 XRef runs from a local web server on your machine. You need Word for Windows (Microsoft 365), Node.js and npm.
 
 ```powershell
-git clone <this repository> radcut
-cd radcut
+git clone <this repository> xref
+cd xref
 npm install
 npm run certs   # once: a trusted HTTPS certificate for localhost:3000
 npm start       # starts the server and sideloads XRef into Word

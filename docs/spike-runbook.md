@@ -17,7 +17,7 @@ palette can work at all.
 3. Spikes change documents, so work on copies of the fixtures:
 
    ```powershell
-   $spikes = "$env:TEMP\radcut-spikes"
+   $spikes = "$env:TEMP\xref-spikes"
    New-Item -ItemType Directory -Force $spikes | Out-Null
    Copy-Item tests\fixtures\*.docx $spikes
    ```
@@ -28,7 +28,7 @@ palette can work at all.
 ## 1. Start Word with the dev panes
 
 ```powershell
-npm run start:dev-pane -- --document "$env:TEMP\radcut-spikes\spec-300.docx"
+npm run start:dev-pane -- --document "$env:TEMP\xref-spikes\spec-300.docx"
 ```
 
 This starts the dev server on `https://localhost:3000`, sideloads the add-in and opens the
@@ -48,7 +48,7 @@ Spike pane again.
 If the XRef group is missing, open it from **Home → Add-ins → Advanced → Developer
 Add-ins → XRef**. If it isn't listed there either: close Word, clear
 `%LOCALAPPDATA%\Microsoft\Office\16.0\Wef\`, and start again. The start/stop scripts sideload
-a copy of the manifest from `%LOCALAPPDATA%\radcut-dev\`, because Word ignores a sideloaded
+a copy of the manifest from `%LOCALAPPDATA%\xref-dev\`, because Word ignores a sideloaded
 manifest whose path contains the `·` of the repository folder. Record anything else here
 under R2.
 
@@ -113,7 +113,7 @@ so run them on a copy of `spec-300.docx` with tracking turned on, as described.
 | 3.1 | Open `tracked.docx` and click **Detect headings that are tracked deletions**. | Does "Deleted heading" report a `Deleted` change and "Inserted heading" an `Added` change? Or does it say WordApi 1.6 is unsupported, in which case the fallback applies? |
 | 3.2 | Open a spec-300 copy, click **Turn change tracking on**, then **Insert with tracking on** with the caret in body text. | Is the reference shown as one tracked insertion? Number of Undo steps with tracking on. |
 | 3.3 | On copy A: **Accept all**, then Ctrl+A, F9. | Does the reference still update and jump? |
-| 3.4 | On copy B (repeat 3.2 first): **Reject all**, then spike 2's **Compare bookmark ranges**. | Is the reference gone? Is the created `_RC…` bookmark still on the heading? |
+| 3.4 | On copy B (repeat 3.2 first): **Reject all**, then spike 2's **Compare bookmark ranges**. | Is the reference gone? Is the created `_XR…` bookmark still on the heading? |
 | 3.5 | Co-authoring, by hand, with two accounts or devices, per `docs/acceptance-checklist.md`. | The outcome. It's fine to defer this until a second user is available, as long as you note that. |
 
 ## 5. Recording the outcomes

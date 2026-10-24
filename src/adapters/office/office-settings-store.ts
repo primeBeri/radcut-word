@@ -3,9 +3,9 @@ import { readStoredRecents, withDocumentRecents } from "../../core/recents/recen
 import type { UserSettings } from "../../core/settings/types";
 
 /** The one versioned key the settings live under (the version is inside the value). */
-export const SETTINGS_KEY = "radcut.settings";
+export const SETTINGS_KEY = "xref.settings";
 /** Every document's recents in one list, so the core can keep it to 50 documents (data-model RecentHeadings). */
-export const RECENTS_KEY = "radcut.recents";
+export const RECENTS_KEY = "xref.recents";
 
 /** The stored text, parsed if it is JSON, else the text itself: the core validates either. */
 function parseRaw(text: string | null): unknown {

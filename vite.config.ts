@@ -12,7 +12,7 @@ const shortcutsFile = resolve(root, "app/shortcuts.json");
  */
 function shortcutsJson(): Plugin {
   return {
-    name: "radcut-shortcuts-json",
+    name: "xref-shortcuts-json",
     configureServer(server) {
       server.middlewares.use("/shortcuts.json", (_req, res) => {
         res.setHeader("Content-Type", "application/json");
@@ -36,7 +36,7 @@ function shortcutsJson(): Plugin {
  */
 function thirdPartyNotices(): Plugin {
   return {
-    name: "radcut-third-party-notices",
+    name: "xref-third-party-notices",
     generateBundle(_options, bundle) {
       const packageDirs = new Set<string>();
       for (const output of Object.values(bundle)) {
@@ -72,7 +72,7 @@ function thirdPartyNotices(): Plugin {
  */
 function devPaneLauncher(): Plugin {
   return {
-    name: "radcut-dev-pane-launcher",
+    name: "xref-dev-pane-launcher",
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const url = req.url ?? "";
@@ -87,15 +87,15 @@ function devPaneLauncher(): Plugin {
 }
 
 /**
- * With `RADCUT_LOG_REQUESTS=1` (set by the desktop harness), logs every request with its status
+ * With `XREF_LOG_REQUESTS=1` (set by the desktop harness), logs every request with its status
  * and time, so a failed add-in install ("failed to download a required resource") shows what
  * Word asked for.
  */
 function requestLog(): Plugin {
   return {
-    name: "radcut-request-log",
+    name: "xref-request-log",
     configureServer(server) {
-      if (process.env.RADCUT_LOG_REQUESTS !== "1") return;
+      if (process.env.XREF_LOG_REQUESTS !== "1") return;
       server.middlewares.use((req, res, next) => {
         const started = performance.now();
         const url = req.url ?? "";

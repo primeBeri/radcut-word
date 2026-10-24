@@ -109,7 +109,7 @@ describe("ChangeShortcut (FR-020, contracts/host-ports.md behaviours 2–4, 6)",
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     replace.mockRejectedValue(new Error("boom"));
     expect(await changeShortcut(shortcut, combo("Ctrl+Alt+J"))).toEqual({ ok: false, error: SHORTCUT_TEXT.failed });
-    expect(log).toHaveBeenCalledWith("[radcut:change-shortcut]", expect.any(Error));
+    expect(log).toHaveBeenCalledWith("[xref:change-shortcut]", expect.any(Error));
     log.mockRestore();
   });
 });

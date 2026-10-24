@@ -40,7 +40,7 @@ export async function saveSettings(store: ISettingsStore, unsaved: UserSettings)
     await store.saveSettings(settings);
     return { ok: true };
   } catch (error) {
-    console.error("[radcut:save-settings]", error);
+    console.error("[xref:save-settings]", error);
     return { ok: false, errors: [], failed: true };
   }
 }

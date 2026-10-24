@@ -14,7 +14,7 @@ Ideas raised during development that are not yet in a spec. Each needs `/speckit
   literals ("§ ", "see ") cannot be told apart from ordinary text once custom templates exist
   (US3), so this needs a decision on how far the add-in may guess.
 - **Plain-text content controls, post V1** (002 M1, 2026-10-15). Plain-text content controls are
-  rare in the documents RAD·CUT targets, and both Office.js and the test harness handle them
+  rare in the documents XRef targets, and both Office.js and the test harness handle them
   awkwardly: Office.js cannot create one (`insertContentControl("PlainText")` fails), and after an
   `insertOoxml` restore it stops listing an existing one in `contentControls`, so a whole-control
   selection is not recognised. The V1 rules stay as built (FR-001a: declined inside; FR-008a:

@@ -552,3 +552,18 @@ the runs were not timed, so no median is recorded for SC-001. Co-authoring (scen
 deferred until after the MVP, when it can be tested properly; `docs/known-behaviours.md` still
 calls it untested. The owner chose to leave the settings
 view's template fields as text boxes (the suggestion pop-up there is a fringe case). T103 is done.
+
+## Rename to XRef (PR #2), full harness run on the desktop, 2026-10-24
+
+RAD·CUT was renamed XRef: the display name, icons and ribbon labels in #1, and the code, harness
+project (`XRef.DesktopTests`), settings keys, page hooks, catalogue share
+(`\\localhost\xref-catalog`), bookmark prefix for new bookmarks (`_XR…`) and repository
+(`primeBeri/xref-word`) in #2. Entries above keep the old names as recorded.
+
+- `npm test` 669 passed, 4 skipped; lint, typecheck and release build clean (41,240 bytes gzip,
+  `THIRD-PARTY-NOTICES.txt` with Svelte's licence).
+- Full harness run on the owner's desktop: 158 tests, 144 passed, 1 failed, 13 skipped (the
+  explicit diagnostics, 10b, 10f, K3, K6, S5) in 16 min 28 s. Every Contract, Document, M0,
+  Performance and Scenario test passed, scenarios 20, 23 and 27 included. The one failure was a
+  harness self-check asserting the repository folder name contains `·`, stale since the folder was
+  renamed; fixed to use a fixed example, and the Harness category then passed (29 of 29).

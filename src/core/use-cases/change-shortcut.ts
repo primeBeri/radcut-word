@@ -21,7 +21,7 @@ export async function readShortcut(shortcut: HostShortcut): Promise<ShortcutStat
     const [current, customisable] = await Promise.all([shortcut.current(), shortcut.canCustomise()]);
     return { current: normal(current), customisable };
   } catch (error) {
-    console.error("[radcut:read-shortcut]", error);
+    console.error("[xref:read-shortcut]", error);
     return { current: null, customisable: false };
   }
 }
@@ -52,7 +52,7 @@ export async function changeShortcut(shortcut: HostShortcut, combo: KeyCombo | n
     }
     return { ok: true, current: normal(await shortcut.current()) };
   } catch (error) {
-    console.error("[radcut:change-shortcut]", error);
+    console.error("[xref:change-shortcut]", error);
     return { ok: false, error: SHORTCUT_TEXT.failed };
   }
 }

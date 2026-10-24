@@ -44,7 +44,7 @@ export type InsertReferenceOutcome =
 
 /** A host error, logged locally with Word's detail (Constitution V: nothing leaves the machine). */
 function hostError(message: "hostError" | "hostErrorPartial", detail: string): InsertReferenceOutcome {
-  console.error("[radcut:insert-host-error]", detail);
+  console.error("[xref:insert-host-error]", detail);
   return { kind: "message", message, detail };
 }
 
@@ -83,11 +83,11 @@ export async function insertReference(
     deps.index.noteBookmark(input.target, result.bookmark);
     await deps.recents
       ?.record(deps.index.cached()?.documentId ?? null, result.bookmark)
-      .catch((error: unknown) => console.error("[radcut:record-recent]", error));
+      .catch((error: unknown) => console.error("[xref:record-recent]", error));
     // The reference is in the document: a focus failure must not turn that into a failure, or the
     // palette would stay open and a second Enter would insert it again.
-    await deps.shell.hidePane().catch((error: unknown) => console.error("[radcut:hide-pane]", error));
-    await deps.gateway.returnFocus(result.reference).catch((error: unknown) => console.error("[radcut:return-focus]", error));
+    await deps.shell.hidePane().catch((error: unknown) => console.error("[xref:hide-pane]", error));
+    await deps.gateway.returnFocus(result.reference).catch((error: unknown) => console.error("[xref:return-focus]", error));
     return {
       kind: "inserted",
       reference: result.reference,

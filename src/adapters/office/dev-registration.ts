@@ -120,7 +120,7 @@ async function prepareDocument(fixture: ContractFixture): Promise<void> {
       // Guard: a write the dirty tracking missed shows up here, is logged and still restored.
       const facts = await mainTextFacts(context);
       if (facts.textLength !== snapshot.textLength || facts.bookmarkCount !== snapshot.bookmarkCount) {
-        console.warn(`[radcut:contract] "${previousCase ?? "?"}" changed the document without marking it dirty; restoring`, {
+        console.warn(`[xref:contract] "${previousCase ?? "?"}" changed the document without marking it dirty; restoring`, {
           expected: { textLength: snapshot.textLength, bookmarkCount: snapshot.bookmarkCount },
           found: facts,
         });
@@ -574,5 +574,5 @@ export async function registerOfficeContracts(): Promise<void> {
   });
 }
 
-const CONTRACT_SETTINGS_KEY = "radcut.contract.settings";
-const CONTRACT_RECENTS_KEY = "radcut.contract.recents";
+const CONTRACT_SETTINGS_KEY = "xref.contract.settings";
+const CONTRACT_RECENTS_KEY = "xref.contract.recents";

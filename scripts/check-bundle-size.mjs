@@ -26,7 +26,7 @@ if (devPages.length > 0) {
 
 // Hooks the desktop harness relies on (specs/002-desktop-test-harness) live only in dev code:
 // the dev pages, and the performance runner the dev server's app loads.
-const HARNESS_HOOKS = ["__radcutContractResults", "contract-results", "__radcutDesktop", "__radcutPerf"];
+const HARNESS_HOOKS = ["__xrefContractResults", "contract-results", "__xrefDesktop", "__xrefPerf"];
 const outputFiles = readdirSync(dist, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile());
 const leaks = outputFiles.flatMap((entry) => {
   const path = join(entry.parentPath, entry.name);

@@ -297,7 +297,7 @@ export class OfficeJsGateway implements IDocumentGateway {
         return { ok: false, reason: "declined", declined: { kind: "declined", reason: "protected" } };
       }
       // Not an error from Word: a bug in the add-in. Logged as such, with its stack, locally.
-      if (!(error instanceof OfficeExtension.Error)) console.error("[radcut:insert-bug]", error);
+      if (!(error instanceof OfficeExtension.Error)) console.error("[xref:insert-bug]", error);
       return { ok: false, reason: "hostError", partialWrite, detail: hostErrorDetail(error) };
     }
   }

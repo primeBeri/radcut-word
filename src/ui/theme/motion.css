@@ -2,7 +2,7 @@
    selection highlight), never awaited by input handlers. All of it is off when Windows asks for
    reduced motion, which Word's WebView reports (research R11). No Svelte transition: directives. */
 
-@keyframes radcut-fade-in {
+@keyframes xref-fade-in {
   from {
     opacity: 0;
   }
@@ -11,8 +11,8 @@
   }
 }
 
-.radcut-pane {
-  animation: radcut-fade-in var(--durationFaster) var(--curveDecelerateMid);
+.xref-pane {
+  animation: xref-fade-in var(--durationFaster) var(--curveDecelerateMid);
 }
 
 [role="option"] {
@@ -22,7 +22,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .radcut-pane {
+  .xref-pane {
     animation: none;
   }
 

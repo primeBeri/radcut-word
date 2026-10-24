@@ -174,7 +174,7 @@ describe("OpenPalette", () => {
     it("drops recents whose heading is gone, against a fresh read only", async () => {
       const { gateway, index } = setup();
       const store = new FakeSettingsStore();
-      await store.saveRecents(docId, ["_RCgone", "_Ref200000001"]);
+      await store.saveRecents(docId, ["_XRgone", "_Ref200000001"]);
       const recents = new RecentHeadings(store);
       // The first open reads the document, so the list is fresh and pruned.
       const first = await openPalette({ gateway, index, recents }, defaults);
@@ -183,11 +183,11 @@ describe("OpenPalette", () => {
       expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
 
       // From the cache: a bookmark it does not know is kept until the refresh shows it gone.
-      await store.saveRecents(docId, ["_RCnew", "_Ref200000001"]);
+      await store.saveRecents(docId, ["_XRnew", "_Ref200000001"]);
       const second = await openPalette({ gateway, index, recents }, defaults);
       if (second.kind !== "open") throw new Error(second.kind);
-      expect(second.recents).toEqual(["_RCnew", "_Ref200000001"]);
-      expect(await store.loadRecents(docId)).toEqual(["_RCnew", "_Ref200000001"]);
+      expect(second.recents).toEqual(["_XRnew", "_Ref200000001"]);
+      expect(await store.loadRecents(docId)).toEqual(["_XRnew", "_Ref200000001"]);
       await second.refreshed;
       await second.pruned;
       expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
@@ -199,17 +199,17 @@ describe("OpenPalette", () => {
       const store = new FakeSettingsStore();
       const recents = new RecentHeadings(store);
 
-      await store.saveRecents(docId, ["_RCgone", "_Ref200000001"]);
+      await store.saveRecents(docId, ["_XRgone", "_Ref200000001"]);
       const skipped = await openPalette({ gateway, index, recents, mayRefresh: async () => false }, defaults);
       if (skipped.kind !== "open") throw new Error(skipped.kind);
       await skipped.pruned;
-      expect(await store.loadRecents(docId)).toEqual(["_RCgone", "_Ref200000001"]);
+      expect(await store.loadRecents(docId)).toEqual(["_XRgone", "_Ref200000001"]);
 
       const { mayRefresh, settle } = goAhead();
       const allowed = await openPalette({ gateway, index, recents, mayRefresh }, defaults);
       if (allowed.kind !== "open") throw new Error(allowed.kind);
       await nextTask();
-      expect(await store.loadRecents(docId)).toEqual(["_RCgone", "_Ref200000001"]);
+      expect(await store.loadRecents(docId)).toEqual(["_XRgone", "_Ref200000001"]);
       settle(true);
       await allowed.pruned;
       expect(await store.loadRecents(docId)).toEqual(["_Ref200000001"]);
@@ -231,12 +231,12 @@ describe("OpenPalette", () => {
       const second = await openPalette({ gateway, index, recents }, defaults);
       if (second.kind !== "open") throw new Error(second.kind);
       // What InsertReference does after writing a new bookmark, while the read above is under way.
-      index.noteBookmark(target, "_RCnew");
-      await recents.record(docId, "_RCnew");
+      index.noteBookmark(target, "_XRnew");
+      await recents.record(docId, "_XRnew");
       release();
       await second.pruned;
-      expect(await store.loadRecents(docId)).toEqual(["_RCnew"]);
-      expect(index.byKey({ kind: "bookmark", name: "_RCnew" })?.order).toBe(target.order);
+      expect(await store.loadRecents(docId)).toEqual(["_XRnew"]);
+      expect(index.byKey({ kind: "bookmark", name: "_XRnew" })?.order).toBe(target.order);
     });
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Dev-only: wires `PerfRecorder` to the task pane page (feature 001 T096). The app's ports are
  * timed, the palette's readiness is watched in the page, long tasks come from a
- * `PerformanceObserver`, and the results are published as `window.__radcutPerf` for the desktop
+ * `PerformanceObserver`, and the results are published as `window.__xrefPerf` for the desktop
  * harness. `main.ts` loads this only in the Vite dev server, never in the release build.
  */
 import type { AppPorts } from "../app/create-app";
@@ -52,11 +52,11 @@ export function installPerfRecorder(ports: AppPorts, target: HTMLElement): AppPo
     }).observe({ type: "longtask", buffered: true });
   } catch (error) {
     recorder.longTasksUnavailable();
-    console.error("[radcut:perf-longtask]", error);
+    console.error("[xref:perf-longtask]", error);
   }
 
   const handle: PerfHandle = { results: () => recorder.results(), clear: () => recorder.clear() };
-  (window as { __radcutPerf?: PerfHandle }).__radcutPerf = handle;
+  (window as { __xrefPerf?: PerfHandle }).__xrefPerf = handle;
 
   return {
     gateway: recorder.timed(ports.gateway, "gateway"),

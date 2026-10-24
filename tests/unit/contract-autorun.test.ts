@@ -113,19 +113,19 @@ describe("desktopBridge", () => {
   it("sends the request as JSON and parses the reply", async () => {
     const sent: string[] = [];
     const bridge = desktopBridge({
-      __radcutDesktop: async (request: string) => {
+      __xrefDesktop: async (request: string) => {
         sent.push(request);
         return JSON.stringify({ ok: true, value: { paragraphText: "Fire strategy" } });
       },
     });
 
-    expect(await bridge!({ action: "followReference", bookmark: "_RC1" })).toEqual({ paragraphText: "Fire strategy" });
-    expect(JSON.parse(sent[0]!)).toEqual({ action: "followReference", bookmark: "_RC1" });
+    expect(await bridge!({ action: "followReference", bookmark: "_XR1" })).toEqual({ paragraphText: "Fire strategy" });
+    expect(JSON.parse(sent[0]!)).toEqual({ action: "followReference", bookmark: "_XR1" });
   });
 
   it("throws the desktop's error message", async () => {
     const bridge = desktopBridge({
-      __radcutDesktop: async () => JSON.stringify({ ok: false, error: "No comment \"x\"." }),
+      __xrefDesktop: async () => JSON.stringify({ ok: false, error: "No comment \"x\"." }),
     });
 
     await expect(bridge!({ action: "select", text: "x" })).rejects.toThrow("Desktop harness: No comment \"x\".");
