@@ -2,7 +2,7 @@ namespace RadCut.DesktopTests.Infrastructure;
 
 /// <summary>
 /// Everything a pane-driven test needs: the dev server, the add-in registered, Word on a scratch
-/// copy with the pane opened from RAD·CUT's ribbon button, COM to the document, and Playwright to
+/// copy with the pane opened from XRef's ribbon button, COM to the document, and Playwright to
 /// the pane. Uses pane route
 /// B (research D3: route A sets no debugging port in this Office build) unless
 /// <c>RADCUT_PANE_ROUTE</c> names another, and records each attempt in <c>test-results/routes.md</c>.

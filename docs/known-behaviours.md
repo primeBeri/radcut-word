@@ -1,6 +1,6 @@
 # Known behaviours
 
-How RAD·CUT behaves in situations that may surprise you. Everything it inserts is ordinary
+How XRef behaves in situations that may surprise you. Everything it inserts is ordinary
 Word: a hidden bookmark on the heading and REF fields pointing at it.
 
 ## Undo
@@ -8,12 +8,12 @@ Word: a hidden bookmark on the heading and REF fields pointing at it.
 **One Ctrl+Z removes one inserted reference, completely.** That holds with or without Track
 Changes, wherever the cursor is (main text, table cell, footnote, endnote, header, footer, text
 box), and when the reference replaces a selection or an existing field. If an insertion fails
-part-way, RAD·CUT checks the document afterwards and tells you whether anything was written.
+part-way, XRef checks the document afterwards and tells you whether anything was written.
 
 ## Selections
 
 Before replacing a selection that spans more than one paragraph, or holds a picture, a shape or
-a content control, or an existing field, RAD·CUT asks you to confirm. **Equations and embedded objects
+a content control, or an existing field, XRef asks you to confirm. **Equations and embedded objects
 (for example an embedded spreadsheet) are not detected**: a selection containing only those and
 text is replaced without the warning. Undo restores it.
 
@@ -24,7 +24,7 @@ A selection that includes a table, or part of one, is refused rather than replac
 Main text, table cells, footnotes, endnotes, headers, footers and text boxes, and rich-text
 content controls. Not in a comment, a plain-text content control or a protected document, nor in
 a heading, Title or Subtitle paragraph unless "Allow cross references in headings" is on;
-RAD·CUT says why and changes nothing.
+XRef says why and changes nothing.
 
 In a header, footer, text box, footnote or endnote, the "above"/"below" formats are not offered:
 Word's `\p` switch shows the heading text there instead of "above" or "below", as Word's own
@@ -45,7 +45,7 @@ inserted there appears in every linked section.
 
 ## Bookmarks
 
-RAD·CUT reuses a bookmark already on the heading when it covers exactly the heading text, and
+XRef reuses a bookmark already on the heading when it covers exactly the heading text, and
 otherwise adds one hidden bookmark named `_RC…`. It never uses the bookmarks Word manages itself
 (`_Toc…` for a table of contents, which Word replaces when the table is updated, `_Hlk…` and
 `_GoBack`). It never renames, moves or deletes a bookmark or field it did not create.
@@ -77,6 +77,6 @@ of inserting.
 
 ## Privacy
 
-RAD·CUT makes no network requests after it has loaded, and no document content leaves your
+XRef makes no network requests after it has loaded, and no document content leaves your
 computer. Settings and recently used headings are kept by Office on your computer, never in the
 document.

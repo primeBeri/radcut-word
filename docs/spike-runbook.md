@@ -34,7 +34,7 @@ npm run start:dev-pane -- --document "$env:TEMP\radcut-spikes\spec-300.docx"
 This starts the dev server on `https://localhost:3000`, sideloads the add-in and opens the
 document in Word. Then:
 
-1. On the **Home** tab, at the right-hand end, find the **RAD·CUT** group and click
+1. On the **Home** tab, at the right-hand end, find the **XRef** group and click
    **Cross-reference**. The task pane opens on the **dev launcher**.
 2. Click **Spike pane**. The log at the bottom starts with **Requirement sets**: copy that line,
    because every spike outcome depends on it.
@@ -45,8 +45,8 @@ To switch documents, run `npm stop`, then start again with a different `--docume
 also open another fixture from Word's File menu, then reopen the pane from the ribbon and click
 Spike pane again.
 
-If the RAD·CUT group is missing, open it from **Home → Add-ins → Advanced → Developer
-Add-ins → RAD·CUT**. If it isn't listed there either: close Word, clear
+If the XRef group is missing, open it from **Home → Add-ins → Advanced → Developer
+Add-ins → XRef**. If it isn't listed there either: close Word, clear
 `%LOCALAPPDATA%\Microsoft\Office\16.0\Wef\`, and start again. The start/stop scripts sideload
 a copy of the manifest from `%LOCALAPPDATA%\radcut-dev\`, because Word ignores a sideloaded
 manifest whose path contains the `·` of the repository folder. Record anything else here

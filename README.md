@@ -1,8 +1,8 @@
-# RAD·CUT
+# XRef
 
 Keyboard-driven cross-references for Microsoft Word.
 
-Press a shortcut, fuzzy-search the document's headings in a palette, press Enter, and a live Word cross-reference is inserted at the cursor. RAD·CUT brings the two-keystroke linking habit of PKM tools such as Obsidian and Logseq to Word, without locking documents into an add-in.
+Press a shortcut, fuzzy-search the document's headings in a palette, press Enter, and a live Word cross-reference is inserted at the cursor. XRef brings the two-keystroke linking habit of PKM tools such as Obsidian and Logseq to Word, without locking documents into an add-in.
 
 > **Status:** the MVP for Word on Windows desktop is in its release checks. It is not yet published; to try it, sideload it as below.
 
@@ -12,7 +12,7 @@ Word's built-in Cross-reference dialog is modal, mouse-heavy and lists every hea
 
 ## How it works
 
-1. Place the cursor and press **Ctrl+Shift+Y** (configurable), or click **Cross-reference** in the RAD·CUT group on the Home tab.
+1. Place the cursor and press **Ctrl+Shift+Y** (configurable), or click **Cross-reference** in the XRef group on the Home tab.
 2. Type to fuzzy-filter the document's headings: `fstrat` finds "4.3 Fire strategy", and `4.3` works too.
 3. Use **↑ ↓** to choose, **Tab** to cycle the reference format, **Enter** to insert, **Esc** to cancel.
 
@@ -56,14 +56,14 @@ For a heading without a number, the number is left out together with the text th
 
 ## Install (sideloading)
 
-RAD·CUT runs from a local web server on your machine. You need Word for Windows (Microsoft 365), Node.js and npm.
+XRef runs from a local web server on your machine. You need Word for Windows (Microsoft 365), Node.js and npm.
 
 ```powershell
 git clone <this repository> radcut
 cd radcut
 npm install
 npm run certs   # once: a trusted HTTPS certificate for localhost:3000
-npm start       # starts the server and sideloads RAD·CUT into Word
+npm start       # starts the server and sideloads XRef into Word
 ```
 
 `npm stop` unloads it. Since Word 2609, an add-in sideloaded this way loses its keyboard shortcut on most starts (office-js#6973); the ribbon button still works. Loading the manifest from a shared-folder add-in catalogue does not help either: Word 2609 does not register that copy's shortcuts. See `tests/desktop/README.md`.
@@ -72,7 +72,7 @@ Known behaviours, such as what happens when a tracked reference is rejected, are
 
 ## Privacy
 
-RAD·CUT makes no network requests after it has loaded, and no document content leaves your computer. Your settings and recently used headings are kept by Office on your computer, never in the document.
+XRef makes no network requests after it has loaded, and no document content leaves your computer. Your settings and recently used headings are kept by Office on your computer, never in the document.
 
 ## Roadmap
 

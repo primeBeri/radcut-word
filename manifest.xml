@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  RAD·CUT add-in only manifest (research R1): shared runtime, ribbon group, keyboard shortcuts.
+  XRef add-in only manifest (research R1): shared runtime, ribbon group, keyboard shortcuts.
   WordApi 1.5 and SharedRuntime 1.1 are required. KeyboardShortcuts 1.1, WordApi 1.6 and
   WordApiDesktop 1.2 and 1.4 are checked at runtime with isSetSupported, not declared here.
 -->
@@ -13,7 +13,7 @@
   <Version>0.1.0.0</Version>
   <ProviderName>RadBeri</ProviderName>
   <DefaultLocale>en-GB</DefaultLocale>
-  <DisplayName DefaultValue="RAD·CUT"/>
+  <DisplayName DefaultValue="XRef"/>
   <Description DefaultValue="Insert native Word cross-references to headings from a keyboard palette."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
@@ -49,9 +49,14 @@
               <Group id="RadCut.Group">
                 <Label resid="Group.Label"/>
                 <Icon>
-                  <bt:Image size="16" resid="Icon.16"/>
-                  <bt:Image size="32" resid="Icon.32"/>
-                  <bt:Image size="80" resid="Icon.80"/>
+                  <bt:Image size="16" resid="CrossReference.16"/>
+                  <bt:Image size="20" resid="CrossReference.20"/>
+                  <bt:Image size="24" resid="CrossReference.24"/>
+                  <bt:Image size="32" resid="CrossReference.32"/>
+                  <bt:Image size="40" resid="CrossReference.40"/>
+                  <bt:Image size="48" resid="CrossReference.48"/>
+                  <bt:Image size="64" resid="CrossReference.64"/>
+                  <bt:Image size="80" resid="CrossReference.80"/>
                 </Icon>
                 <Control xsi:type="Button" id="RadCut.CrossReference">
                   <Label resid="CrossReference.Label"/>
@@ -60,9 +65,14 @@
                     <Description resid="CrossReference.Tooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16"/>
-                    <bt:Image size="32" resid="Icon.32"/>
-                    <bt:Image size="80" resid="Icon.80"/>
+                    <bt:Image size="16" resid="CrossReference.16"/>
+                    <bt:Image size="20" resid="CrossReference.20"/>
+                    <bt:Image size="24" resid="CrossReference.24"/>
+                    <bt:Image size="32" resid="CrossReference.32"/>
+                    <bt:Image size="40" resid="CrossReference.40"/>
+                    <bt:Image size="48" resid="CrossReference.48"/>
+                    <bt:Image size="64" resid="CrossReference.64"/>
+                    <bt:Image size="80" resid="CrossReference.80"/>
                   </Icon>
                   <Action xsi:type="ExecuteFunction">
                     <FunctionName>OpenPalette</FunctionName>
@@ -75,9 +85,14 @@
                     <Description resid="Settings.Tooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16"/>
-                    <bt:Image size="32" resid="Icon.32"/>
-                    <bt:Image size="80" resid="Icon.80"/>
+                    <bt:Image size="16" resid="Settings.16"/>
+                    <bt:Image size="20" resid="Settings.20"/>
+                    <bt:Image size="24" resid="Settings.24"/>
+                    <bt:Image size="32" resid="Settings.32"/>
+                    <bt:Image size="40" resid="Settings.40"/>
+                    <bt:Image size="48" resid="Settings.48"/>
+                    <bt:Image size="64" resid="Settings.64"/>
+                    <bt:Image size="80" resid="Settings.80"/>
                   </Icon>
                   <Action xsi:type="ExecuteFunction">
                     <FunctionName>OpenSettings</FunctionName>
@@ -91,17 +106,30 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="CrossReference.16" DefaultValue="https://localhost:3000/assets/cross-reference-16.png"/>
+        <bt:Image id="CrossReference.20" DefaultValue="https://localhost:3000/assets/cross-reference-20.png"/>
+        <bt:Image id="CrossReference.24" DefaultValue="https://localhost:3000/assets/cross-reference-24.png"/>
+        <bt:Image id="CrossReference.32" DefaultValue="https://localhost:3000/assets/cross-reference-32.png"/>
+        <bt:Image id="CrossReference.40" DefaultValue="https://localhost:3000/assets/cross-reference-40.png"/>
+        <bt:Image id="CrossReference.48" DefaultValue="https://localhost:3000/assets/cross-reference-48.png"/>
+        <bt:Image id="CrossReference.64" DefaultValue="https://localhost:3000/assets/cross-reference-64.png"/>
+        <bt:Image id="CrossReference.80" DefaultValue="https://localhost:3000/assets/cross-reference-80.png"/>
+        <bt:Image id="Settings.16" DefaultValue="https://localhost:3000/assets/settings-16.png"/>
+        <bt:Image id="Settings.20" DefaultValue="https://localhost:3000/assets/settings-20.png"/>
+        <bt:Image id="Settings.24" DefaultValue="https://localhost:3000/assets/settings-24.png"/>
+        <bt:Image id="Settings.32" DefaultValue="https://localhost:3000/assets/settings-32.png"/>
+        <bt:Image id="Settings.40" DefaultValue="https://localhost:3000/assets/settings-40.png"/>
+        <bt:Image id="Settings.48" DefaultValue="https://localhost:3000/assets/settings-48.png"/>
+        <bt:Image id="Settings.64" DefaultValue="https://localhost:3000/assets/settings-64.png"/>
+        <bt:Image id="Settings.80" DefaultValue="https://localhost:3000/assets/settings-80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/app/taskpane.html"/>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/primeBeri/radcut-word"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="RAD·CUT is ready"/>
-        <bt:String id="Group.Label" DefaultValue="RAD·CUT"/>
+        <bt:String id="GetStarted.Title" DefaultValue="XRef is ready"/>
+        <bt:String id="Group.Label" DefaultValue="XRef"/>
         <bt:String id="CrossReference.Label" DefaultValue="Cross-reference"/>
         <bt:String id="Settings.Label" DefaultValue="Settings"/>
       </bt:ShortStrings>

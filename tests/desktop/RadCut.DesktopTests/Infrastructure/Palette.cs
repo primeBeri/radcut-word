@@ -61,7 +61,7 @@ public sealed class Palette(PaneSession session) : IDisposable
             string? assigned = await Pane.Page.EvaluateAsync<string?>("async () => (await Office.actions.getShortcuts()).OpenPalette ?? null");
             return string.Equals(assigned, pressed, StringComparison.OrdinalIgnoreCase)
                 ? ""
-                : $"The palette's shortcut in this Office account is {assigned ?? "unassigned"}, not {pressed}: reset it to default in RAD·CUT's settings in your own Word. ";
+                : $"The palette's shortcut in this Office account is {assigned ?? "unassigned"}, not {pressed}: reset it to default in XRef's settings in your own Word. ";
         }
         catch (PlaywrightException)
         {

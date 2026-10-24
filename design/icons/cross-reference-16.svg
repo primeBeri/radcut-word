@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- Cross-reference, 16 px master (also 20 and 24 px). -->
+  <path d="M5.5 .5h6l3 3v11h-9z" fill="#FFFFFF" stroke="#424242"/>
+  <rect x="7" y="3" width="4" height="1" fill="#424242"/>
+  <rect x="7" y="10" width="5" height="1" fill="#C42245"/>
+  <path d="M5 10.5H1.5V4H3" fill="none" stroke="#C42245"/>
+  <polygon points="5.5,4 3,1.5 3,6.5" fill="#C42245"/>
+</svg>

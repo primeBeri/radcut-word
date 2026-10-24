@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Product icon: a heading, two lines of text and a two-facet arrow pointing up at the heading. -->
+  <rect width="64" height="64" fill="#C42245"/>
+  <rect x="12" y="12" width="40" height="7" fill="#FFFFFF"/>
+  <rect x="12" y="25" width="24" height="4" fill="#FFFFFF" fill-opacity="0.55"/>
+  <rect x="12" y="33" width="18" height="4" fill="#FFFFFF" fill-opacity="0.55"/>
+  <polygon points="36,52 45,27 45,52" fill="#FFFFFF"/>
+  <polygon points="45,27 54,52 45,52" fill="#F4B9C6"/>
+</svg>
