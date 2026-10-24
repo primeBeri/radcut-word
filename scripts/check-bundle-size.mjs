@@ -1,6 +1,7 @@
 // Release-build checks, run after `vite build`:
 // - no dev-only page (src/dev/**, src/adapters/office/spikes/**) in the output (Constitution V);
 // - no desktop-harness hook (the contract pane's results, the desktop bridge) in any output file;
+// - the bundled packages' licences in THIRD-PARTY-NOTICES.txt;
 // - the task pane JavaScript within the 150 KB min+gzip budget (Constitution IV).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -34,6 +35,13 @@ const leaks = outputFiles.flatMap((entry) => {
 });
 if (leaks.length > 0) {
   console.error(`check-bundle-size: desktop-harness hooks in the release output: ${leaks.join(", ")}`);
+  process.exit(1);
+}
+
+// Svelte (MIT) is bundled, and its licence must travel with the copy (vite.config.ts writes the file).
+const notices = join(dist, "THIRD-PARTY-NOTICES.txt");
+if (!existsSync(notices) || !readFileSync(notices, "utf8").includes("svelte ")) {
+  console.error("check-bundle-size: dist/THIRD-PARTY-NOTICES.txt is missing or does not list Svelte's licence.");
   process.exit(1);
 }
 

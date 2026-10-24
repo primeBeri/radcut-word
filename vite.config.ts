@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig, type Plugin } from "vite";
@@ -24,6 +24,43 @@ function shortcutsJson(): Plugin {
         type: "asset",
         fileName: "shortcuts.json",
         source: readFileSync(shortcutsFile),
+      });
+    },
+  };
+}
+
+/**
+ * Emits `THIRD-PARTY-NOTICES.txt` with the licence of every npm package whose code is in the
+ * bundle (Svelte's runtime and what it imports), as their licences require copies to carry it.
+ * Fails the build for a bundled package without a licence file rather than shipping without it.
+ */
+function thirdPartyNotices(): Plugin {
+  return {
+    name: "radcut-third-party-notices",
+    generateBundle(_options, bundle) {
+      const packageDirs = new Set<string>();
+      for (const output of Object.values(bundle)) {
+        if (output.type !== "chunk") continue;
+        for (const id of output.moduleIds) {
+          const path = id.replace(/^\0/, "").split("?")[0]!.replaceAll("\\", "/");
+          const match = /^(.*\/node_modules\/(?:@[^/]+\/)?[^/]+)\//.exec(path);
+          if (match) packageDirs.add(match[1]!);
+        }
+      }
+      const notices = [...packageDirs]
+        .map((dir) => {
+          const pkg = JSON.parse(readFileSync(`${dir}/package.json`, "utf8")) as { name: string; version: string; license?: string };
+          const licenceFile = readdirSync(dir).find((name) => /^(licen[cs]e|copying)(\.|$)/i.test(name));
+          if (!licenceFile) throw new Error(`third-party-notices: ${pkg.name} is bundled but has no licence file`);
+          const text = readFileSync(`${dir}/${licenceFile}`, "utf8").trim();
+          return { name: pkg.name, text: `${pkg.name} ${pkg.version} (${pkg.license ?? "see below"})\n\n${text}` };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const rule = `\n\n${"-".repeat(72)}\n\n`;
+      this.emitFile({
+        type: "asset",
+        fileName: "THIRD-PARTY-NOTICES.txt",
+        source: `This add-in includes the following third-party software.${rule}${notices.map((n) => n.text).join(rule)}\n`,
       });
     },
   };
@@ -103,6 +140,7 @@ export default defineConfig(async ({ command, mode }) => {
       requestLog(),
       svelte({ configFile: resolve(import.meta.dirname, "svelte.config.js") }),
       shortcutsJson(),
+      thirdPartyNotices(),
       ...(mode === "devpane" ? [devPaneLauncher()] : []),
     ],
     server: { host, port: 3000, strictPort: true, ...(https ? { https } : {}) },
